@@ -9,7 +9,14 @@ on:
       - "src/lib/competitions.ts"
       - ".github/workflows/sync.yml"
   schedule:
-    - cron: "17 */2 * * *"
+    # Spain mainland time; timezone handles summer/winter automatically.
+    # Keep 12 runs/day, moving the two evening slots to common match times.
+    - cron: "17 1-19/2 * * *"
+      timezone: "Europe/Madrid"
+    - cron: "10 21 * * *"
+      timezone: "Europe/Madrid"
+    - cron: "0 23 * * *"
+      timezone: "Europe/Madrid"
   workflow_dispatch:
 permissions:
   contents: read
