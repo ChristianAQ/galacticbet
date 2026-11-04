@@ -303,13 +303,14 @@ export default function ProfilePage({
               </p>
               <p>
                 Los partidos muestran la hora de tu dispositivo. Los resultados
-                se sincronizan cada 2 horas entre las 01:17 y las 19:17, y a las
-                21:10 y las 23:00, en hora peninsular española. La web consulta
-                el calendario cada 5 minutos mientras está visible. Puede haber
+                se sincronizan cada 2 horas, con dos actualizaciones adicionales
+                a las 21:10 y las 23:00 en hora peninsular española. La web
+                consulta el calendario cada 5 minutos mientras está visible.
+                Puede haber
                 retrasos del proveedor o de la tarea programada. Los puntos se
-                recalculan con
-                los partidos finalizados durante esa sincronización; vuelve a
-                entrar en Clasificación para consultar los nuevos totales.
+                recalculan con los partidos finalizados durante esa
+                sincronización; vuelve a entrar en Clasificación para consultar
+                los nuevos totales.
               </p>
             </div>
           </>
