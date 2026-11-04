@@ -168,7 +168,11 @@ it("elige la jornada en juego antes que la siguiente, incluso sin partidos futur
   };
   expect(currentRankingRound([next, base], [r1, r2], now)).toBe(r1);
   expect(
-    currentRankingRound([next, { ...base, status: "FINISHED" }], [r1, r2], now),
+    currentRankingRound(
+      [next, { ...base, status: "FINISHED", homeScore: 1, awayScore: 0 }],
+      [r1, r2],
+      now,
+    ),
   ).toBe(r2);
   expect(
     currentRankingRound([{ ...base, status: "TIMED" }, next], [r1, r2], now),

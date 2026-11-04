@@ -165,10 +165,6 @@ export default function PredictionsPage({
     !busy &&
     !submitting &&
     !isSealed;
-  // Keep the chosen round on screen when its last fixture starts.
-  useEffect(() => {
-    if (selected && selected !== round) setRound(selected);
-  }, [selected, round]);
   useEffect(() => {
     const id = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(id);
@@ -343,7 +339,8 @@ export default function PredictionsPage({
   const chooseRef = useRef(choose);
   chooseRef.current = choose;
   const onChoose = useCallback(
-    (match: Match, value: PredictionValue) => void chooseRef.current(match, value),
+    (match: Match, value: PredictionValue) =>
+      void chooseRef.current(match, value),
     [],
   );
   useEffect(() => {
@@ -583,11 +580,7 @@ export default function PredictionsPage({
               ))}
             </div>
           ) : (
-            <div
-              id="group-predictions"
-              role="region"
-              aria-label="El grupo"
-            >
+            <div id="group-predictions" role="region" aria-label="El grupo">
               {peopleError && (
                 <p className="error" role="alert">
                   {peopleError}

@@ -66,18 +66,6 @@ export default function MatchesPage({
     return [...byDay.values()];
   }, [filtered, selected]);
   const isLeague = LEAGUE_STAGES.includes(days[0]?.[0]?.stage || "");
-  useEffect(() => {
-    if (selected && round !== selected) {
-      setParams(
-        (previous) => {
-          const next = new URLSearchParams(previous);
-          next.set("round", selected);
-          return next;
-        },
-        { replace: true },
-      );
-    }
-  }, [selected, round, setParams]);
   return (
     <>
       <PageTitle eyebrow="CALENDARIO Y RESULTADOS" title="Partidos" />

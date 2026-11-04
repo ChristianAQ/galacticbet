@@ -118,10 +118,70 @@ export function roundLabelFromId(id: string) {
   const parts = id.split("-");
   return roundLabel({ stage: parts[2] || "", matchday: Number(parts[3]) || 0 });
 }
-export function preferredRound(matches: Match[]) {
+export function hasPublishedResult(match: Match) {
   return (
-    matches.find((m) => canPredict(m.utcDate, Date.now(), m.status))?.roundId ||
-    matches.at(-1)?.roundId ||
+    match.status === "FINISHED" &&
+    [match.homeScore, match.awayScore].every(
+      (value) =>
+        typeof value === "number" && Number.isInteger(value) && value >= 0,
+    )
+  );
+}
+
+// Cancelled/awarded fixtures need no played result. Postponed fixtures remain pending.
+export function isRoundComplete(matches: Match[]) {
+  return (
+    matches.length > 0 &&
+    matches.every(
+      (match) =>
+        ["CANCELLED", "AWARDED"].includes(match.status) ||
+        hasPublishedResult(match),
+    )
+  );
+}
+
+export function preferredRound(matches: Match[], now = Date.now()) {
+  const valid = matches.filter((m) => Number.isFinite(Date.parse(m.utcDate)));
+  // An incomplete archived season must not become the current round of a new season.
+  const latestSeasons = new Map<string, string>();
+  for (const match of valid) {
+    const latest = latestSeasons.get(match.competition);
+    if (
+      !latest ||
+      match.seasonId.localeCompare(latest, "es", { numeric: true }) > 0
+    )
+      latestSeasons.set(match.competition, match.seasonId);
+  }
+  const byRound = new Map<string, Match[]>();
+  for (const match of valid) {
+    if (match.seasonId !== latestSeasons.get(match.competition)) continue;
+    const list = byRound.get(match.roundId);
+    if (list) list.push(match);
+    else byRound.set(match.roundId, [match]);
+  }
+  const rounds = [...byRound]
+    .map(([id, list]) => ({
+      id,
+      list,
+      start: Math.min(...list.map((m) => Date.parse(m.utcDate))),
+      started: list.some((m) => hasMatchStarted(m, now)),
+    }))
+    .sort(
+      (a, b) =>
+        a.start - b.start || a.id.localeCompare(b.id, "es", { numeric: true }),
+    );
+  // Wait for the whole started round, including missing final scores and the gap
+  // between Champions match days. A passing kick-off time never closes a round.
+  const current = rounds.find((r) => r.started && !isRoundComplete(r.list));
+  if (current) return current.id;
+  const upcoming = rounds.find(
+    (r) =>
+      !r.started && r.list.some((m) => canPredict(m.utcDate, now, m.status)),
+  );
+  return (
+    upcoming?.id ||
+    rounds.filter((r) => r.started).at(-1)?.id ||
+    rounds.at(-1)?.id ||
     ""
   );
 }

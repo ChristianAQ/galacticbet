@@ -1,4 +1,4 @@
-import type { Match } from "./domain";
+import { hasPublishedResult, type Match } from "./domain";
 export type Side = "home" | "away";
 export type FormResult = "win" | "draw" | "loss";
 export interface TeamIdentity {
@@ -26,21 +26,9 @@ export function teamSide(match: Match, team: TeamIdentity): Side | null {
       : null;
 }
 export function hasRegulationResult(match: Match) {
-  return (
-    match.status === "FINISHED" &&
-    match.homeScore !== null &&
-    match.awayScore !== null &&
-    Number.isInteger(match.homeScore) &&
-    Number.isInteger(match.awayScore) &&
-    match.homeScore >= 0 &&
-    match.awayScore >= 0
-  );
+  return hasPublishedResult(match);
 }
-export function previousResults(
-  target: Match,
-  matches: Match[],
-  now: number,
-) {
+export function previousResults(target: Match, matches: Match[], now: number) {
   const cutoff = Math.min(Date.parse(target.utcDate), now);
   return matches
     .filter(

@@ -53,7 +53,7 @@ export function QuinielaSpotlight({
           </p>
           <Link
             className="button primary full spotlight-cta"
-            to="/quiniela"
+            to={`/quiniela?round=${encodeURIComponent(main.id)}`}
             onClick={() => pick(main.competition)}
           >
             Hacer mi quiniela <ArrowRight size={16} />
@@ -62,7 +62,10 @@ export function QuinielaSpotlight({
             <ul className="spotlight-more">
               {others.map((r) => (
                 <li key={r.id}>
-                  <Link to="/quiniela" onClick={() => pick(r.competition)}>
+                  <Link
+                    to={`/quiniela?round=${encodeURIComponent(r.id)}`}
+                    onClick={() => pick(r.competition)}
+                  >
                     <CompetitionLogo code={r.competition} small />
                     <span>
                       <strong>{competitionName(r.competition, true)}</strong>

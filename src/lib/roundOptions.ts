@@ -1,4 +1,9 @@
-import { hasMatchStarted, roundLabel, type Match } from "./domain";
+import {
+  hasMatchStarted,
+  isRoundComplete,
+  roundLabel,
+  type Match,
+} from "./domain";
 
 export type RoundState = "open" | "live" | "playing" | "finished";
 export interface RoundOption {
@@ -33,7 +38,6 @@ const shortStages: Record<string, string> = {
   QUALIFICATION: "Clasif.",
 };
 const roundStages = ["REGULAR_SEASON", "LEAGUE_STAGE", "GROUP_STAGE"];
-const closedStatuses = ["FINISHED", "AWARDED", "CANCELLED", "POSTPONED"];
 
 export function roundShortLabel(match: Pick<Match, "stage" | "matchday">) {
   if (roundStages.includes(match.stage) && match.matchday)
@@ -59,7 +63,7 @@ export function roundOptions(matches: Match[], now = Date.now()) {
       ["IN_PLAY", "PAUSED"].includes(m.status),
     )
       ? "live"
-      : started && list.every((m) => closedStatuses.includes(m.status))
+      : started && isRoundComplete(list)
         ? "finished"
         : started
           ? "playing"
