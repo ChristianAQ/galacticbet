@@ -2317,6 +2317,10 @@ td {
   margin: 0;
   font-size: 18px;
 }
+/* This heading receives context after saving; it is not an interactive control. */
+.group-view-heading h2:focus {
+  outline: none;
+}
 .match-own-pick {
   display: flex;
   flex-direction: column;

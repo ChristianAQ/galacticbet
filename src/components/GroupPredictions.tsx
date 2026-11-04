@@ -145,7 +145,7 @@ export default function GroupPredictions({
   return (
     <section className="group-predictions" aria-label="Pronósticos del grupo">
       <div className="group-view-heading">
-        <h2>El grupo</h2>
+        <h2 tabIndex={-1}>El grupo</h2>
         {sealed && (
           <span className="round-state saved" role="status">
             Guardada

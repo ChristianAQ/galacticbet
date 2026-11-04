@@ -90,6 +90,7 @@ export default function PredictionsPage({
   const [demoSeals, setDemoSeals] = useState<Record<string, boolean>>({});
   const [confirm, setConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const focusAfterSubmit = useRef(false);
   const [submitError, setSubmitError] = useState("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [peopleError, setPeopleError] = useState("");
@@ -331,6 +332,7 @@ export default function PredictionsPage({
         );
         setSealed({ key: sealKey, value: true, sharing: true });
       }
+      focusAfterSubmit.current = true;
       setConfirm(false);
     } catch (e) {
       setSubmitError(readableError(e));
@@ -345,10 +347,12 @@ export default function PredictionsPage({
     [],
   );
   useEffect(() => {
-    if (isSealed && !submitting) {
+    // Loading an existing delivery must not steal focus or highlight the whole list.
+    if (isSealed && !submitting && focusAfterSubmit.current) {
+      focusAfterSubmit.current = false;
       setConfirm(false);
       document
-        .getElementById("group-predictions")
+        .querySelector<HTMLElement>("#group-predictions .group-view-heading h2")
         ?.focus({ preventScroll: true });
     }
   }, [isSealed, submitting]);
@@ -581,7 +585,6 @@ export default function PredictionsPage({
           ) : (
             <div
               id="group-predictions"
-              tabIndex={-1}
               role="region"
               aria-label="El grupo"
             >
