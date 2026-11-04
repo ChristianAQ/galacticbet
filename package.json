@@ -9,7 +9,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "sync": "tsx scripts/sync.ts",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-galacticbet \"vitest run tests/firestore.rules.test.ts tests/calendarSync.firestore.test.ts\"",
+    "sync:live": "tsx scripts/sync-live.ts",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-galacticbet \"vitest run tests/firestore.rules.test.ts tests/calendarSync.firestore.test.ts tests/sportApi.firestore.test.ts\"",
     "deploy:firestore": "tsx scripts/deploy-firestore.ts"
   },
   "dependencies": {

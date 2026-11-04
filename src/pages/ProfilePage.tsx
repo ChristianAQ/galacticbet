@@ -306,9 +306,10 @@ export default function ProfilePage({
                 se sincronizan cada 2 horas, con dos actualizaciones adicionales
                 a las 21:10 y las 23:00 en hora peninsular española. La web
                 consulta el calendario cada 5 minutos mientras está visible.
-                Puede haber
-                retrasos del proveedor o de la tarea programada. Los puntos se
-                recalculan con los partidos finalizados durante esa
+                SportAPI se comprueba cada 10 minutos cuando hay partidos
+                próximos o recientes, para adelantar resultados y puntos. Puede
+                haber retrasos del proveedor o de la tarea programada. Los
+                puntos se recalculan con los partidos finalizados durante esa
                 sincronización; vuelve a entrar en Clasificación para consultar
                 los nuevos totales.
               </p>

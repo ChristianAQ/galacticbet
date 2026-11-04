@@ -18,6 +18,11 @@
     }
   ],
   "fieldOverrides": [
+    {
+      "collectionGroup": "providerBudgets",
+      "fieldPath": "reservations",
+      "indexes": []
+    },
     { "collectionGroup": "teamDirectory", "fieldPath": "teams", "indexes": [] },
     { "collectionGroup": "news", "fieldPath": "articles", "indexes": [] },
     {

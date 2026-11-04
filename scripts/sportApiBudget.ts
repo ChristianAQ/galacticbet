@@ -1,8 +1,8 @@
 import type { Firestore } from "firebase-admin/firestore";
 
-// Preparatory infrastructure. No SportAPI HTTP client is enabled until its API contract is verified.
 export const SPORTAPI_WINDOW_MS = 24 * 60 * 60_000;
 export const SPORTAPI_REQUEST_LIMIT = 1800;
+export const SPORTAPI_MONTH_LIMIT = 12000;
 export const SPORTAPI_RUN_LIMIT = 40;
 interface Reservation {
   id: string;
@@ -12,6 +12,8 @@ interface Reservation {
 export interface SportApiLedger {
   version: 1;
   reservations: Reservation[];
+  month?: string;
+  monthUsed?: number;
 }
 
 function parseLedger(value: unknown): SportApiLedger {
@@ -21,6 +23,10 @@ function parseLedger(value: unknown): SportApiLedger {
   const ledger = value as SportApiLedger;
   if (
     ledger.version !== 1 ||
+    (ledger.month !== undefined && !/^\d{4}-\d{2}$/.test(ledger.month)) ||
+    (ledger.monthUsed !== undefined &&
+      (!Number.isSafeInteger(ledger.monthUsed) || ledger.monthUsed < 0)) ||
+    (ledger.month === undefined) !== (ledger.monthUsed === undefined) ||
     !Array.isArray(ledger.reservations) ||
     ledger.reservations.length > SPORTAPI_REQUEST_LIMIT ||
     ledger.reservations.some(
@@ -58,19 +64,35 @@ export function allocateSportApiRequests(
   )
     throw new Error("SportAPI: reserva inválida.");
   const old = parseLedger(value);
+  const month = new Date(now).toISOString().slice(0, 7);
+  if (old.month && old.month > month)
+    throw new Error(
+      "SportAPI: reloj anterior al contador mensual; consultas bloqueadas.",
+    );
+  const monthUsed = old.month === month ? old.monthUsed! : 0;
   const reservations = old.reservations.filter(
     (r) => r.at >= now - SPORTAPI_WINDOW_MS,
   );
   // A repeated job must not spend the same reservation again, even after a crash.
   if (reservations.some((r) => r.id === runId))
-    return { ledger: { version: 1, reservations }, granted: 0 };
+    return {
+      ledger: { version: 1, reservations, month, monthUsed },
+      granted: 0,
+    };
   const used = reservations.reduce((total, r) => total + r.count, 0);
   const granted = Math.max(
     0,
-    Math.min(requested, SPORTAPI_REQUEST_LIMIT - used),
+    Math.min(
+      requested,
+      SPORTAPI_REQUEST_LIMIT - used,
+      SPORTAPI_MONTH_LIMIT - monthUsed,
+    ),
   );
   if (granted) reservations.push({ id: runId, at: now, count: granted });
-  return { ledger: { version: 1, reservations }, granted };
+  return {
+    ledger: { version: 1, reservations, month, monthUsed: monthUsed + granted },
+    granted,
+  };
 }
 
 /** One transaction per job reserves the whole block: no Firestore operation per HTTP call. */

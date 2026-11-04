@@ -8,6 +8,7 @@ import { type ApiMatch } from "./normalize";
 import { syncCalendars } from "./calendarSync";
 import { recompute } from "./recompute";
 import { syncMatchInsights } from "./syncMatchInsights";
+import { syncSportApi } from "./syncSportApi";
 const token = process.env.FOOTBALL_DATA_TOKEN;
 if (!token) throw new Error("Falta FOOTBALL_DATA_TOKEN (solo backend).");
 // GitHub secret may contain a service-account JSON. Never log it or place it in VITE_*.
@@ -147,3 +148,12 @@ async function sync() {
 }
 
 await sync();
+if (process.env.SPORTAPI_KEY?.trim()) {
+  try {
+    await syncSportApi(db, process.env.SPORTAPI_KEY);
+  } catch {
+    console.warn(
+      "SportAPI: actualización rápida pendiente; se conservan los calendarios y puntos oficiales.",
+    );
+  }
+}

@@ -23,6 +23,8 @@ export function calendarMatch(m: Match): Match {
     halfTimeHomeScore: m.halfTimeHomeScore,
     halfTimeAwayScore: m.halfTimeAwayScore,
     winner: m.winner,
+    resultProvider: m.resultProvider,
+    sportApiId: m.sportApiId,
     homeCrest: m.homeCrest,
     awayCrest: m.awayCrest,
     homeScore: m.homeScore,
@@ -55,6 +57,9 @@ export function validCalendarMatch(value: unknown): value is Match {
     ) &&
     Number.isFinite(Date.parse(m.utcDate as string)) &&
     Number.isInteger(m.matchday) &&
+    (m.resultProvider === undefined || m.resultProvider === "SportAPI") &&
+    (m.sportApiId === undefined ||
+      (typeof m.sportApiId === "string" && /^\d{1,30}$/.test(m.sportApiId))) &&
     [m.homeTeamId, m.awayTeamId].every(
       (id) => id === undefined || id === null || Number.isInteger(id),
     ) &&

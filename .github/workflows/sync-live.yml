@@ -1,0 +1,34 @@
+name: Update live football scores
+on:
+  schedule:
+    - cron: "3-53/10 * * * *"
+      timezone: "UTC"
+  push:
+    branches: [master]
+    paths:
+      - "scripts/sportApi*.ts"
+      - "scripts/syncSportApi.ts"
+      - "scripts/sync-live.ts"
+      - ".github/workflows/sync-live.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: football-sync
+  cancel-in-progress: false
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run sync:live
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SPORTAPI_KEY: ${{ secrets.SPORTAPI_KEY }}
+          SPORTAPI_VERIFY: ${{ github.event_name != 'schedule' }}

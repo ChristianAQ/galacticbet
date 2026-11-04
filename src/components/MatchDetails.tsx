@@ -60,7 +60,13 @@ export default function MatchDetails({
                 : "vs"}
           </strong>
           <small>{matchStatusLabel[match.status] || match.status}</small>
-          {resultKnown && <small>A 90 minutos</small>}
+          {resultKnown && (
+            <small>
+              {match.status === "FINISHED"
+                ? "A 90 minutos"
+                : "Marcador en juego"}
+            </small>
+          )}
         </div>
         <div>
           <Team name={match.away} crest={match.awayCrest} />
@@ -76,6 +82,13 @@ export default function MatchDetails({
           }).format(new Date(match.utcDate))}
         </time>
       </p>
+      {match.resultProvider === "SportAPI" &&
+        match.status !== "FINISHED" &&
+        !demo && (
+          <p className="match-data-note">
+            Resultado: SportAPI · actualización periódica.
+          </p>
+        )}
       {!demo && <MatchMeta insight={insights.insight} />}
       {!demo && <MatchCalendarAction match={match} />}
       {upcoming && <MatchPreview match={match} matches={matches} />}

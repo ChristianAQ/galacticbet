@@ -32,6 +32,8 @@ export interface Match {
   halfTimeHomeScore?: number | null;
   halfTimeAwayScore?: number | null;
   winner?: Outcome | null;
+  resultProvider?: "SportAPI";
+  sportApiId?: string;
   homeCrest?: string;
   awayCrest?: string;
   homeScore: number | null;

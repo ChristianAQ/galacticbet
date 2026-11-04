@@ -112,6 +112,9 @@ export default function MatchResult({
           </div>
         </div>
       </div>
+      {match.resultProvider === "SportAPI" && !demo && (
+        <p className="match-data-note">Resultado: SportAPI · 90 minutos.</p>
+      )}
       {showStatistics && (
         <div
           id={panelId}

@@ -13,6 +13,7 @@ import {
 import type { Match } from "../src/lib/domain";
 import { normalize, type ApiMatch } from "./normalize";
 import { roundRequirements, requiresDelivery } from "../src/lib/roundDelivery";
+import { preserveSportResult } from "./sportApi";
 
 function roundMetadata(fixtures: Match[], policyFrom: string) {
   const rounds = new Map<string, Match[]>();
@@ -72,11 +73,18 @@ export async function syncCalendars(
   }
   const cache = new Map<string, Match[]>();
   for (const [seasonId, entries] of seasons) {
-    const fixtures = entries.map((entry) => entry.match);
-    const data = snapshotData(seasonId, fixtures);
     const ref = db.doc(`calendars/${seasonId}`);
     const previous = await ref.get();
     const previousData = previous.data();
+    const oldFixtures = previous.exists ? decodeCalendar(previousData!) : [];
+    const oldById = new Map(oldFixtures.map((m) => [m.id, m]));
+    for (const entry of entries)
+      entry.match = preserveSportResult(
+        entry.match,
+        oldById.get(entry.match.id),
+      );
+    const fixtures = entries.map((entry) => entry.match);
+    const data = snapshotData(seasonId, fixtures);
     const policyFrom: string =
       previousData?.deliveryPolicyFrom || new Date().toISOString();
     policies.set(seasonId, policyFrom);
@@ -91,7 +99,6 @@ export async function syncCalendars(
       );
       continue;
     }
-    const oldFixtures = previous.exists ? decodeCalendar(previousData!) : [];
     const previousById = new Map(
       oldFixtures.map((m) => [m.id, encodeCalendar([m])]),
     );
