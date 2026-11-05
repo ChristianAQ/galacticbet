@@ -2566,23 +2566,29 @@ td {
 }
 
 .standings-heading {
-  background: var(--surface-header);
-  border-bottom: 1px solid var(--surface-border);
-  margin-bottom: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 15px;
-  padding: 22px 20px 15px;
+  gap: 12px;
+  margin: 6px 0 14px;
+}
+.standings-heading > div {
+  min-width: 0;
 }
 .standings-heading h2 {
-  margin: 0 0 7px;
+  margin: 0 0 4px;
   font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .standings-heading p {
   margin: 0;
   font-size: 12px;
   color: #9ba4b4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .standings-heading > span {
   font-size: 11px;
@@ -2590,7 +2596,7 @@ td {
   white-space: nowrap;
 }
 .standings-note {
-  margin: 0 20px 15px;
+  margin: 0 0 14px;
   padding: 12px;
   border: 1px solid #303a4b;
   border-radius: 7px;
@@ -2636,14 +2642,6 @@ td {
   font-size: 17px;
 }
 @media (max-width: 600px) {
-  .standings-heading {
-    flex-wrap: wrap;
-    padding: 18px 12px 12px;
-  }
-  .standings-note {
-    margin-left: 12px;
-    margin-right: 12px;
-  }
   .standings-table th,
   .standings-table td {
     padding: 14px 8px;
@@ -3408,9 +3406,6 @@ td {
   height: 17px;
   accent-color: var(--green);
 }
-.standings-panel {
-  min-height: 300px;
-}
 .standings-skeleton,
 .page-skeleton {
   display: grid;
@@ -3478,13 +3473,7 @@ td {
 }
 
 /* Shared compact context and filters for predictions, standings and fixtures. */
-.standings-panel {
-  overflow: hidden;
-}
 @media (max-width: 760px) {
-  .standings-heading {
-    padding: 16px 14px;
-  }
   .profile-identity {
     margin: -20px -20px 20px;
     padding: 16px;
@@ -3723,4 +3712,13 @@ a.schedule-fixture:active {
 .private-gate-text {
   display: block;
   margin-bottom: 14px;
+}
+.standings-body {
+  min-height: 300px;
+}
+.standings-card {
+  overflow: hidden;
+}
+.standings-body > .empty.panel {
+  padding: 28px 16px;
 }

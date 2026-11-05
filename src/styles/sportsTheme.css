@@ -463,28 +463,24 @@ body {
   gap: 10px;
 }
 .match-day + .match-day {
-  margin-top: 14px;
+  margin-top: 8px;
 }
-/* Day separator: weekday, date, hairline rule and count; sticks while scrolling. */
+/* Day separator: a quiet label with a hairline rule. */
 .match-day-title {
-  position: sticky;
-  top: 0;
-  z-index: 5;
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 7px;
   margin: 0;
-  padding: 10px 2px 8px;
-  background: linear-gradient(#111317 75%, #11131700);
-  font-size: 13px;
+  padding: 12px 2px 2px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 .match-day-name {
-  color: #f1f3f6;
-  font-size: 15px;
-  font-weight: 750;
-  letter-spacing: -0.01em;
-  text-transform: capitalize;
+  color: #c6ccd7;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .match-day-title.is-near .match-day-name {
   color: var(--brand-accent);
@@ -501,16 +497,9 @@ body {
   background: linear-gradient(90deg, var(--border), transparent);
 }
 .match-day-count {
-  color: var(--muted);
-  font-size: 11px;
+  color: #7d8592;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-@media (max-width: 760px) {
-  .match-day-title {
-    top: calc(73px + var(--safe-area-top));
-  }
 }
 
 /* Pending deliveries: only while the round is open and someone is missing. */
@@ -986,7 +975,10 @@ body {
 .group-picker {
   position: relative;
   display: flex;
+  flex-direction: row;
   align-items: center;
+  margin: 0;
+  font-size: 14px;
   gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
@@ -1004,10 +996,12 @@ body {
 }
 .group-picker select {
   flex: 1;
+  width: auto;
   min-width: 0;
   height: 42px;
-  padding: 0 24px 0 0;
+  padding: 0 26px 0 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -1026,7 +1020,9 @@ body {
 }
 .group-picker > svg:last-child {
   position: absolute;
+  top: 50%;
   right: 12px;
+  transform: translateY(-50%);
   color: var(--muted);
   pointer-events: none;
 }

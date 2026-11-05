@@ -211,7 +211,7 @@ function GroupStandings({
         />
       )}
       <div
-        className="panel standings-panel"
+        className="standings-body"
         aria-busy={Boolean(selectedGroup && !data && !error)}
       >
         {!selectedGroup ? (
@@ -219,7 +219,7 @@ function GroupStandings({
             Selecciona un grupo para ver a todos sus participantes y sus puntos.
           </Empty>
         ) : error ? (
-          <div role="alert" className="empty">
+          <div role="alert" className="empty panel">
             <h3>No se pudo cargar la clasificación</h3>
             <p>{error}</p>
             <button className="button secondary" onClick={retry}>
@@ -302,89 +302,96 @@ function GroupStandings({
               <Podium rows={rows} userId={user.uid} />
             )}
             <MyRankCard rows={rows} userId={user.uid} showHits={showHits} />
-            <table
-              className={`standings-table${showHits ? "" : " standings-points-only"}${latest ? " has-latest" : ""}`}
-            >
-              <caption className="sr-only">
-                {selectedGroup.name} · {title}
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Pos.</th>
-                  <th scope="col">Jugador</th>
-                  {latest && (
-                    <th scope="col" title={`Puntos en ${latestLabel}`}>
-                      Últ.
-                    </th>
-                  )}
-                  {showHits && (
-                    <th scope="col" title="Aciertos">
-                      Acie.
-                    </th>
-                  )}
-                  <th scope="col">Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const moved = movement?.get(r.id) || 0;
-                  return (
-                    <tr
-                      key={r.id}
-                      className={r.id === user.uid ? "standings-me" : undefined}
-                    >
-                      <td>
-                        <span className="standings-position">
-                          <RankBadge position={r.position} />
-                          {moved !== 0 && (
-                            <span
-                              className={`standings-move ${moved > 0 ? "is-up" : "is-down"}`}
-                              aria-label={`${moved > 0 ? "Sube" : "Baja"} ${Math.abs(moved)} ${Math.abs(moved) === 1 ? "puesto" : "puestos"}`}
-                            >
-                              {moved > 0 ? (
-                                <ChevronUp size={12} aria-hidden="true" />
-                              ) : (
-                                <ChevronDown size={12} aria-hidden="true" />
-                              )}
-                              {Math.abs(moved)}
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <th scope="row">
-                        <span className="standings-player">
-                          <RankAvatar name={r.name} avatar={r.avatar} />
-                          <span className="standings-name">
-                            <span>
-                              {r.name}
-                              {r.id === user.uid && <small> Tú</small>}
-                            </span>
-                            <span className="standings-bar" aria-hidden="true">
-                              <i
-                                style={{
-                                  width: `${leaderPoints ? (r.points / leaderPoints) * 100 : 0}%`,
-                                }}
-                              />
+            <div className="panel standings-card">
+              <table
+                className={`standings-table${showHits ? "" : " standings-points-only"}${latest ? " has-latest" : ""}`}
+              >
+                <caption className="sr-only">
+                  {selectedGroup.name} · {title}
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Pos.</th>
+                    <th scope="col">Jugador</th>
+                    {latest && (
+                      <th scope="col" title={`Puntos en ${latestLabel}`}>
+                        Últ.
+                      </th>
+                    )}
+                    {showHits && (
+                      <th scope="col" title="Aciertos">
+                        Ac.
+                      </th>
+                    )}
+                    <th scope="col">Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const moved = movement?.get(r.id) || 0;
+                    return (
+                      <tr
+                        key={r.id}
+                        className={
+                          r.id === user.uid ? "standings-me" : undefined
+                        }
+                      >
+                        <td>
+                          <span className="standings-position">
+                            <RankBadge position={r.position} />
+                            {moved !== 0 && (
+                              <span
+                                className={`standings-move ${moved > 0 ? "is-up" : "is-down"}`}
+                                aria-label={`${moved > 0 ? "Sube" : "Baja"} ${Math.abs(moved)} ${Math.abs(moved) === 1 ? "puesto" : "puestos"}`}
+                              >
+                                {moved > 0 ? (
+                                  <ChevronUp size={12} aria-hidden="true" />
+                                ) : (
+                                  <ChevronDown size={12} aria-hidden="true" />
+                                )}
+                                {Math.abs(moved)}
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <th scope="row">
+                          <span className="standings-player">
+                            <RankAvatar name={r.name} avatar={r.avatar} />
+                            <span className="standings-name">
+                              <span>
+                                {r.name}
+                                {r.id === user.uid && <small> Tú</small>}
+                              </span>
+                              <span
+                                className="standings-bar"
+                                aria-hidden="true"
+                              >
+                                <i
+                                  style={{
+                                    width: `${leaderPoints ? (r.points / leaderPoints) * 100 : 0}%`,
+                                  }}
+                                />
+                              </span>
                             </span>
                           </span>
-                        </span>
-                      </th>
-                      {latest && (
-                        <td className="standings-latest">
-                          {latestPoints.get(r.id)
-                            ? `+${latestPoints.get(r.id)}`
-                            : "0"}
+                        </th>
+                        {latest && (
+                          <td className="standings-latest">
+                            {latestPoints.get(r.id)
+                              ? `+${latestPoints.get(r.id)}`
+                              : "0"}
+                          </td>
+                        )}
+                        {showHits && <td>{r.hits}</td>}
+                        <td>
+                          <strong>{r.points}</strong>
                         </td>
-                      )}
-                      {showHits && <td>{r.hits}</td>}
-                      <td>
-                        <strong>{r.points}</strong>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
             {latest && (
               <p className="standings-footnote">
                 «Últ.»: puntos de {latestLabel}. Las flechas indican los puestos
