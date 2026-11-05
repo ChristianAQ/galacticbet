@@ -1,7 +1,7 @@
 import { competitionName } from "../lib/competitions";
 import type { User } from "firebase/auth";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Empty, PageTitle, PrivateGate } from "../components/ui";
 import { type Group } from "../lib/data";
@@ -48,21 +48,31 @@ export default function StandingsPage({
   user: User | null;
   onLogin: () => void;
 }) {
+  if (user && groups.length)
+    return <GroupStandings groups={groups} matches={matches} user={user} />;
   return (
     <>
-      <PageTitle eyebrow="CADA ACIERTO SUMA" title="Clasificación" />
+      <StandingsTitle />
       {!user ? (
         <PrivateGate onLogin={onLogin} />
-      ) : !groups.length ? (
+      ) : (
         <Empty title="Tu grupo, en la tabla">
           <Link to="/grupos">
             Crea un grupo o únete con un código de invitación.
           </Link>
         </Empty>
-      ) : (
-        <GroupStandings groups={groups} matches={matches} user={user} />
       )}
     </>
+  );
+}
+
+function StandingsTitle({ action }: { action?: ReactNode }) {
+  return (
+    <PageTitle
+      eyebrow="CADA ACIERTO SUMA"
+      title="Clasificación"
+      titleControl={action}
+    />
   );
 }
 
@@ -166,6 +176,7 @@ function GroupStandings({
     period === "round" ? selectedRound : "",
   );
   const hasPoints = rows.some((r) => r.points > 0);
+  const shareGroup = selectedGroup?.name || "";
   const leaderPoints = rows[0]?.points || 0;
   const scopeName =
     scope === "global" ? "Todas las competiciones" : competitionName(scope);
@@ -176,6 +187,40 @@ function GroupStandings({
 
   return (
     <>
+      <StandingsTitle
+        action={
+          <ShareTrigger
+            label="Compartir"
+            disabled={!data || !rows.length}
+            onClick={() => setSharing(true)}
+          />
+        }
+      />
+      {sharing && data && (
+        <Suspense fallback={null}>
+          <ShareDialog
+            title={`Clasificación · ${shareGroup}`}
+            filename={shareFileName("clasificacion", shareGroup, title)}
+            text={standingsText({
+              groupName: shareGroup,
+              title,
+              rows,
+              showHits,
+            })}
+            render={() =>
+              import("../lib/shareImage").then((m) =>
+                m.standingsImage({
+                  groupName: shareGroup,
+                  title,
+                  rows,
+                  showHits,
+                }),
+              )
+            }
+            onClose={() => setSharing(false)}
+          />
+        </Suspense>
+      )}
       <PageFilters
         groups={groups}
         groupId={groupId}
@@ -242,62 +287,6 @@ function GroupStandings({
             className="ranking-view"
             key={`${groupId}:${scope}:${period}:${selectedRound}`}
           >
-            <div className="standings-heading">
-              <div>
-                <h2>{selectedGroup.name}</h2>
-                <p>
-                  {title} · {rows.length}{" "}
-                  {rows.length === 1 ? "participante" : "participantes"}
-                </p>
-              </div>
-              <ShareTrigger
-                label="Compartir"
-                disabled={!rows.length}
-                onClick={() => setSharing(true)}
-              />
-            </div>
-            {sharing && (
-              <Suspense fallback={null}>
-                <ShareDialog
-                  title={`Clasificación · ${selectedGroup.name}`}
-                  filename={shareFileName(
-                    "clasificacion",
-                    selectedGroup.name,
-                    title,
-                  )}
-                  text={standingsText({
-                    groupName: selectedGroup.name,
-                    title,
-                    rows,
-                    showHits,
-                  })}
-                  render={() =>
-                    import("../lib/shareImage").then((m) =>
-                      m.standingsImage({
-                        groupName: selectedGroup.name,
-                        title,
-                        rows,
-                        showHits,
-                      }),
-                    )
-                  }
-                  onClose={() => setSharing(false)}
-                />
-              </Suspense>
-            )}
-            {roundUnavailable ? (
-              <p className="standings-note" role="status">
-                Aún no hay jornadas disponibles para esta competición. Estos son
-                los participantes, con 0 puntos para esta vista.
-              </p>
-            ) : (
-              !hasPoints && (
-                <p className="standings-note" role="status">
-                  Todos en la línea de salida. Los puntos aparecerán cuando se
-                  puntúen los primeros resultados.
-                </p>
-              )
-            )}
             {hasPoints && rows.length >= 2 && (
               <Podium rows={rows} userId={user.uid} />
             )}

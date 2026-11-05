@@ -2565,45 +2565,6 @@ td {
   }
 }
 
-.standings-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 6px 0 14px;
-}
-.standings-heading > div {
-  min-width: 0;
-}
-.standings-heading h2 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.standings-heading p {
-  margin: 0;
-  font-size: 12px;
-  color: #9ba4b4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.standings-heading > span {
-  font-size: 11px;
-  color: #9ba4b4;
-  white-space: nowrap;
-}
-.standings-note {
-  margin: 0 0 14px;
-  padding: 12px;
-  border: 1px solid #303a4b;
-  border-radius: 7px;
-  color: #9ba4b4;
-  font-size: 12px;
-  line-height: 1.6;
-}
 .standings-table {
   table-layout: fixed;
 }

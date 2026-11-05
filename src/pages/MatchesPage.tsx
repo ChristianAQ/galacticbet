@@ -10,6 +10,7 @@ import { preferredRound, type Match } from "../lib/domain";
 import { preferenceStore } from "../lib/preferences";
 import { roundOptions } from "../lib/roundOptions";
 import { usePreferences } from "../lib/useGroupSelection";
+import { useStuck } from "../lib/useStuck";
 
 const dayTitle = new Intl.DateTimeFormat("es", {
   weekday: "long",
@@ -34,15 +35,24 @@ function DayTitle({ date, count }: { date: string; count: number }) {
       : day.toDateString() === tomorrow.toDateString()
         ? "Mañana"
         : "";
+  // Background only while pinned, so the resting list stays light.
+  const { sentinel, stuck } = useStuck();
   return (
-    <h2 className={`match-day-title${relative ? " is-near" : ""}`}>
-      <span className="match-day-name">{relative || weekday.format(day)}</span>
-      <span className="match-day-date">{dayMonth.format(day)}</span>
-      <i className="match-day-rule" aria-hidden="true" />
-      <span className="match-day-count">
-        {count} {count === 1 ? "partido" : "partidos"}
-      </span>
-    </h2>
+    <>
+      <span ref={sentinel} className="sticky-sentinel" aria-hidden="true" />
+      <h2
+        className={`match-day-title${relative ? " is-near" : ""}${stuck ? " is-stuck" : ""}`}
+      >
+        <span className="match-day-name">
+          {relative || weekday.format(day)}
+        </span>
+        <span className="match-day-date">{dayMonth.format(day)}</span>
+        <i className="match-day-rule" aria-hidden="true" />
+        <span className="match-day-count">
+          {count} {count === 1 ? "partido" : "partidos"}
+        </span>
+      </h2>
+    </>
   );
 }
 

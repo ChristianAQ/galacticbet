@@ -33,6 +33,7 @@ import { preferenceStore } from "../lib/preferences";
 import { roundOptions } from "../lib/roundOptions";
 import { useGroupSelection } from "../lib/useGroupSelection";
 import { useRoundDelivery } from "../lib/useRoundDelivery";
+import { useStuck } from "../lib/useStuck";
 
 const demoPlayers: Participant[] = [
   { id: "demo-me", name: "Tú", avatar: null },
@@ -103,6 +104,8 @@ export default function PredictionsPage({
   const current = useMemo(() => preferredRound(filtered), [filtered, minute]);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  // The progress panel pins under the app bar and slims down while scrolling.
+  const { sentinel: saveSentinel, stuck: saveStuck } = useStuck();
   const requestedRound = searchParams.get("round") || "";
   const selected = rounds.some((r) => r.id === round)
     ? round
@@ -484,9 +487,10 @@ export default function PredictionsPage({
             clock={clock}
             userId={uid}
           />
+          {!isSealed && <div ref={saveSentinel} className="sticky-sentinel" />}
           {!isSealed && (
             <section
-              className="round-save-panel panel"
+              className={`round-save-panel panel${saveStuck ? " is-stuck" : ""}`}
               aria-label="Estado de la quiniela"
               aria-busy={pending || submitting}
             >
@@ -531,7 +535,7 @@ export default function PredictionsPage({
                 }}
               >
                 <Save size={16} />
-                Guardar quiniela
+                Guardar<span className="round-save-long"> quiniela</span>
               </button>
             </section>
           )}

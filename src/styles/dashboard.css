@@ -265,18 +265,6 @@
   white-space: nowrap;
 }
 /* Standings views */
-.standings-heading-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  color: var(--green);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.standings-heading-link:hover {
-  color: var(--brand-accent);
-}
 .league-table {
   table-layout: auto;
   font-size: 13px;
@@ -673,9 +661,6 @@
   color: var(--brand-accent);
   font-size: 12.5px;
   font-weight: 700;
-}
-.standings-heading .share-trigger {
-  flex-shrink: 0;
 }
 .standings-footnote {
   margin: 0;
