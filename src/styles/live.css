@@ -225,12 +225,6 @@
   font-size: 11px;
   margin-left: 4px;
 }
-.round-board-note {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1.45;
-}
 .group-view-actions {
   display: flex;
   align-items: center;
@@ -242,6 +236,10 @@
 }
 .rival-selection.pick-hit strong {
   color: #8cdb63;
+}
+/* Own pick: a hit only recolours the prediction, without the green frame. */
+.rival-selection.compact.pick-hit {
+  box-shadow: none;
 }
 .rival-selection.pick-miss {
   opacity: 0.6;

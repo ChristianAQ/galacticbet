@@ -33,7 +33,7 @@ import {
   type PickState,
   type RoundPlayer,
 } from "../lib/roundBoard";
-import { quinielaText, shareFileName } from "../lib/shareSummary";
+import { shareFileName } from "../lib/shareSummary";
 
 const ShareDialog = lazy(() => import("./ShareDialog"));
 
@@ -223,7 +223,7 @@ export default function GroupPredictions({
           <ShareDialog
             title={`Quiniela · ${roundTitle}`}
             filename={shareFileName("quiniela", groupName, roundTitle)}
-            text={quinielaText(share)}
+            text={`Quiniela · ${roundTitle}`}
             render={() =>
               import("../lib/shareImage").then((m) => m.quinielaImage(share))
             }
@@ -293,11 +293,6 @@ function RoundBoardPanel({
           </li>
         ))}
       </ol>
-      <p className="round-board-note">
-        Solo entre quienes han entregado. Los puntos en verde se suman si los
-        partidos en juego terminan así. La clasificación oficial la calcula el
-        servidor.
-      </p>
     </section>
   );
 }
