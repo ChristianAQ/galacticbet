@@ -7,6 +7,7 @@ import { syncCalendars } from "./calendarSync";
 import { recompute } from "./recompute";
 import { syncMatchInsights } from "./syncMatchInsights";
 import { syncNews } from "./syncNews";
+import { syncOdds } from "./syncOdds";
 import { syncTeamDirectory } from "./syncTeamDirectory";
 
 export const SYNC_STATUS_DOC = "syncStatus/football";
@@ -122,6 +123,17 @@ export async function officialSync(db: Firestore, token: string) {
       // Optional enrichment must never prevent official results or points updating.
       console.warn(
         "::warning::No se pudieron actualizar los detalles complementarios de ESPN. Los calendarios y puntos oficiales ya se han sincronizado.",
+      );
+    }
+  }
+  const oddsKey = process.env.ODDS_API_KEY?.trim();
+  if (oddsKey) {
+    try {
+      await syncOdds(db, oddsKey, [...cache.values()].flat());
+    } catch {
+      // Informational odds never block official results or points.
+      console.warn(
+        "::warning::No se pudieron actualizar las cuotas. Los resultados oficiales están guardados.",
       );
     }
   }

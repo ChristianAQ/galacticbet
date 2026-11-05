@@ -1,5 +1,5 @@
 import { isCompetition, type CompetitionCode } from "../lib/competitions";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, Target, Trophy } from "lucide-react";
 import { knockoutContext } from "../lib/matchInsights";
@@ -13,7 +13,6 @@ import { preferenceStore } from "../lib/preferences";
 import { roundOptions } from "../lib/roundOptions";
 import { usePreferences } from "../lib/useGroupSelection";
 
-const MatchDetails = lazy(() => import("../components/MatchDetails"));
 const dayTitle = new Intl.DateTimeFormat("es", {
   weekday: "long",
   day: "numeric",
@@ -40,8 +39,6 @@ export default function MatchesPage({
     ? requested
     : preferences.competition;
   const round = params.get("round") || "";
-  const [detailId, setDetailId] = useState("");
-  const detail = matches.find((m) => m.id === detailId);
   // A competition opened from a link becomes the shared choice for quiniela and standings.
   useEffect(() => {
     if (isCompetition(requested))
@@ -134,11 +131,11 @@ export default function MatchesPage({
               {items.map((m) => {
                 const tie = knockoutContext(m, matches);
                 return (
-                  <button
+                  <Link
                     key={m.id}
                     className="panel fixture-card-button"
                     aria-label={`Ver ficha de ${m.home} contra ${m.away}`}
-                    onClick={() => setDetailId(m.id)}
+                    to={`/partido/${encodeURIComponent(m.id)}`}
                   >
                     <MatchRow match={m} history={matches} as="span" />
                     <span className="fixture-card-footer">
@@ -146,7 +143,7 @@ export default function MatchesPage({
                       Ver ficha del partido
                       <ArrowUpRight size={15} />
                     </span>
-                  </button>
+                  </Link>
                 );
               })}
             </section>
@@ -165,17 +162,6 @@ export default function MatchesPage({
           </Empty>
         )}
       </div>
-      {detail && (
-        <Suspense fallback={null}>
-          <MatchDetails
-            key={detail.id}
-            match={detail}
-            matches={matches}
-            demo={demo}
-            onClose={() => setDetailId("")}
-          />
-        </Suspense>
-      )}
     </>
   );
 }

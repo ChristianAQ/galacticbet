@@ -22,6 +22,8 @@ service cloud.firestore {
   match /matchInsights/{id} { allow get: if true; }
   // Single public live board (scores, minute, goals and cards); backend writes only.
   match /live/football { allow get: if true; }
+  // Informational 1X2 prices from public bookmakers; backend writes only.
+  match /odds/football { allow get: if true; }
   match /groups/{gid} {
    // A high-entropy document ID is an invitation capability. Lists remain member-only.
    allow get: if signed();

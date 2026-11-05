@@ -32,6 +32,8 @@
     },
     { "collectionGroup": "calendars", "fieldPath": "payload", "indexes": [] },
     { "collectionGroup": "live", "fieldPath": "matches", "indexes": [] },
+    { "collectionGroup": "odds", "fieldPath": "matches", "indexes": [] },
+    { "collectionGroup": "odds", "fieldPath": "checked", "indexes": [] },
     { "collectionGroup": "players", "fieldPath": "selections", "indexes": [] },
     {
       "collectionGroup": "roundAttendance",

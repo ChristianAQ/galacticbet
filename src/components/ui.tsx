@@ -170,10 +170,10 @@ export function PrivateGate({
 }) {
   return (
     <Empty title="Tu quiniela te espera">
-      <p>
+      <span className="private-gate-text">
         Inicia sesión para jugar con tus amigos y conservar tus pronósticos en
         todos tus dispositivos.
-      </p>
+      </span>
       <button className="button primary" onClick={onLogin}>
         Iniciar sesión <ArrowRight size={16} />
       </button>

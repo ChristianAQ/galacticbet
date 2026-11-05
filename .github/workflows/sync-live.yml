@@ -37,6 +37,7 @@ jobs:
           SPORTAPI_KEY: ${{ secrets.SPORTAPI_KEY }}
           SPORTAPI_VERIFY: ${{ github.event_name != 'schedule' }}
           FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           ESPN_NEWS: ${{ vars.ESPN_NEWS }}
           ESPN_MATCH_DETAILS: ${{ vars.ESPN_MATCH_DETAILS }}
           LIVE_LOOP_MINUTES: "25"

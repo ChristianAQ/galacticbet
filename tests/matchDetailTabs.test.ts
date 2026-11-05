@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableMatchTabs } from "../src/lib/matchDetailTabs";
+import { availableMatchTabs, matchPageTabs } from "../src/lib/matchDetailTabs";
 import type { Match } from "../src/lib/domain";
 import type { MatchInsight } from "../src/lib/matchInsightsData";
 const now = Date.parse("2026-10-28T10:00:00Z");
@@ -137,4 +137,33 @@ it("muestra los enfrentamientos solo en la previa y cuando existen datos", () =>
   expect(
     availableMatchTabs({ ...match, status: "FINISHED" }, history, now),
   ).toEqual([]);
+});
+
+describe("Menú de la página del partido", () => {
+  const lineups = [
+    { side: "home" as const, players: [{ name: "A", starter: true }] },
+  ];
+  const statistics = [{ label: "Posesión", home: "55%", away: "45%" }];
+  it("abre los próximos partidos con previa y cuotas", () => {
+    expect(matchPageTabs(match, null, true, now)).toEqual([
+      "preview",
+      "odds",
+      "table",
+    ]);
+    expect(
+      matchPageTabs(match, { ...insight, lineups, statistics }, false, now),
+    ).toEqual(["preview", "odds", "lineups"]);
+  });
+  it("muestra eventos, alineaciones y estadísticas de un partido jugado", () => {
+    const played = {
+      ...match,
+      status: "FINISHED",
+      homeScore: 1,
+      awayScore: 0,
+    };
+    expect(
+      matchPageTabs(played, { ...insight, lineups, statistics }, true, now),
+    ).toEqual(["events", "lineups", "statistics", "table"]);
+    expect(matchPageTabs(played, null, false, now)).toEqual(["events"]);
+  });
 });

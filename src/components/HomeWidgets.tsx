@@ -135,7 +135,7 @@ export function MatchTicker({
             <li key={m.id}>
               <Link
                 className="ticker-card"
-                to={`/partidos?competition=${m.competition}&round=${encodeURIComponent(m.roundId)}`}
+                to={`/partido/${encodeURIComponent(m.id)}`}
                 aria-label={`${m.home} ${m.homeScore ?? ""} – ${m.awayScore ?? ""} ${m.away}`}
               >
                 <small>

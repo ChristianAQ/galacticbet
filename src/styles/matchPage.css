@@ -1,0 +1,486 @@
+/* Full-page match view, designed first for iPhone (safe areas, 44px targets). */
+.match-page {
+  --match-sticky-top: 0px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding-bottom: 24px;
+}
+.match-page-skeleton {
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.match-page-skeleton span {
+  display: block;
+  height: 120px;
+  border-radius: 18px;
+  background: linear-gradient(90deg, #191c21, #22262d, #191c21);
+  background-size: 200% 100%;
+  animation: match-page-shimmer 1.4s linear infinite;
+}
+.match-page-skeleton span:first-child {
+  height: 220px;
+}
+@keyframes match-page-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.match-page-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.match-page-back {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: #e3e8ef;
+  cursor: pointer;
+}
+.match-page-competition {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.match-page-competition > span:last-child {
+  display: grid;
+  min-width: 0;
+}
+.match-page-competition strong {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.match-page-competition small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Hero: crests, score, scorers */
+.match-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 14px 8px;
+  padding: 22px 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #c5f66a12, transparent 60%),
+    var(--panel);
+}
+.match-hero.is-live {
+  border-color: #8cdb6355;
+}
+.match-hero-team {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
+}
+.match-hero-team > strong {
+  font-size: 15px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.match-hero-crest {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: #ffffff0a;
+}
+.match-hero-crest img,
+.match-hero-crest .crest-placeholder {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+}
+.match-hero-center {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 6px;
+  min-height: 64px;
+  padding-top: 4px;
+}
+.match-hero-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 42px;
+  font-weight: 850;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.match-hero-score i {
+  font-style: normal;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 30px;
+}
+.match-hero-time {
+  font-size: 30px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.match-hero-status {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+.match-hero-scorers {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.match-hero-scorers ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  font-size: 13px;
+}
+.match-hero-scorers li {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.match-hero-scorers .is-home li {
+  justify-content: flex-end;
+  text-align: right;
+}
+.match-hero-scorers .is-away li {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+.match-hero-scorers span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #e3e8ef;
+}
+.match-hero-scorers small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.match-hero-scorers .is-home li::after,
+.match-hero-scorers .is-away li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: #eeeff2;
+  flex-shrink: 0;
+}
+.match-hero-scorers .is-away li::before {
+  order: 3;
+}
+.match-hero-date {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px 7px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+.match-hero-date svg {
+  flex-shrink: 0;
+}
+.match-hero-cta {
+  grid-column: 1 / -1;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--brand-accent, #c5f66a);
+  color: #121417;
+  font-weight: 750;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+/* Scrollable section menu, stuck under the app bar */
+.match-tabs {
+  position: sticky;
+  top: var(--match-sticky-top);
+  z-index: 15;
+  display: flex;
+  gap: 6px;
+  margin: 14px -2px 0;
+  padding: 8px 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  background: linear-gradient(#111317 80%, #11131700);
+}
+.match-tabs::-webkit-scrollbar {
+  display: none;
+}
+.match-tabs button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: #b9c0cb;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 650;
+  scroll-snap-align: start;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.match-tabs button[aria-selected="true"] {
+  background: #eeeff2;
+  border-color: #eeeff2;
+  color: #121417;
+}
+.match-tabs button:focus-visible,
+.match-page-back:focus-visible {
+  outline: 2px solid var(--brand-accent, #c5f66a);
+  outline-offset: 2px;
+}
+.match-page-panel {
+  display: grid;
+  gap: 14px;
+  padding-top: 6px;
+  animation: match-panel-in 0.18s ease-out;
+}
+@keyframes match-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .match-page-panel,
+  .match-page-skeleton span {
+    animation: none;
+  }
+}
+.match-page-panel > .match-preview,
+.match-page-panel > .match-probability,
+.match-page-panel > .matchup-history,
+.match-page-panel > .match-extra-goals,
+.match-page-panel > .match-statistics-card,
+.match-page-panel > .lineup-full-list,
+.match-page-panel > .odds-panel,
+.match-page-panel > .odds-empty,
+.match-page-panel > .match-page-table,
+.match-page-panel > .match-extra-meta,
+.match-page-panel > .match-extra-empty {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+}
+.match-page-panel > .match-extra-empty {
+  padding: 22px 16px;
+  text-align: center;
+}
+.match-page-panel > .lineup-full-list {
+  padding: 4px 12px 12px;
+}
+.match-page-panel > .match-probability,
+.match-page-panel > .matchup-history,
+.match-page-panel > .match-extra-goals {
+  padding: 14px;
+}
+.match-page-panel > .match-extra-meta {
+  border-top: 1px solid var(--border);
+}
+.match-page-table {
+  overflow: hidden;
+}
+.league-table tr.is-highlight {
+  background: #c5f66a14;
+}
+.league-table tr.is-highlight th,
+.league-table tr.is-highlight td:nth-child(2) {
+  color: #fff;
+  font-weight: 750;
+}
+.league-table tr.is-highlight td:first-child {
+  box-shadow: inset 3px 0 0 var(--brand-accent, #c5f66a);
+}
+
+/* Odds */
+.odds-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px 14px;
+}
+.odds-best {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.odds-best-item {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 12px 6px;
+  border-radius: 14px;
+  background: #ffffff08;
+  border: 1px solid var(--border);
+  text-align: center;
+  min-width: 0;
+}
+.odds-best-item small,
+.odds-best-item span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.odds-best-item strong {
+  font-size: 24px;
+  font-weight: 850;
+  color: var(--brand-accent, #c5f66a);
+  font-variant-numeric: tabular-nums;
+}
+.odds-market p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.odds-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.odds-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.odds-table th,
+.odds-table td {
+  padding: 11px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.odds-table tbody tr:last-child th,
+.odds-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.odds-table thead th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.odds-table tbody th {
+  text-align: left;
+  font-weight: 600;
+  color: #e3e8ef;
+  white-space: nowrap;
+}
+.odds-table td.is-best {
+  color: var(--brand-accent, #c5f66a);
+  font-weight: 800;
+}
+
+/* External links */
+.match-page-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.match-page-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: #d5dbe4;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (max-width: 760px) {
+  .match-page {
+    /* The mobile app bar is sticky: keep the section menu just below it. */
+    --match-sticky-top: calc(73px + var(--safe-area-top));
+  }
+  .match-hero {
+    padding: 18px 10px 16px;
+    border-radius: 20px;
+  }
+  .match-hero-crest {
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+  }
+  .match-hero-crest img,
+  .match-hero-crest .crest-placeholder {
+    width: 40px;
+    height: 40px;
+  }
+  .match-hero-team > strong {
+    font-size: 13.5px;
+  }
+  .match-hero-score {
+    font-size: 36px;
+  }
+  .match-hero-time {
+    font-size: 26px;
+  }
+  .match-hero-scorers {
+    gap: 14px;
+    font-size: 12px;
+  }
+  .match-tabs {
+    margin-left: calc(-20px - var(--safe-area-left));
+    margin-right: calc(-20px - var(--safe-area-right));
+    padding-left: calc(20px + var(--safe-area-left));
+    padding-right: calc(20px + var(--safe-area-right));
+    scroll-padding-left: calc(20px + var(--safe-area-left));
+  }
+  .odds-best-item strong {
+    font-size: 21px;
+  }
+}

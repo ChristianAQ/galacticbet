@@ -204,6 +204,11 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
         updatedAt: 1,
         matches: [],
       });
+      await setDoc(doc(c.firestore(), "odds/football"), {
+        formatVersion: 1,
+        updatedAt: "2026-11-05T00:00:00Z",
+        matches: {},
+      });
       await setDoc(doc(c.firestore(), "syncStatus/football"), {
         fullSyncAt: 1,
       });
@@ -213,6 +218,10 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
       env.authenticatedContext("alice").firestore(),
     ]) {
       await assertSucceeds(getDoc(doc(db, "live/football")));
+      await assertSucceeds(getDoc(doc(db, "odds/football")));
+      await assertFails(getDocs(collection(db, "odds")));
+      await assertFails(setDoc(doc(db, "odds/football"), { matches: {} }));
+      await assertFails(getDoc(doc(db, "providerBudgets/oddsapi")));
       await assertFails(getDoc(doc(db, "live/other")));
       await assertFails(getDocs(collection(db, "live")));
       await assertFails(getDoc(doc(db, "syncStatus/football")));

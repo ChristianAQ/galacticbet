@@ -7,11 +7,12 @@ import type { User } from "firebase/auth";
 import { ArrowRight } from "lucide-react";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Crest, Empty, PageTitle, PrivateGate } from "../components/ui";
+import { Empty, PageTitle, PrivateGate } from "../components/ui";
 import { type Group } from "../lib/data";
 import { useGroupRankings } from "../lib/useGroupRankings";
 import { type Match } from "../lib/domain";
 import CompetitionTabs from "../components/CompetitionTabs";
+import LeagueTable from "../components/LeagueTable";
 import RoundSelector from "../components/RoundSelector";
 import ShareTrigger from "../components/ShareTrigger";
 import { shareFileName, standingsText } from "../lib/shareSummary";
@@ -21,7 +22,6 @@ import {
   RankAvatar,
   RankBadge,
 } from "../components/RankingWidgets";
-import { formNames } from "../components/TeamForm";
 import { currentLeagueTable, LEAGUE_STAGES } from "../lib/leagueTable";
 import { preferenceStore } from "../lib/preferences";
 import { useGroupSelection, usePreferences } from "../lib/useGroupSelection";
@@ -40,38 +40,6 @@ import {
 const ShareDialog = lazy(() => import("../components/ShareDialog"));
 
 type View = "grupo" | "liga";
-interface Zone {
-  kind: "top" | "mid" | "down";
-  label: string;
-  test: (position: number, size: number) => boolean;
-}
-// Only shown when every team is in the table, so partial early tables are not labelled.
-const leagueZones: Partial<
-  Record<CompetitionCode, { size: number; zones: Zone[] }>
-> = {
-  PD: {
-    size: 20,
-    zones: [
-      { kind: "top", label: "Champions League", test: (p) => p <= 4 },
-      { kind: "down", label: "Descenso", test: (p, n) => p > n - 3 },
-    ],
-  },
-  PL: {
-    size: 20,
-    zones: [
-      { kind: "top", label: "Champions League", test: (p) => p <= 4 },
-      { kind: "down", label: "Descenso", test: (p, n) => p > n - 3 },
-    ],
-  },
-  CL: {
-    size: 36,
-    zones: [
-      { kind: "top", label: "Octavos de final", test: (p) => p <= 8 },
-      { kind: "mid", label: "Playoffs", test: (p) => p > 8 && p <= 24 },
-    ],
-  },
-};
-
 export default function StandingsPage({
   groups,
   matches,
@@ -178,8 +146,6 @@ function LeagueStandings({
     () => currentLeagueTable(matches, code),
     [matches, code],
   );
-  const config = leagueZones[code];
-  const zones = config && rows.length === config.size ? config.zones : [];
   return (
     <>
       <CompetitionTabs
@@ -221,99 +187,7 @@ function LeagueStandings({
                 Ver partidos <ArrowRight size={14} />
               </Link>
             </div>
-            <table className="league-table">
-              <caption className="sr-only">
-                Clasificación de {competitionName(code)}
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">Equipo</th>
-                  <th scope="col" title="Partidos jugados">
-                    PJ
-                  </th>
-                  <th scope="col" className="hide-sm" title="Ganados">
-                    G
-                  </th>
-                  <th scope="col" className="hide-sm" title="Empatados">
-                    E
-                  </th>
-                  <th scope="col" className="hide-sm" title="Perdidos">
-                    P
-                  </th>
-                  <th scope="col" className="hide-sm" title="Goles">
-                    Goles
-                  </th>
-                  <th scope="col" title="Diferencia de goles">
-                    DG
-                  </th>
-                  <th scope="col">Pts</th>
-                  <th scope="col" className="hide-md">
-                    Forma
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => {
-                  const position = i + 1;
-                  const zone = zones.find((z) => z.test(position, rows.length));
-                  const diff = r.goalsFor - r.goalsAgainst;
-                  return (
-                    <tr
-                      key={r.key}
-                      className={zone ? `zone-${zone.kind}` : undefined}
-                    >
-                      <td>
-                        <span className="league-pos">{position}</span>
-                      </td>
-                      <th scope="row">
-                        <span className="league-team">
-                          <Crest src={r.crest} />
-                          <span>{r.name}</span>
-                        </span>
-                      </th>
-                      <td>{r.played}</td>
-                      <td className="hide-sm">{r.wins}</td>
-                      <td className="hide-sm">{r.draws}</td>
-                      <td className="hide-sm">{r.losses}</td>
-                      <td className="hide-sm">
-                        {r.goalsFor}:{r.goalsAgainst}
-                      </td>
-                      <td>{diff > 0 ? `+${diff}` : diff}</td>
-                      <td>
-                        <strong>{r.points}</strong>
-                      </td>
-                      <td className="hide-md">
-                        <span
-                          className="team-form"
-                          aria-label={r.form
-                            .map((f) => formNames[f])
-                            .join(", ")}
-                        >
-                          {r.form.map((f, j) => (
-                            <span
-                              key={j}
-                              className={`form-dot form-${f}`}
-                              title={formNames[f]}
-                            />
-                          ))}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {zones.length > 0 && (
-              <ul className="league-legend">
-                {zones.map((z) => (
-                  <li key={z.kind} className={`zone-${z.kind}`}>
-                    <i aria-hidden="true" />
-                    {z.label}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <LeagueTable rows={rows} code={code} />
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@ import { COMPETITION_CODES, competitionName } from "../lib/competitions";
 import {
   ArrowUpRight,
   CircleHelp,
+  LogIn,
   Plus,
   NotebookPen,
   Users,
@@ -164,9 +165,14 @@ export default function Sidebar({
             <Users size={22} />
             <h4>El fútbol, con los tuyos.</h4>
             <p>Crea una liga privada y demuestra quién sabe más.</p>
-            <Link to="/grupos?action=create">
-              Crear mi grupo <Plus size={15} />
-            </Link>
+            <div className="friend-card-actions">
+              <Link to="/grupos?action=create">
+                Crear mi grupo <Plus size={15} />
+              </Link>
+              <Link to="/grupos?join=1">
+                Unirme a un grupo <LogIn size={15} />
+              </Link>
+            </div>
           </div>
           <Link to="/perfil?tab=play" className="sidebar-help">
             <CircleHelp size={18} />

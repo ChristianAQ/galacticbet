@@ -73,14 +73,15 @@ export default function UpcomingSchedule({
                   {kickoffLabel(next.utcDate, now)}
                 </time>
               </div>
-              <div
+              <Link
                 className="schedule-fixture"
-                aria-label={`${next.home} contra ${next.away}`}
+                to={`/partido/${encodeURIComponent(next.id)}`}
+                aria-label={`Previa de ${next.home} contra ${next.away}`}
               >
                 <Team name={next.home} crest={next.homeCrest} />
                 <span className="schedule-versus">vs</span>
                 <Team name={next.away} crest={next.awayCrest} />
-              </div>
+              </Link>
               {next.status === "SCHEDULED" && (
                 <p className="schedule-provisional">Horario provisional</p>
               )}

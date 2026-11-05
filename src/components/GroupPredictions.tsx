@@ -5,7 +5,8 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { Users } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
+import { Link } from "react-router-dom";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   hasMatchStarted,
@@ -394,6 +395,15 @@ function RivalsCard({
         </div>
       </div>
       <LiveEvents match={match} />
+      <Link
+        className="prediction-details-link"
+        to={`/partido/${encodeURIComponent(match.id)}`}
+      >
+        {["TIMED", "SCHEDULED"].includes(match.status)
+          ? "Previa y cuotas"
+          : "Ficha del partido"}
+        <ChevronRight size={15} aria-hidden="true" />
+      </Link>
       {match.status === "FINISHED" && <MatchResult match={match} demo={demo} />}
       {hasScore && match.status !== "FINISHED" && (
         <div className="saved-match-footer">

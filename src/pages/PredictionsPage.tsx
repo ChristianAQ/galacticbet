@@ -3,16 +3,8 @@ import { COMPETITION_CODES } from "../lib/competitions";
 import type { User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { Save } from "lucide-react";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import CompetitionSwitch from "../components/CompetitionSwitch";
 import FilterPanel, { FilterField } from "../components/FilterPanel";
 import ConfirmQuiniela from "../components/ConfirmQuiniela";
@@ -42,8 +34,6 @@ import { preferenceStore } from "../lib/preferences";
 import { roundOptions } from "../lib/roundOptions";
 import { useGroupSelection } from "../lib/useGroupSelection";
 import { useRoundDelivery } from "../lib/useRoundDelivery";
-
-const MatchDetails = lazy(() => import("../components/MatchDetails"));
 
 const demoPlayers: Participant[] = [
   { id: "demo-me", name: "Tú", avatar: null },
@@ -94,7 +84,6 @@ export default function PredictionsPage({
   const [submitError, setSubmitError] = useState("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [peopleError, setPeopleError] = useState("");
-  const [detailId, setDetailId] = useState("");
   const uid = demo ? "demo-me" : user?.uid || "demo-me";
   const selectedGroup = groups.find((g) => g.id === group);
   const active = seasons.find((s) => s.id === season);
@@ -113,7 +102,8 @@ export default function PredictionsPage({
   const minute = Math.floor(clock / 60_000);
   const rounds = useMemo(() => roundOptions(filtered), [filtered, minute]);
   const current = useMemo(() => preferredRound(filtered), [filtered, minute]);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const requestedRound = searchParams.get("round") || "";
   const selected = rounds.some((r) => r.id === round)
     ? round
@@ -124,7 +114,6 @@ export default function PredictionsPage({
     () => filtered.filter((m) => m.roundId === selected),
     [filtered, selected],
   );
-  const detail = detailId ? matches.find((m) => m.id === detailId) : undefined;
   const predictionKey = `${uid}:${group}:${season}:${selected}`;
   const sealKey = predictionKey;
   const values = demo || valuesKey === predictionKey ? storedValues : {};
@@ -336,6 +325,23 @@ export default function PredictionsPage({
       setSubmitting(false);
     }
   }
+  // Remember the round in the URL so «Volver» returns to the same jornada.
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const onDetails = useCallback(
+    (id: string) => {
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          next.set("round", selectedRef.current);
+          return next;
+        },
+        { replace: true },
+      );
+      navigate(`/partido/${encodeURIComponent(id)}`);
+    },
+    [navigate, setSearchParams],
+  );
   const chooseRef = useRef(choose);
   chooseRef.current = choose;
   const onChoose = useCallback(
@@ -575,7 +581,7 @@ export default function PredictionsPage({
                   saving={busy === m.id}
                   demo={demo}
                   onChoose={onChoose}
-                  onDetails={setDetailId}
+                  onDetails={onDetails}
                 />
               ))}
             </div>
@@ -648,17 +654,6 @@ export default function PredictionsPage({
           }}
           onConfirm={() => void finalize()}
         />
-      )}
-      {detail && (
-        <Suspense fallback={null}>
-          <MatchDetails
-            key={detail.id}
-            match={detail}
-            matches={matches}
-            demo={demo}
-            onClose={() => setDetailId("")}
-          />
-        </Suspense>
       )}
     </>
   );

@@ -4119,3 +4119,29 @@ td {
     max-width: 100%;
   }
 }
+.friend-card-actions {
+  display: grid;
+}
+.friend-card-actions a {
+  min-height: 40px;
+}
+.friend-card-actions a + a {
+  border-top: 1px solid #2a3343;
+}
+a.fixture-card-button {
+  display: block;
+  text-decoration: none;
+}
+a.schedule-fixture {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 12px;
+  -webkit-tap-highlight-color: transparent;
+}
+a.schedule-fixture:active {
+  background: #ffffff08;
+}
+.private-gate-text {
+  display: block;
+  margin-bottom: 14px;
+}

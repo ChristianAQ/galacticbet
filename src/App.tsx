@@ -54,6 +54,7 @@ const pageLoaders = {
   "/clasificacion": () => import("./pages/StandingsPage"),
   "/perfil": () => import("./pages/ProfilePage"),
   "/porra": () => import("./pages/PorraPage"),
+  "/partido": () => import("./pages/MatchPage"),
 };
 const TeamsPage = lazy(pageLoaders["/equipos"]);
 const HomePage = lazy(pageLoaders["/"]);
@@ -63,6 +64,7 @@ const GroupsPage = lazy(pageLoaders["/grupos"]);
 const StandingsPage = lazy(pageLoaders["/clasificacion"]);
 const ProfilePage = lazy(pageLoaders["/perfil"]);
 const PorraPage = lazy(pageLoaders["/porra"]);
+const MatchPage = lazy(pageLoaders["/partido"]);
 function preloadPage(path: string) {
   const load = pageLoaders[path as keyof typeof pageLoaders];
   if (load) void load().catch(() => {});
@@ -74,6 +76,8 @@ const nav = [
   { to: "/clasificacion", label: "Clasificación", icon: Trophy },
   { to: "/grupos", label: "Mis grupos", short: "Grupos", icon: Users },
 ];
+// Groups stay in the side menu; the bottom bar keeps the four daily sections.
+const bottomNav = nav.filter((item) => item.to !== "/grupos");
 export default function App() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -311,6 +315,17 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="/partido/:id"
+                    element={
+                      <MatchPage
+                        matches={matches}
+                        loading={loading}
+                        demo={demo}
+                        userId={user?.uid || ""}
+                      />
+                    }
+                  />
+                  <Route
                     path="/partidos"
                     element={
                       <MatchesPage
@@ -419,7 +434,7 @@ export default function App() {
           </main>
         </div>
         <BottomNavigation
-          items={nav}
+          items={bottomNav}
           inactive={mobileMenuOpen}
           onPrefetch={preloadPage}
         />

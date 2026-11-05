@@ -96,7 +96,7 @@ function PredictionCard({
         onClick={() => onDetails(m.id)}
       >
         {["TIMED", "SCHEDULED"].includes(m.status)
-          ? "Previa y ficha del partido"
+          ? "Previa, cuotas y ficha"
           : "Ficha del partido"}
         <ChevronRight size={15} aria-hidden="true" />
       </button>

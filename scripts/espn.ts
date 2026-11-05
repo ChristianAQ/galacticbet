@@ -92,7 +92,12 @@ const aliases = [
   ["Tottenham Hotspur FC", "Tottenham Hotspur"],
   ["West Ham United FC", "West Ham", "West Ham United"],
   ["Nottingham Forest FC", "Nottingham Forest"],
-  ["Brighton & Hove Albion FC", "Brighton & Hove Albion", "Brighton"],
+  [
+    "Brighton & Hove Albion FC",
+    "Brighton & Hove Albion",
+    "Brighton and Hove Albion",
+    "Brighton",
+  ],
   ["Wolverhampton Wanderers FC", "Wolverhampton Wanderers", "Wolves"],
   ["Fulham FC", "Fulham"],
   ["Crystal Palace FC", "Crystal Palace"],
