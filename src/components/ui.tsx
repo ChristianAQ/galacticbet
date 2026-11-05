@@ -4,6 +4,7 @@ import { matchStatusLabel, type Match } from "../lib/domain";
 import { finishedMatchResult } from "../lib/matchResult";
 import { kickoffLabel } from "../lib/matchInsights";
 import TeamForm from "./TeamForm";
+import { LiveMinute } from "./LiveStatus";
 export function Empty({
   title,
   children,
@@ -151,6 +152,8 @@ export function MatchRow({
             </span>
             <small>{result.decision}</small>
           </>
+        ) : ["IN_PLAY", "PAUSED"].includes(m.status) ? (
+          <LiveMinute match={m} />
         ) : (
           matchStatusLabel[m.status] || m.status
         )}

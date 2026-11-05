@@ -25,10 +25,8 @@ export function createMatchInsightLoader(
   const entries = new Map<string, Entry>();
   const pending = new Map<string, Promise<MatchInsight | null>>();
   let restored = false;
-  const fresh = (time: number) =>
-    Number.isFinite(time) &&
-    time <= Date.now() &&
-    Date.now() - time < MATCH_INSIGHT_TTL;
+  const fresh = (time: number, ttl = MATCH_INSIGHT_TTL) =>
+    Number.isFinite(time) && time <= Date.now() && Date.now() - time < ttl;
   function restore() {
     if (restored) return;
     restored = true;
@@ -69,6 +67,7 @@ export function createMatchInsightLoader(
   }
   return (
     match: Pick<Match, "id" | "competition" | "utcDate">,
+    ttl = MATCH_INSIGHT_TTL,
   ): Promise<MatchInsight | null> => {
     if (match.id.startsWith("demo-")) return Promise.resolve(null);
     restore();
@@ -76,7 +75,7 @@ export function createMatchInsightLoader(
     const cached = entries.get(key);
     if (
       cached &&
-      fresh(cached.savedAt) &&
+      fresh(cached.savedAt, Math.min(ttl, MATCH_INSIGHT_TTL)) &&
       (!cached.insight || insightFitsMatch(cached.insight, match))
     )
       return Promise.resolve(cached.insight);

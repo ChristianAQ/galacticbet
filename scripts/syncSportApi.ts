@@ -15,6 +15,7 @@ import {
 } from "./sportApi";
 import { reserveSportApiRequests } from "./sportApiBudget";
 import { recompute } from "./recompute";
+import { isHotMatch, normalizeLiveMinute } from "../src/lib/liveBoard";
 
 const day = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Europe/Madrid",
@@ -42,6 +43,8 @@ export async function syncSportApi(
     request?: typeof fetch;
     log?: (message: string) => void;
     verify?: boolean;
+    /** Live loop pacing: provider calls only when the previous one is old enough. */
+    throttle?: { lastRequestAt: number; hotGapMs: number; idleGapMs: number };
   } = {},
 ) {
   const now = options.now ?? Date.now();
@@ -64,12 +67,24 @@ export async function syncSportApi(
     if (data.scoringPending) pending.add(snapshot.id);
   }
   const candidates = sportApiCandidates([...cache.values()].flat(), now);
-  const dates = [
-    ...new Set([
-      ...candidates.map((m) => day.format(new Date(m.utcDate))),
-      ...(options.verify ? [day.format(new Date(now))] : []),
-    ]),
-  ].sort();
+  const throttle = options.throttle;
+  const due =
+    !throttle ||
+    now - throttle.lastRequestAt >=
+      (candidates.some((m) => isHotMatch(m, now))
+        ? throttle.hotGapMs
+        : throttle.idleGapMs);
+  const dates =
+    key.trim() && due
+      ? [
+          ...new Set([
+            ...candidates.map((m) => day.format(new Date(m.utcDate))),
+            ...(options.verify ? [day.format(new Date(now))] : []),
+          ]),
+        ].sort()
+      : [];
+  // Provider minute per fixture, only used as a display anchor for the live board.
+  const minutes = new Map<string, string>();
   let requests = 0;
   let changed = 0;
   let stopped = false;
@@ -100,6 +115,10 @@ export async function syncSportApi(
             const fixture = findSportFixture(match, fixtures);
             if (!fixture) return match;
             matched++;
+            const minute = normalizeLiveMinute(
+              fixture.status === "LIVE" ? fixture.minute : "",
+            );
+            if (minute) minutes.set(match.id, minute);
             const updated = applySportFixture(match, fixture, now);
             if (encodeCalendar([updated]) === encodeCalendar([match]))
               return match;
@@ -170,6 +189,7 @@ export async function syncSportApi(
       );
   }
   // A durable flag retries scoring even if the previous job died after publishing results.
+  const scored = pending.size > 0;
   if (pending.size) {
     await recompute(db, cache, policies);
     const batch = db.batch();
@@ -184,5 +204,12 @@ export async function syncSportApi(
   log(
     `SportAPI: ${requests} peticiones, ${changed} partidos actualizados; ${pending.size} temporadas revisadas para puntuación.`,
   );
-  return { requests, changed, stopped };
+  return {
+    requests,
+    changed,
+    stopped,
+    scored,
+    matches: [...cache.values()].flat(),
+    minutes,
+  };
 }

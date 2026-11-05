@@ -8,9 +8,11 @@ import {
   validMatchInsight,
   type MatchInsight,
 } from "../src/lib/matchInsightsData";
+import { isHotMatch } from "../src/lib/liveBoard";
 import {
   createEspnClient,
   EspnRequestError,
+  eventFitsMatch,
   findEspnEvent,
   normalizeEspnSummary,
   type EspnClient,
@@ -31,6 +33,12 @@ interface SyncOptions {
   now?: number;
   client?: EspnClient;
   log?: (message: string) => void;
+  /** Live loop: shorter refresh for fixtures in play (events, cards). */
+  liveRefreshMs?: number;
+  /** Live loop: ESPN identities already matched, avoiding repeated scoreboards. */
+  events?: Map<string, EspnEvent>;
+  /** Final stored state of every candidate, refreshed or not. */
+  onInsight?: (matchId: string, insight: MatchInsight | null) => void;
 }
 export function insightRefreshInterval(
   match: Match,
@@ -250,11 +258,14 @@ export async function syncMatchInsights(
     }))
     .filter(({ match, previous }) => {
       const checkedAt = previous ? Date.parse(previous.checkedAt) : 0;
+      const interval =
+        options.liveRefreshMs !== undefined && isHotMatch(match, now)
+          ? options.liveRefreshMs
+          : insightRefreshInterval(match, now, previous?.insight);
       const fresh =
         previous &&
         checkedAt <= now &&
-        now - checkedAt <
-          insightRefreshInterval(match, now, previous.insight) &&
+        now - checkedAt < interval &&
         previous.status === match.status;
       if (fresh) report.skipped++;
       return !fresh;
@@ -264,7 +275,19 @@ export async function syncMatchInsights(
         (a.previous ? Date.parse(a.previous.checkedAt) : -Infinity) -
         (b.previous ? Date.parse(b.previous.checkedAt) : -Infinity),
     );
+  const emit = (updated: { id: string; data: StoredMatchInsight }[]) => {
+    if (!options.onInsight) return;
+    const written = new Map(updated.map((u) => [u.id, u.data.insight]));
+    for (const match of candidates)
+      options.onInsight(
+        match.id,
+        written.has(match.id)
+          ? written.get(match.id)!
+          : validPrevious(prior.get(match.id), match)?.insight || null,
+      );
+  };
   if (!pending.length) {
+    emit([]);
     log(
       `Detalles de partidos: ${report.reads} lecturas, caché vigente; 0 consultas a ESPN.`,
     );
@@ -281,9 +304,11 @@ export async function syncMatchInsights(
   try {
     for (const { match, previous } of pending) {
       if (report.summaries >= MAX_SUMMARIES) break;
+      let event = options.events?.get(match.id) ?? null;
+      if (event && !eventFitsMatch(event, match)) event = null;
       const window = windowForMatch.get(match.id)!;
       // Download only the date window actually needed, not every historical day.
-      if (!listings.has(window)) {
+      if (!event && !listings.has(window)) {
         report.scoreboards++;
         try {
           listings.set(
@@ -303,9 +328,12 @@ export async function syncMatchInsights(
           } else throw error;
         }
       }
-      const listing = listings.get(window);
-      if (!listing) continue;
-      const event = findEspnEvent(match, listing);
+      if (!event) {
+        const listing = listings.get(window);
+        if (!listing) continue;
+        event = findEspnEvent(match, listing);
+        if (event) options.events?.set(match.id, event);
+      }
       let insight = previous?.insight || null;
       let matchupsCheckedAt = previous?.matchupsCheckedAt;
       if (event) {
@@ -531,6 +559,7 @@ export async function syncMatchInsights(
       if (hasInformation(update.data.insight)) report.available++;
     }
   }
+  emit(updates);
   report.historyRequests = history.requests;
   log(
     `Detalles de partidos: ${report.reads} lecturas, ${report.historyRequests} consultas de historial, ${report.scoreboards} calendarios ESPN, ${report.summaries} fichas, ${report.odds} consultas de cuotas, ${report.missingSummaries} fichas no disponibles, ${report.failedCompetitions} calendarios fallidos, ${report.updated} documentos actualizados, ${report.available} fichas con información, ${report.unmatched} sin asociación y ${report.rejectedSummaries} respuestas rechazadas${report.stopped ? "; proveedor interrumpido" : ""}.`,

@@ -3,6 +3,7 @@ import { memo, useEffect, useState } from "react";
 import type { Match, Mode, Prediction, PredictionValue } from "../lib/domain";
 import MatchResult from "./MatchResult";
 import { MatchRow } from "./ui";
+import { LiveEvents } from "./LiveStatus";
 
 export type PredictionLock = "sealed" | "deadline" | "kickoff" | null;
 
@@ -38,6 +39,7 @@ function PredictionCard({
       aria-label={`${m.home} contra ${m.away}`}
     >
       <MatchRow match={m} history={history} />
+      <LiveEvents match={m} />
       <div className="prediction-actions">
         <span className="prediction-state">
           {lock ? (

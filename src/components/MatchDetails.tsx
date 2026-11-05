@@ -12,6 +12,7 @@ import MatchPreview from "./MatchPreview";
 import { useMatchInsight } from "../lib/useMatchInsight";
 import TeamForm from "./TeamForm";
 import { Team } from "./ui";
+import { LiveEvents, LiveMinute } from "./LiveStatus";
 
 export default function MatchDetails({
   match,
@@ -59,7 +60,13 @@ export default function MatchDetails({
                 ? "—"
                 : "vs"}
           </strong>
-          <small>{matchStatusLabel[match.status] || match.status}</small>
+          <small>
+            {["IN_PLAY", "PAUSED"].includes(match.status) ? (
+              <LiveMinute match={match} />
+            ) : (
+              matchStatusLabel[match.status] || match.status
+            )}
+          </small>
           {resultKnown && (
             <small>
               {match.status === "FINISHED"
@@ -82,11 +89,14 @@ export default function MatchDetails({
           }).format(new Date(match.utcDate))}
         </time>
       </p>
+      {["IN_PLAY", "PAUSED"].includes(match.status) && (
+        <LiveEvents match={match} />
+      )}
       {match.resultProvider === "SportAPI" &&
         match.status !== "FINISHED" &&
         !demo && (
           <p className="match-data-note">
-            Resultado: SportAPI · actualización periódica.
+            Resultado: SportAPI · en directo, aproximadamente cada minuto.
           </p>
         )}
       {!demo && <MatchMeta insight={insights.insight} />}

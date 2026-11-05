@@ -197,6 +197,31 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
       await assertFails(deleteDoc(doc(db, "matchInsights/future")));
     }
   });
+  it("publica el marcador en directo solo para lectura y oculta el estado interno", async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), "live/football"), {
+        formatVersion: 1,
+        updatedAt: 1,
+        matches: [],
+      });
+      await setDoc(doc(c.firestore(), "syncStatus/football"), {
+        fullSyncAt: 1,
+      });
+    });
+    for (const db of [
+      env.unauthenticatedContext().firestore(),
+      env.authenticatedContext("alice").firestore(),
+    ]) {
+      await assertSucceeds(getDoc(doc(db, "live/football")));
+      await assertFails(getDoc(doc(db, "live/other")));
+      await assertFails(getDocs(collection(db, "live")));
+      await assertFails(getDoc(doc(db, "syncStatus/football")));
+      await assertFails(
+        setDoc(doc(db, "live/football"), { formatVersion: 1, matches: [] }),
+      );
+      await assertFails(deleteDoc(doc(db, "live/football")));
+    }
+  });
   it("permite leer calendarios agregados públicos pero nunca escribir resultados desde el cliente", async () => {
     await env.withSecurityRulesDisabled((c) =>
       setDoc(doc(c.firestore(), "calendars/PD-2026"), {

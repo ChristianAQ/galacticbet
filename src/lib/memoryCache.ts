@@ -44,6 +44,11 @@ export function createMemoryCache(limit = 20) {
   return {
     peek,
     read,
+    /** Expire matching entries only, keeping unrelated cached reads. */
+    drop(match: (key: string) => boolean) {
+      for (const key of [...entries.keys()])
+        if (match(key)) entries.delete(key);
+    },
     clear() {
       entries.clear();
     },

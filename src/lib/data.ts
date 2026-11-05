@@ -201,6 +201,10 @@ export function getCachedGroupRankings(group: Group) {
     cacheKey("rankings", group),
   );
 }
+/** New backend totals: refetch standings without re-reading profiles or modes. */
+export function expireGroupRankings() {
+  privateCache.drop((key) => key.includes(`,"rankings",`));
+}
 export function loadGroupRankings(group: Group) {
   return privateCache.read(
     cacheKey("rankings", group),

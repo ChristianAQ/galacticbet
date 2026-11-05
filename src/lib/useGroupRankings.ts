@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { getCachedGroupRankings, loadGroupRankings, type Group } from "./data";
+import {
+  expireGroupRankings,
+  getCachedGroupRankings,
+  loadGroupRankings,
+  type Group,
+} from "./data";
 import { readableError } from "../components/ui";
 import { privateCache } from "./memoryCache";
+import { STANDINGS_UPDATED } from "./useLiveBoard";
 
 /** Shared between Home and Standings; the data service deduplicates requests. */
 export function useGroupRankings(userId: string, group?: Group) {
@@ -40,10 +46,17 @@ export function useGroupRankings(userId: string, group?: Group) {
       )
         setAttempt((n) => n + 1);
     };
+    // A live result was scored: expire totals; hidden pages refetch on return.
+    const scored = () => {
+      expireGroupRankings();
+      refresh();
+    };
     window.addEventListener("focus", refresh);
+    window.addEventListener(STANDINGS_UPDATED, scored);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       window.removeEventListener("focus", refresh);
+      window.removeEventListener(STANDINGS_UPDATED, scored);
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [key]);

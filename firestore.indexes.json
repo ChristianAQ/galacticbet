@@ -31,6 +31,7 @@
       "indexes": []
     },
     { "collectionGroup": "calendars", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "live", "fieldPath": "matches", "indexes": [] },
     { "collectionGroup": "players", "fieldPath": "selections", "indexes": [] },
     {
       "collectionGroup": "roundAttendance",

@@ -9,6 +9,8 @@ on:
       - "scripts/sportApi*.ts"
       - "scripts/syncSportApi.ts"
       - "scripts/sync-live.ts"
+      - "scripts/liveLoop.ts"
+      - "src/lib/liveBoard.ts"
       - ".github/workflows/sync-live.yml"
   workflow_dispatch:
 permissions:
@@ -19,7 +21,9 @@ concurrency:
 jobs:
   live:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The job stays alive while fixtures are in play (minute-by-minute checks)
+    # and exits after one quick pass when there are none.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,3 +36,7 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           SPORTAPI_KEY: ${{ secrets.SPORTAPI_KEY }}
           SPORTAPI_VERIFY: ${{ github.event_name != 'schedule' }}
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+          ESPN_NEWS: ${{ vars.ESPN_NEWS }}
+          ESPN_MATCH_DETAILS: ${{ vars.ESPN_MATCH_DETAILS }}
+          LIVE_LOOP_MINUTES: "25"

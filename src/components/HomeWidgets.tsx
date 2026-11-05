@@ -13,6 +13,7 @@ import { preferenceStore } from "../lib/preferences";
 import { roundDateRange } from "../lib/roundOptions";
 import CompetitionLogo from "./CompetitionLogo";
 import { Crest } from "./ui";
+import { LiveMinute } from "./LiveStatus";
 import "../styles/dashboard.css";
 
 const shortDate = new Intl.DateTimeFormat("es", {
@@ -139,9 +140,13 @@ export function MatchTicker({
               >
                 <small>
                   {competitionName(m.competition, true)} ·{" "}
-                  {live.length
-                    ? matchStatusLabel[m.status]
-                    : shortDate.format(new Date(m.utcDate))}
+                  {["IN_PLAY", "PAUSED"].includes(m.status) ? (
+                    <LiveMinute match={m} />
+                  ) : live.length ? (
+                    matchStatusLabel[m.status]
+                  ) : (
+                    shortDate.format(new Date(m.utcDate))
+                  )}
                 </small>
                 {(["home", "away"] as const).map((side) => (
                   <span

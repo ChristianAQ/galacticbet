@@ -602,6 +602,13 @@ export default function PredictionsPage({
                 canShare={canShare}
                 roundId={selected}
                 completedIds={delivery.completedIds}
+                mode={mode}
+                groupName={
+                  demo
+                    ? "Grupo de demostración"
+                    : selectedGroup?.name || "Grupo"
+                }
+                roundTitle={`${competitionName(list[0].competition)} · ${roundLabel(list[0])}`}
               />
             </div>
           )}

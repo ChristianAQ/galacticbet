@@ -5,7 +5,7 @@ import {
 } from "../lib/competitions";
 import type { User } from "firebase/auth";
 import { ArrowRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Crest, Empty, PageTitle, PrivateGate } from "../components/ui";
 import { type Group } from "../lib/data";
@@ -13,6 +13,8 @@ import { useGroupRankings } from "../lib/useGroupRankings";
 import { type Match } from "../lib/domain";
 import CompetitionTabs from "../components/CompetitionTabs";
 import RoundSelector from "../components/RoundSelector";
+import ShareTrigger from "../components/ShareTrigger";
+import { shareFileName, standingsText } from "../lib/shareSummary";
 import {
   MyRankCard,
   Podium,
@@ -34,6 +36,8 @@ import {
   roundShortLabel,
   type RoundOption,
 } from "../lib/roundOptions";
+
+const ShareDialog = lazy(() => import("../components/ShareDialog"));
 
 type View = "grupo" | "liga";
 interface Zone {
@@ -338,6 +342,7 @@ function GroupStandings({
   );
   const scope = period === "all" && combined ? "global" : competition;
   const [round, setRound] = useState("");
+  const [sharing, setSharing] = useState(false);
   const selectedGroup = groups.find((g) => g.id === groupId);
   const { data, error, retry } = useGroupRankings(user.uid, selectedGroup);
   const rounds = useMemo(
@@ -398,6 +403,10 @@ function GroupStandings({
     period === "all"
       ? "Todas las jornadas"
       : rounds.find((r) => r.id === selectedRound)?.label || "Por jornada";
+  const shareTitle =
+    period === "all"
+      ? `${scope === "global" ? "Global del grupo" : competitionName(scope)} · Todas las jornadas`
+      : title;
 
   return (
     <>
@@ -496,11 +505,47 @@ function GroupStandings({
                 <h2>{selectedGroup.name}</h2>
                 <p>{title}</p>
               </div>
-              <span>
-                {rows.length}{" "}
-                {rows.length === 1 ? "participante" : "participantes"}
+              <span className="group-view-actions">
+                <span>
+                  {rows.length}{" "}
+                  {rows.length === 1 ? "participante" : "participantes"}
+                </span>
+                <ShareTrigger
+                  label="Compartir"
+                  disabled={!rows.length}
+                  onClick={() => setSharing(true)}
+                />
               </span>
             </div>
+            {sharing && (
+              <Suspense fallback={null}>
+                <ShareDialog
+                  title={`Clasificación · ${selectedGroup.name}`}
+                  filename={shareFileName(
+                    "clasificacion",
+                    selectedGroup.name,
+                    shareTitle,
+                  )}
+                  text={standingsText({
+                    groupName: selectedGroup.name,
+                    title: shareTitle,
+                    rows,
+                    showHits,
+                  })}
+                  render={() =>
+                    import("../lib/shareImage").then((m) =>
+                      m.standingsImage({
+                        groupName: selectedGroup.name,
+                        title: shareTitle,
+                        rows,
+                        showHits,
+                      }),
+                    )
+                  }
+                  onClose={() => setSharing(false)}
+                />
+              </Suspense>
+            )}
             {roundUnavailable ? (
               <p className="standings-note" role="status">
                 Aún no hay jornadas disponibles para esta competición. Estos son

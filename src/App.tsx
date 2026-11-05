@@ -14,7 +14,14 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Link,
   Route,
@@ -36,6 +43,8 @@ import { type Match } from "./lib/domain";
 import { MOBILE_LAYOUT_QUERY } from "./lib/mobileViewport";
 import { auth, configured, db } from "./lib/firebase";
 import { privateCache } from "./lib/memoryCache";
+import { applyLiveBoard } from "./lib/liveBoard";
+import { LiveContext, useLiveBoard } from "./lib/useLiveBoard";
 const pageLoaders = {
   "/equipos": () => import("./pages/TeamsPage"),
   "/": () => import("./pages/HomePage"),
@@ -79,7 +88,13 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(!auth);
   const [demo, setDemo] = useState(false);
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [calendar, setMatches] = useState<Match[]>([]);
+  const live = useLiveBoard(calendar, configured && !demo);
+  // Faster live scores over the cached calendar; official results always win.
+  const matches = useMemo(
+    () => applyLiveBoard(calendar, live.board),
+    [calendar, live.board],
+  );
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupsUid, setGroupsUid] = useState("");
   const activeGroups = user && groupsUid === user.uid ? groups : [];
@@ -193,219 +208,223 @@ export default function App() {
     void refreshGroups();
   }, [user]);
   return (
-    <div className="app-shell">
-      <Sidebar
-        open={mobileMenuOpen}
-        mobile={mobile}
-        onClose={closeMenu}
-        items={nav}
-        onPrefetch={preloadPage}
-      />
-      <div
-        className="main-shell"
-        inert={mobileMenuOpen}
-        aria-hidden={mobileMenuOpen || undefined}
-      >
-        <header className="topbar">
-          <button
-            className="mobile-menu icon-button"
-            aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-            aria-expanded={mobileMenuOpen}
-            aria-controls="app-sidebar"
-            onClick={() => setMenu((value) => !value)}
-          >
-            <Menu />
-          </button>
-          <div className="topbar-breadcrumb">
-            Tu comunidad. Tu fútbol.<span>/</span>
-            <strong>Temporada 2026 / 27</strong>
-          </div>
-          <div className="topbar-right">
-            <span className="private-label">
-              <ShieldCheck size={15} /> Ligas privadas, rivalidad real
-            </span>
+    <LiveContext.Provider value={live}>
+      <div className="app-shell">
+        <Sidebar
+          open={mobileMenuOpen}
+          mobile={mobile}
+          onClose={closeMenu}
+          items={nav}
+          onPrefetch={preloadPage}
+        />
+        <div
+          className="main-shell"
+          inert={mobileMenuOpen}
+          aria-hidden={mobileMenuOpen || undefined}
+        >
+          <header className="topbar">
             <button
-              aria-label="Ver perfil"
-              onPointerEnter={() => preloadPage("/perfil")}
-              onFocus={() => preloadPage("/perfil")}
-              onPointerDown={() => preloadPage("/perfil")}
-              className="profile-button"
-              onClick={() => navigate("/perfil")}
+              className="mobile-menu icon-button"
+              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="app-sidebar"
+              onClick={() => setMenu((value) => !value)}
             >
-              <span className="avatar">
-                {user?.photoURL ? (
-                  <img src={user.photoURL} alt="Tu avatar" />
-                ) : (
-                  user?.displayName?.charAt(0) || "G"
-                )}
-              </span>
-              <span>{user?.displayName || "Mi perfil"}</span>
-              <ChevronRight size={14} />
+              <Menu />
             </button>
-          </div>
-        </header>
-        <main>
-          {demo && (
-            <div className="demo-banner">
-              <span>
-                <Activity size={15} /> Modo demo · Calendario y resultados de
-                ejemplo. Los pronósticos no se guardan en la nube.
+            <div className="topbar-breadcrumb">
+              Tu comunidad. Tu fútbol.<span>/</span>
+              <strong>Temporada 2026 / 27</strong>
+            </div>
+            <div className="topbar-right">
+              <span className="private-label">
+                <ShieldCheck size={15} /> Ligas privadas, rivalidad real
               </span>
-              <button onClick={() => setDemo(false)}>
-                Salir de demo <X size={14} />
-              </button>
-            </div>
-          )}
-          {error && (
-            <div className="error" role="alert">
-              {error}
-              <button onClick={() => setError("")} aria-label="Cerrar error">
-                <X size={16} />
-              </button>
-            </div>
-          )}
-          <Suspense
-            fallback={
-              <div
-                className="page-skeleton"
-                role="status"
-                aria-label="Cargando página"
+              <button
+                aria-label="Ver perfil"
+                onPointerEnter={() => preloadPage("/perfil")}
+                onFocus={() => preloadPage("/perfil")}
+                onPointerDown={() => preloadPage("/perfil")}
+                className="profile-button"
+                onClick={() => navigate("/perfil")}
               >
-                <span />
-                <span />
-                <span />
-              </div>
-            }
-          >
-            <div className="route-view" key={pathname}>
-              <Routes>
-                <Route
-                  path="/equipos"
-                  element={<TeamsPage matches={matches} demo={demo} />}
-                />
-                <Route
-                  path="/"
-                  element={
-                    <HomePage
-                      userId={user?.uid || ""}
-                      matches={matches}
-                      loading={loading}
-                      demo={demo}
-                    />
-                  }
-                />
-                <Route
-                  path="/partidos"
-                  element={
-                    <MatchesPage
-                      matches={matches}
-                      demo={demo}
-                      onDemo={() => setDemo(true)}
-                      loading={loading}
-                      userId={user?.uid || ""}
-                    />
-                  }
-                />
-                <Route
-                  path="/quiniela"
-                  element={
-                    !authReady ? (
-                      <Empty title="Comprobando sesión…">Un momento.</Empty>
-                    ) : !user && !demo ? (
-                      <PrivateGate
-                        onLogin={() => setLogin(true)}
-                        onDemo={() => setDemo(true)}
-                      />
-                    ) : (
-                      <PredictionsPage
-                        matches={matches}
-                        groups={activeGroups}
-                        user={user}
-                        demo={demo}
-                      />
-                    )
-                  }
-                />
-                <Route
-                  path="/grupos"
-                  element={
-                    <GroupsPage
-                      user={user}
-                      groups={activeGroups}
-                      refresh={refreshGroups}
-                      onLogin={() => setLogin(true)}
-                    />
-                  }
-                />
-                <Route
-                  path="/clasificacion"
-                  element={
-                    <StandingsPage
-                      groups={activeGroups}
-                      matches={matches}
-                      loading={loading}
-                      user={user}
-                      onLogin={() => setLogin(true)}
-                    />
-                  }
-                />
-                <Route
-                  path="/perfil"
-                  element={
-                    <ProfilePage
-                      user={user}
-                      groups={activeGroups}
-                      onLogin={() => setLogin(true)}
-                      onUpdated={() => setProfileVersion((v) => v + 1)}
-                    />
-                  }
-                />
-                <Route
-                  path="/porra"
-                  element={
-                    !authReady ? (
-                      <Empty title="Preparando tus porras…">Un momento.</Empty>
-                    ) : (
-                      <PorraPage
-                        key={user?.uid || "guest"}
-                        owner={user?.uid || "guest"}
-                        matches={matches}
-                        demo={demo}
-                        loading={loading}
-                      />
-                    )
-                  }
-                />
-                <Route
-                  path="*"
-                  element={
-                    <Empty title="Fuera de juego">
-                      Esta página no existe.{" "}
-                      <Link to="/">Volver al inicio</Link>
-                    </Empty>
-                  }
-                />
-              </Routes>
+                <span className="avatar">
+                  {user?.photoURL ? (
+                    <img src={user.photoURL} alt="Tu avatar" />
+                  ) : (
+                    user?.displayName?.charAt(0) || "G"
+                  )}
+                </span>
+                <span>{user?.displayName || "Mi perfil"}</span>
+                <ChevronRight size={14} />
+              </button>
             </div>
-          </Suspense>
-          <footer className="main-footer">
-            <span>© {new Date().getFullYear()} GalacticBet</span>
-            <span>
-              Fútbol real. Rivalidad sana.{" "}
-              <span className="green-text">Siempre entre amigos.</span>
-            </span>
-            <Link to="/perfil?tab=play">
-              Cómo jugar <ArrowUpRight size={13} />
-            </Link>
-          </footer>
-        </main>
+          </header>
+          <main>
+            {demo && (
+              <div className="demo-banner">
+                <span>
+                  <Activity size={15} /> Modo demo · Calendario y resultados de
+                  ejemplo. Los pronósticos no se guardan en la nube.
+                </span>
+                <button onClick={() => setDemo(false)}>
+                  Salir de demo <X size={14} />
+                </button>
+              </div>
+            )}
+            {error && (
+              <div className="error" role="alert">
+                {error}
+                <button onClick={() => setError("")} aria-label="Cerrar error">
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+            <Suspense
+              fallback={
+                <div
+                  className="page-skeleton"
+                  role="status"
+                  aria-label="Cargando página"
+                >
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              }
+            >
+              <div className="route-view" key={pathname}>
+                <Routes>
+                  <Route
+                    path="/equipos"
+                    element={<TeamsPage matches={matches} demo={demo} />}
+                  />
+                  <Route
+                    path="/"
+                    element={
+                      <HomePage
+                        userId={user?.uid || ""}
+                        matches={matches}
+                        loading={loading}
+                        demo={demo}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/partidos"
+                    element={
+                      <MatchesPage
+                        matches={matches}
+                        demo={demo}
+                        onDemo={() => setDemo(true)}
+                        loading={loading}
+                        userId={user?.uid || ""}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/quiniela"
+                    element={
+                      !authReady ? (
+                        <Empty title="Comprobando sesión…">Un momento.</Empty>
+                      ) : !user && !demo ? (
+                        <PrivateGate
+                          onLogin={() => setLogin(true)}
+                          onDemo={() => setDemo(true)}
+                        />
+                      ) : (
+                        <PredictionsPage
+                          matches={matches}
+                          groups={activeGroups}
+                          user={user}
+                          demo={demo}
+                        />
+                      )
+                    }
+                  />
+                  <Route
+                    path="/grupos"
+                    element={
+                      <GroupsPage
+                        user={user}
+                        groups={activeGroups}
+                        refresh={refreshGroups}
+                        onLogin={() => setLogin(true)}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/clasificacion"
+                    element={
+                      <StandingsPage
+                        groups={activeGroups}
+                        matches={matches}
+                        loading={loading}
+                        user={user}
+                        onLogin={() => setLogin(true)}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/perfil"
+                    element={
+                      <ProfilePage
+                        user={user}
+                        groups={activeGroups}
+                        onLogin={() => setLogin(true)}
+                        onUpdated={() => setProfileVersion((v) => v + 1)}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/porra"
+                    element={
+                      !authReady ? (
+                        <Empty title="Preparando tus porras…">
+                          Un momento.
+                        </Empty>
+                      ) : (
+                        <PorraPage
+                          key={user?.uid || "guest"}
+                          owner={user?.uid || "guest"}
+                          matches={matches}
+                          demo={demo}
+                          loading={loading}
+                        />
+                      )
+                    }
+                  />
+                  <Route
+                    path="*"
+                    element={
+                      <Empty title="Fuera de juego">
+                        Esta página no existe.{" "}
+                        <Link to="/">Volver al inicio</Link>
+                      </Empty>
+                    }
+                  />
+                </Routes>
+              </div>
+            </Suspense>
+            <footer className="main-footer">
+              <span>© {new Date().getFullYear()} GalacticBet</span>
+              <span>
+                Fútbol real. Rivalidad sana.{" "}
+                <span className="green-text">Siempre entre amigos.</span>
+              </span>
+              <Link to="/perfil?tab=play">
+                Cómo jugar <ArrowUpRight size={13} />
+              </Link>
+            </footer>
+          </main>
+        </div>
+        <BottomNavigation
+          items={nav}
+          inactive={mobileMenuOpen}
+          onPrefetch={preloadPage}
+        />
+        {login && <LoginModal close={() => setLogin(false)} />}
       </div>
-      <BottomNavigation
-        items={nav}
-        inactive={mobileMenuOpen}
-        onPrefetch={preloadPage}
-      />
-      {login && <LoginModal close={() => setLogin(false)} />}
-    </div>
+    </LiveContext.Provider>
   );
 }
