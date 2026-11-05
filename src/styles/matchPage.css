@@ -484,3 +484,8 @@
     font-size: 21px;
   }
 }
+.match-hero-half {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}

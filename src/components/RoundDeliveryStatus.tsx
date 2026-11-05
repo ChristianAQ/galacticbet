@@ -1,6 +1,10 @@
-import { ChevronDown } from "lucide-react";
 import type { Participant } from "../lib/data";
+import { countdownLabel } from "../lib/matchPreview";
 
+/**
+ * Shown only while the round is open and someone still has to save: who is
+ * missing, the group progress and the time left before the first kick-off.
+ */
 export default function RoundDeliveryStatus({
   memberIds,
   participants,
@@ -8,6 +12,7 @@ export default function RoundDeliveryStatus({
   ready,
   deadline,
   clock,
+  userId,
 }: {
   memberIds: string[];
   participants: Participant[];
@@ -15,86 +20,76 @@ export default function RoundDeliveryStatus({
   ready: boolean;
   deadline: number | null;
   clock: number;
-  canShare: boolean;
-  sealed: boolean;
+  userId: string;
 }) {
   const done = memberIds.filter((id) => completedIds.includes(id));
   const missing = memberIds.filter((id) => !completedIds.includes(id));
   const validDate = deadline !== null && Number.isFinite(deadline);
   const closed = validDate && clock >= deadline;
+  if (!ready || closed || !missing.length) return null;
+  const me = missing.includes(userId);
+  const others = missing.filter((id) => id !== userId);
+  const ordered = me ? [userId, ...others] : others;
   const date = validDate
     ? new Intl.DateTimeFormat("es", {
+        weekday: "short",
         day: "numeric",
         month: "short",
         hour: "2-digit",
         minute: "2-digit",
       }).format(deadline)
-    : "Fecha pendiente";
+    : "";
+  const progress = memberIds.length
+    ? (done.length / memberIds.length) * 100
+    : 0;
   return (
-    <details
-      className="delivery-panel panel"
-      aria-label="Entregas de la jornada"
-      aria-busy={!ready}
-    >
-      <summary className="delivery-summary">
-        <strong
-          aria-label={
-            ready
-              ? `${done.length} de ${memberIds.length} participantes han guardado`
-              : "Comprobando entregas"
-          }
+    <section className="delivery-alert panel" aria-label="Entregas pendientes">
+      <div className="delivery-alert-head">
+        <div>
+          <strong>
+            {missing.length === 1
+              ? me
+                ? "Solo faltas tú"
+                : "Falta 1 por guardar"
+              : `Faltan ${missing.length} por guardar`}
+          </strong>
+          <span>
+            {validDate ? (
+              <>
+                Cierra en{" "}
+                {countdownLabel(new Date(deadline).toISOString(), clock)} ·{" "}
+                <time dateTime={new Date(deadline).toISOString()}>{date}</time>
+              </>
+            ) : (
+              "Fecha de cierre pendiente"
+            )}
+          </span>
+        </div>
+        <span
+          className="delivery-alert-count"
+          aria-label={`${done.length} de ${memberIds.length} han guardado`}
         >
-          {ready ? done.length : "—"} <span>de {memberIds.length}</span>
-        </strong>
-        <span className={`delivery-summary-date ${closed ? "is-closed" : ""}`}>
-          <span className="delivery-date-label">Inicio de jornada</span>
-          {validDate ? (
-            <time
-              dateTime={new Date(deadline).toISOString()}
-              title={
-                closed
-                  ? "Jornada iniciada · Plazo cerrado"
-                  : "Inicio de jornada · Cierre de entregas"
-              }
-            >
-              {date}
-            </time>
-          ) : (
-            date
-          )}
-          <ChevronDown size={15} aria-hidden="true" />
+          {done.length}
+          <small>/{memberIds.length}</small>
         </span>
-      </summary>
-      <div className="delivery-content">
-        {!ready ? (
-          <p className="delivery-all-done" role="status">
-            Comprobando quién falta…
-          </p>
-        ) : missing.length ? (
-          <div className="delivery-missing">
-            <h3>
-              {closed ? "Sin entregar" : "Faltan por guardar"}
-              <span>{missing.length}</span>
-            </h3>
-            <ul>
-              {missing.map((id) => {
-                const name =
-                  participants.find((p) => p.id === id)?.name || "Jugador";
-                return (
-                  <li key={id}>
-                    <span className="delivery-person-icon" aria-hidden="true">
-                      {name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span>{name}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ) : (
-          <p className="delivery-all-done">Todos han guardado su quiniela.</p>
-        )}
       </div>
-    </details>
+      <div className="delivery-alert-track" aria-hidden="true">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <ul className="delivery-alert-people" aria-label="Pendientes">
+        {ordered.map((id) => {
+          const name =
+            id === userId
+              ? "Tú"
+              : participants.find((p) => p.id === id)?.name || "Jugador";
+          return (
+            <li key={id} className={id === userId ? "is-me" : undefined}>
+              <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
+              {name}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

@@ -1,14 +1,12 @@
 import { isCompetition, type CompetitionCode } from "../lib/competitions";
 import { useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowUpRight, Target, Trophy } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { knockoutContext } from "../lib/matchInsights";
 import CompetitionTabs from "../components/CompetitionTabs";
 import RoundSelector from "../components/RoundSelector";
 import { Empty, MatchRow, PageTitle } from "../components/ui";
 import { preferredRound, type Match } from "../lib/domain";
-import { LEAGUE_STAGES } from "../lib/leagueTable";
-import { countdownLabel } from "../lib/matchPreview";
 import { preferenceStore } from "../lib/preferences";
 import { roundOptions } from "../lib/roundOptions";
 import { usePreferences } from "../lib/useGroupSelection";
@@ -18,6 +16,35 @@ const dayTitle = new Intl.DateTimeFormat("es", {
   day: "numeric",
   month: "long",
 });
+const weekday = new Intl.DateTimeFormat("es", { weekday: "long" });
+const dayMonth = new Intl.DateTimeFormat("es", {
+  day: "numeric",
+  month: "long",
+});
+
+/** Day separator: «Hoy»/«Mañana» or the weekday, the date and the fixture count. */
+function DayTitle({ date, count }: { date: string; count: number }) {
+  const day = new Date(date);
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+  const relative =
+    day.toDateString() === today.toDateString()
+      ? "Hoy"
+      : day.toDateString() === tomorrow.toDateString()
+        ? "Mañana"
+        : "";
+  return (
+    <h2 className={`match-day-title${relative ? " is-near" : ""}`}>
+      <span className="match-day-name">{relative || weekday.format(day)}</span>
+      <span className="match-day-date">{dayMonth.format(day)}</span>
+      <i className="match-day-rule" aria-hidden="true" />
+      <span className="match-day-count">
+        {count} {count === 1 ? "partido" : "partidos"}
+      </span>
+    </h2>
+  );
+}
 
 export default function MatchesPage({
   matches,
@@ -51,7 +78,6 @@ export default function MatchesPage({
   const rounds = useMemo(() => roundOptions(filtered), [filtered]);
   const current = useMemo(() => preferredRound(filtered), [filtered]);
   const selected = rounds.some((r) => r.id === round) ? round : current;
-  const selectedRound = rounds.find((r) => r.id === selected);
   const days = useMemo(() => {
     const byDay = new Map<string, Match[]>();
     for (const m of filtered
@@ -62,7 +88,6 @@ export default function MatchesPage({
     }
     return [...byDay.values()];
   }, [filtered, selected]);
-  const isLeague = LEAGUE_STAGES.includes(days[0]?.[0]?.stage || "");
   return (
     <>
       <PageTitle eyebrow="CALENDARIO Y RESULTADOS" title="Partidos" />
@@ -90,31 +115,6 @@ export default function MatchesPage({
           }
         />
       )}
-      {selectedRound && (selectedRound.state === "open" || isLeague) && (
-        <nav className="round-actions" aria-label="Acciones de la jornada">
-          {selectedRound.state === "open" && (
-            <Link
-              className="round-action is-primary"
-              to={`/quiniela?round=${encodeURIComponent(selectedRound.id)}`}
-            >
-              <Target size={16} aria-hidden="true" />
-              <span>
-                <strong>Hacer mi quiniela</strong>
-                <small>Cierra en {countdownLabel(selectedRound.start)}</small>
-              </span>
-            </Link>
-          )}
-          {isLeague && (
-            <Link className="round-action" to="/clasificacion?vista=liga">
-              <Trophy size={16} aria-hidden="true" />
-              <span>
-                <strong>Clasificación</strong>
-                <small>Tabla de la competición</small>
-              </span>
-            </Link>
-          )}
-        </nav>
-      )}
       <div className="match-calendar-list">
         {loading ? (
           <Empty title="Cargando partidos…">Consultando Firestore.</Empty>
@@ -125,9 +125,7 @@ export default function MatchesPage({
               className="match-day"
               aria-label={dayTitle.format(new Date(items[0].utcDate))}
             >
-              <h2 className="match-day-title">
-                {dayTitle.format(new Date(items[0].utcDate))}
-              </h2>
+              <DayTitle date={items[0].utcDate} count={items.length} />
               {items.map((m) => {
                 const tie = knockoutContext(m, matches);
                 return (

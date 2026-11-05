@@ -2,11 +2,10 @@ import { competitionCode, competitionName } from "../lib/competitions";
 import { COMPETITION_CODES } from "../lib/competitions";
 import type { User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
-import { Save } from "lucide-react";
+import { CalendarDays, ChevronDown, Save } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import CompetitionSwitch from "../components/CompetitionSwitch";
-import FilterPanel, { FilterField } from "../components/FilterPanel";
+import PageFilters from "../components/PageFilters";
 import ConfirmQuiniela from "../components/ConfirmQuiniela";
 import RoundDeliveryStatus from "../components/RoundDeliveryStatus";
 import GroupPredictions from "../components/GroupPredictions";
@@ -380,60 +379,43 @@ export default function PredictionsPage({
                     : "Jornada abierta · Haz tu pronóstico antes del primer partido."
         }
       />
-      <FilterPanel
-        title={
-          demo
-            ? "Grupo de demostración"
-            : selectedGroup?.name || "Selecciona tu grupo"
-        }
-        summary={`${competitionName(demo ? demoCompetition : active?.competition)} · ${list[0] ? roundLabel(list[0]) : "Sin jornada"} · ${mode === "classic" ? "Clásica 1X2" : "Marcador exacto"}`}
+      <PageFilters
+        groups={demo ? [] : groups}
+        groupId={group}
+        groupLabel={demo ? "Grupo de demostración" : undefined}
+        onGroup={setGroup}
+        disabled={selectorsDisabled}
         competition={competitionCode(
           demo ? demoCompetition : active?.competition,
         )}
-        applyLabel="Ver mis apuestas"
-      >
-        {!demo && (
-          <FilterField label="Grupo">
-            <select
-              aria-label="Grupo"
-              value={group}
-              disabled={selectorsDisabled}
-              onChange={(e) => setGroup(e.target.value)}
-            >
-              <option value="">Selecciona tu grupo</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </FilterField>
-        )}
-        <CompetitionSwitch
-          value={competitionCode(demo ? demoCompetition : active?.competition)}
-          disabled={selectorsDisabled}
-          available={
-            demo
-              ? [...COMPETITION_CODES]
-              : COMPETITION_CODES.filter((code) =>
-                  seasons.some((s) => s.competition === code),
-                )
+        available={
+          demo
+            ? COMPETITION_CODES
+            : COMPETITION_CODES.filter((code) =>
+                seasons.some((s) => s.competition === code),
+              )
+        }
+        onCompetition={(code) => {
+          if (demo) setDemoCompetition(code);
+          else {
+            if (user) preferenceStore.update(user.uid, { competition: code });
+            setSeason(seasons.find((s) => s.competition === code)?.id || "");
           }
-          onChange={(code) => {
-            if (demo) setDemoCompetition(code);
-            else {
-              if (user) preferenceStore.update(user.uid, { competition: code });
-              setSeason(seasons.find((s) => s.competition === code)?.id || "");
-            }
-            setRound("");
-          }}
-        />
+          setRound("");
+        }}
+        aside={
+          <span className="page-filters-chip">
+            {mode === "classic" ? "1X2" : "Marcador exacto"}
+          </span>
+        }
+      >
         {!demo &&
           seasons.filter((s) => s.competition === active?.competition).length >
             1 && (
-            <FilterField label="Temporada">
+            <label className="group-picker page-filters-season">
+              <CalendarDays size={16} aria-hidden="true" />
+              <span className="sr-only">Temporada de la competición</span>
               <select
-                aria-label="Temporada de la competición"
                 value={season}
                 disabled={selectorsDisabled}
                 onChange={(e) => {
@@ -447,14 +429,15 @@ export default function PredictionsPage({
                     const year = Number(s.id.split("-")[1]);
                     return (
                       <option key={s.id} value={s.id}>
-                        {year} / {year + 1}
+                        Temporada {year} / {year + 1}
                       </option>
                     );
                   })}
               </select>
-            </FilterField>
+              <ChevronDown size={16} aria-hidden="true" />
+            </label>
           )}
-      </FilterPanel>
+      </PageFilters>
       {(demo || active) && (
         <RoundSelector
           rounds={rounds}
@@ -499,8 +482,7 @@ export default function PredictionsPage({
             ready={delivery.attendanceReady}
             deadline={delivery.deadline}
             clock={clock}
-            canShare={canShare}
-            sealed={isSealed}
+            userId={uid}
           />
           {!isSealed && (
             <section

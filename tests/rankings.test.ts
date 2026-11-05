@@ -1,6 +1,8 @@
 import { expect, it } from "vitest";
 import {
   buildRanking,
+  latestScoredRound,
+  rankingMovement,
   rankingRounds,
   type SeasonRanking,
 } from "../src/lib/rankings";
@@ -258,4 +260,44 @@ it("determina la modalidad de la jornada sin confundir temporadas históricas", 
   expect(isClassicRanking(configs, "PD", "PD-2027-REGULAR_SEASON-1")).toBe(
     false,
   );
+});
+
+it("calcula subidas y bajadas respecto a la última jornada puntuada", () => {
+  const people = [
+    { id: "a", name: "Ana", avatar: null },
+    { id: "b", name: "Bea", avatar: null },
+    { id: "c", name: "Carla", avatar: null },
+  ];
+  const seasons: SeasonRanking[] = [
+    {
+      id: "PD-2026",
+      competition: "PD",
+      mode: "classic",
+      standings: [
+        {
+          id: "a",
+          points: 5,
+          hits: 5,
+          rounds: { r1: { points: 5, hits: 5 } },
+        },
+        {
+          id: "b",
+          points: 7,
+          hits: 7,
+          rounds: { r1: { points: 3, hits: 3 }, r2: { points: 4, hits: 4 } },
+        },
+        {
+          id: "c",
+          points: 1,
+          hits: 1,
+          rounds: { r1: { points: 1, hits: 1 } },
+        },
+      ],
+    },
+  ];
+  const total = buildRanking(people, seasons, "PD");
+  const latest = latestScoredRound(people, seasons, "PD", ["r1", "r2", "r3"]);
+  expect(latest?.id).toBe("r2");
+  const moves = rankingMovement(total, latest!.rows);
+  expect(Object.fromEntries(moves)).toEqual({ b: 1, a: -1, c: 0 });
 });

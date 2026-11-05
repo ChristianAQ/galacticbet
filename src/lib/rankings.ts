@@ -151,3 +151,42 @@ export function currentRankingRound(
   );
   return preferredRound(fixtures, now) || roundIds.at(-1) || "";
 }
+
+/**
+ * Places gained (positive) or lost with one round: compares the current totals with
+ * the same totals minus that round. Display only; ties share positions as usual.
+ */
+export function rankingMovement(total: RankingRow[], round: RankingRow[]) {
+  const gained = new Map(round.map((r) => [r.id, r.points]));
+  const before = total
+    .map((r) => ({ ...r, points: r.points - (gained.get(r.id) || 0) }))
+    .sort(
+      (a, b) =>
+        b.points - a.points ||
+        a.name.localeCompare(b.name, "es") ||
+        a.id.localeCompare(b.id),
+    );
+  const previous = new Map<string, number>();
+  let position = 1;
+  before.forEach((row, index) => {
+    if (index && row.points !== before[index - 1].points) position = index + 1;
+    previous.set(row.id, position);
+  });
+  return new Map(
+    total.map((r) => [r.id, (previous.get(r.id) ?? r.position) - r.position]),
+  );
+}
+
+/** Latest round of the scope where somebody already scored, for «Última jornada». */
+export function latestScoredRound(
+  participants: Participant[],
+  seasons: SeasonRanking[],
+  scope: string,
+  roundIds: string[],
+) {
+  for (const id of [...roundIds].reverse()) {
+    const rows = buildRanking(participants, seasons, scope, id);
+    if (rows.some((r) => r.points > 0)) return { id, rows };
+  }
+  return null;
+}

@@ -23,7 +23,6 @@ import MatchMeta from "../components/MatchMeta";
 import MatchOddsPanel from "../components/MatchOddsPanel";
 import MatchPreview from "../components/MatchPreview";
 import MatchProbability from "../components/MatchProbability";
-import MatchResult from "../components/MatchResult";
 import MatchStatistics from "../components/MatchStatistics";
 import MatchTimeline from "../components/MatchTimeline";
 import Matchups from "../components/Matchups";
@@ -49,6 +48,7 @@ import {
   type MatchInsight,
 } from "../lib/matchInsightsData";
 import { chronologicalGoals } from "../lib/matchPresentation";
+import { finishedMatchResult } from "../lib/matchResult";
 import { countdownLabel } from "../lib/matchPreview";
 import { preferenceStore } from "../lib/preferences";
 import { useLiveMatch } from "../lib/useLiveBoard";
@@ -219,6 +219,7 @@ function MatchView({
     if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
     else navigate(`/partidos?competition=${match.competition}`);
   }
+  const result = finishedMatchResult(match);
   const canPlay = !demo && canPredict(match.utcDate, now, match.status);
   return (
     <article
@@ -273,12 +274,21 @@ function MatchView({
               <LiveMinute match={match} />
             ) : upcoming ? (
               `Empieza en ${countdownLabel(match.utcDate, now)}`
-            ) : match.status === "FINISHED" ? (
-              "Final · 90 min"
+            ) : result ? (
+              result.extended && result.winnerName ? (
+                `Gana ${result.winnerName} ${result.decision.toLowerCase()}`
+              ) : (
+                "Final"
+              )
             ) : (
               matchStatusLabel[match.status] || match.status
             )}
           </span>
+          {result?.halfTime && (
+            <small className="match-hero-half">
+              Descanso {result.halfTime.home}–{result.halfTime.away}
+            </small>
+          )}
         </div>
         <div className="match-hero-team">
           <span className="match-hero-crest">
@@ -389,14 +399,6 @@ function MatchView({
         )}
         {tab === "events" && (
           <>
-            {match.status === "FINISHED" && (
-              <MatchResult
-                match={match}
-                insight={insight}
-                loading={loading}
-                demo={demo}
-              />
-            )}
             {demo ? (
               <p className="match-extra-empty">
                 La demo no consulta información de partidos reales.
