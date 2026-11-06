@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LEAGUE_TABS, type LeagueTab } from "../lib/leagueHub";
 
 export default function LeagueNavigation({
@@ -17,67 +11,12 @@ export default function LeagueNavigation({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const sentinel = useRef<HTMLSpanElement>(null);
   const [compact, setCompact] = useState(false);
-  const compactRef = useRef(false);
-  const holdUntil = useRef(0);
-  function expand() {
-    compactRef.current = false;
-    holdUntil.current = performance.now() + 400;
-    setCompact(false);
-  }
-  useEffect(() => {
-    let frame = 0;
-    let lastY = Math.max(0, window.scrollY);
-    let direction = 0;
-    let distance = 0;
-    function update() {
-      frame = 0;
-      const y = Math.max(0, window.scrollY);
-      const delta = y - lastY;
-      lastY = y;
-      if (y < 16) {
-        if (compactRef.current) {
-          compactRef.current = false;
-          setCompact(false);
-        }
-        distance = 0;
-        return;
-      }
-      if (performance.now() < holdUntil.current) return;
-      const nextDirection = Math.sign(delta);
-      if (!nextDirection) return;
-      distance =
-        nextDirection === direction
-          ? distance + Math.abs(delta)
-          : Math.abs(delta);
-      direction = nextDirection;
-      const keyboardFocus =
-        ref.current?.contains(document.activeElement) &&
-        document.activeElement?.matches(":focus-visible");
-      const next =
-        direction < 0 && distance > 18
-          ? false
-          : y > 80 && direction > 0 && distance > 32 && !keyboardFocus
-            ? true
-            : compactRef.current;
-      if (next === compactRef.current) return;
-      compactRef.current = next;
-      setCompact(next);
-      // Ignore layout-induced scrolling during the height transition.
-      holdUntil.current = performance.now() + 300;
-      distance = 0;
-    }
-    const scroll = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    window.addEventListener("scroll", scroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", scroll);
-      cancelAnimationFrame(frame);
-    };
-  }, []);
   useLayoutEffect(() => {
     const topbar = document.querySelector<HTMLElement>(".topbar");
+    let pinned: IntersectionObserver | undefined;
+    let observedOffset = -1;
     const update = () => {
       const style = topbar && getComputedStyle(topbar);
       const offset =
@@ -93,6 +32,19 @@ export default function LeagueNavigation({
         "--league-navigation-height",
         `${ref.current.getBoundingClientRect().height}px`,
       );
+      if (observedOffset === offset || !sentinel.current) return;
+      observedOffset = offset;
+      pinned?.disconnect();
+      // A fixed origin keeps the logos compact until the navigation returns to
+      // its resting position, even when scrolling up or changing tabs.
+      pinned = new IntersectionObserver(
+        ([entry]) =>
+          setCompact(
+            !entry.isIntersecting && entry.boundingClientRect.top < offset,
+          ),
+        { rootMargin: `-${offset}px 0px 0px 0px`, threshold: 0 },
+      );
+      pinned.observe(sentinel.current);
     };
     update();
     const observer = new ResizeObserver(update);
@@ -102,12 +54,12 @@ export default function LeagueNavigation({
     window.addEventListener("resize", update);
     return () => {
       observer.disconnect();
+      pinned?.disconnect();
       window.removeEventListener("resize", update);
     };
   }, []);
   function select(next: LeagueTab) {
     if (next === tab) return;
-    expand();
     const panel = document.getElementById("league-panel");
     const header = ref.current;
     if (panel && header) {
@@ -131,66 +83,60 @@ export default function LeagueNavigation({
     onChange(next);
   }
   return (
-    <div
-      className={`league-navigation${compact ? " is-compact" : ""}`}
-      ref={ref}
-      onFocusCapture={expand}
-    >
-      {children}
+    <>
+      <span ref={sentinel} className="sticky-sentinel" aria-hidden="true" />
       <div
-        className="league-tabs-wrap"
-        inert={compact}
-        aria-hidden={compact || undefined}
+        className={`league-navigation${compact ? " is-compact" : ""}`}
+        ref={ref}
       >
-        <div className="league-tabs-clip">
-          <div
-            className="league-tabs"
-            role="tablist"
-            aria-label="Información de la liga"
-            onKeyDown={(e) => {
-              const current = LEAGUE_TABS.findIndex((t) => t.id === tab);
-              const next =
-                e.key === "Home"
-                  ? 0
-                  : e.key === "End"
-                    ? 3
-                    : e.key === "ArrowRight"
-                      ? (current + 1) % 4
-                      : e.key === "ArrowLeft"
-                        ? (current + 3) % 4
-                        : null;
-              if (next === null) return;
-              e.preventDefault();
-              select(LEAGUE_TABS[next].id);
-              ref.current
-                ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-                [next]?.focus({ preventScroll: true });
+        {children}
+        <div
+          className="league-tabs"
+          role="tablist"
+          aria-label="Información de la liga"
+          onKeyDown={(e) => {
+            const current = LEAGUE_TABS.findIndex((t) => t.id === tab);
+            const next =
+              e.key === "Home"
+                ? 0
+                : e.key === "End"
+                  ? 3
+                  : e.key === "ArrowRight"
+                    ? (current + 1) % 4
+                    : e.key === "ArrowLeft"
+                      ? (current + 3) % 4
+                      : null;
+            if (next === null) return;
+            e.preventDefault();
+            select(LEAGUE_TABS[next].id);
+            ref.current
+              ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+              [next]?.focus({ preventScroll: true });
+          }}
+        >
+          <span
+            className="league-tab-indicator"
+            aria-hidden="true"
+            style={{
+              transform: `translateX(${LEAGUE_TABS.findIndex((t) => t.id === tab) * 100}%)`,
             }}
-          >
-            <span
-              className="league-tab-indicator"
-              aria-hidden="true"
-              style={{
-                transform: `translateX(${LEAGUE_TABS.findIndex((t) => t.id === tab) * 100}%)`,
-              }}
-            />
-            {LEAGUE_TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                id={`league-tab-${t.id}`}
-                aria-selected={t.id === tab}
-                aria-controls="league-panel"
-                tabIndex={t.id === tab ? 0 : -1}
-                onClick={() => select(t.id)}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          />
+          {LEAGUE_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`league-tab-${t.id}`}
+              aria-selected={t.id === tab}
+              aria-controls="league-panel"
+              tabIndex={t.id === tab ? 0 : -1}
+              onClick={() => select(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }

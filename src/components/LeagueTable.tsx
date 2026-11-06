@@ -1,6 +1,7 @@
 import type { CompetitionCode } from "../lib/competitions";
 import { competitionName } from "../lib/competitions";
 import type { LeagueRow } from "../lib/leagueTable";
+import { useStuck } from "../lib/useStuck";
 import { formNames } from "./TeamForm";
 import { Crest } from "./ui";
 import "../styles/dashboard.css";
@@ -49,10 +50,14 @@ export default function LeagueTable({
   highlight?: string[];
   full?: boolean;
 }) {
+  const { sentinel, stuck } = useStuck();
   const config = leagueZones[code];
   const zones = config && rows.length === config.size ? config.zones : [];
   return (
     <>
+      {full && (
+        <span ref={sentinel} className="sticky-sentinel" aria-hidden="true" />
+      )}
       <table className={full ? "competition-table" : "league-table"}>
         <caption className="sr-only">
           Clasificación de {competitionName(code)}
@@ -67,7 +72,7 @@ export default function LeagueTable({
             <col className="competition-col-points" />
           </colgroup>
         )}
-        <thead>
+        <thead className={full && stuck ? "is-stuck" : undefined}>
           <tr>
             <th scope="col">#</th>
             <th scope="col">Equipo</th>

@@ -100,23 +100,6 @@ main:has(.leagues-page) > .main-footer {
   width: 28px;
   height: 28px;
 }
-.league-tabs-wrap {
-  display: grid;
-  grid-template-rows: 1fr;
-  opacity: 1;
-  transition:
-    grid-template-rows 240ms ease,
-    opacity 180ms ease;
-}
-.league-tabs-clip {
-  min-height: 0;
-  overflow: hidden;
-}
-.league-navigation.is-compact .league-tabs-wrap {
-  grid-template-rows: 0fr;
-  opacity: 0;
-  pointer-events: none;
-}
 .league-tabs {
   position: relative;
   display: grid;
@@ -163,6 +146,14 @@ main:has(.leagues-page) > .main-footer {
 }
 .league-content {
   min-height: 300px;
+  /* Short/loading tabs retain enough height to keep the pinned menu stable. */
+  min-height: max(
+    300px,
+    calc(
+      100svh - var(--league-header-offset, 0px) -
+        var(--league-navigation-height, 0px)
+    )
+  );
   padding-bottom: 12px;
 }
 .league-content:focus-visible {
@@ -238,6 +229,18 @@ main:has(.leagues-page) > .main-footer {
   color: var(--muted);
   font-size: 10px;
   box-shadow: 0 1px 0 var(--border);
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+.competition-table thead.is-stuck th {
+  background: #232a36;
+  color: #e0e6ef;
+  box-shadow:
+    inset 0 1px 0 #ffffff0b,
+    0 1px 0 #3b4657,
+    0 6px 12px #00000024;
 }
 .competition-col-position {
   width: var(--table-position-width);
@@ -441,7 +444,7 @@ main:has(.leagues-page) > .main-footer {
 @media (prefers-reduced-motion: reduce) {
   .league-tabs button,
   .league-tab-indicator,
-  .league-tabs-wrap,
+  .competition-table thead th,
   .league-selection .competition-tabs > button,
   .league-selection .competition-tabs > button > span:last-child,
   .league-selection .competition-logo.competition-badge.small {
