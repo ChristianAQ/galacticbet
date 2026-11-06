@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   Target,
   Trophy,
-  Users,
   X,
 } from "lucide-react";
 import {
@@ -75,10 +74,9 @@ const nav = [
   { to: "/ligas", label: "Ligas", icon: CalendarDays },
   { to: "/quiniela", label: "Mi quiniela", short: "Quiniela", icon: Target },
   { to: "/clasificacion", label: "Clasificación", icon: Trophy },
-  { to: "/grupos", label: "Mis grupos", short: "Grupos", icon: Users },
 ];
-// Groups stay in the side menu; the bottom bar keeps the four daily sections.
-const bottomNav = nav.filter((item) => item.to !== "/grupos");
+// Group management remains available from the profile and the group actions.
+const bottomNav = nav;
 function LegacyMatchesRoute() {
   const { search, hash } = useLocation();
   return <Navigate to={{ pathname: "/ligas", search, hash }} replace />;

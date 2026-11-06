@@ -57,6 +57,16 @@ export default function LeagueTable({
         <caption className="sr-only">
           Clasificación de {competitionName(code)}
         </caption>
+        {full && (
+          <colgroup>
+            <col className="competition-col-position" />
+            <col />
+            <col className="competition-col-stat" span={4} />
+            <col className="competition-col-goals" />
+            <col className="competition-col-difference" />
+            <col className="competition-col-points" />
+          </colgroup>
+        )}
         <thead>
           <tr>
             <th scope="col">#</th>
@@ -86,14 +96,9 @@ export default function LeagueTable({
               {full ? "D" : "P"}
             </th>
             {full ? (
-              <>
-                <th scope="col" title="Goles a favor">
-                  GF
-                </th>
-                <th scope="col" title="Goles en contra">
-                  GC
-                </th>
-              </>
+              <th scope="col" title="Goles a favor y en contra">
+                +/−
+              </th>
             ) : (
               <th scope="col" className="hide-sm" title="Goles">
                 Goles
@@ -133,7 +138,7 @@ export default function LeagueTable({
                   <span className="league-pos">{position}</span>
                 </td>
                 <th scope="row">
-                  <span className="league-team">
+                  <span className="league-team" title={r.name}>
                     <Crest src={r.crest} />
                     <span>{r.name}</span>
                   </span>
@@ -143,10 +148,11 @@ export default function LeagueTable({
                 <td className={full ? undefined : "hide-sm"}>{r.draws}</td>
                 <td className={full ? undefined : "hide-sm"}>{r.losses}</td>
                 {full ? (
-                  <>
-                    <td>{r.goalsFor}</td>
-                    <td>{r.goalsAgainst}</td>
-                  </>
+                  <td
+                    aria-label={`${r.goalsFor} a favor, ${r.goalsAgainst} en contra`}
+                  >
+                    {r.goalsFor}-{r.goalsAgainst}
+                  </td>
                 ) : (
                   <td className="hide-sm">
                     {r.goalsFor}:{r.goalsAgainst}

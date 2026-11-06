@@ -4,20 +4,27 @@ import NewsSection from "../components/NewsSection";
 import {
   competitionSeasons,
   leagueTab,
-  seasonLabel,
+  LEAGUE_TABS,
   type LeagueTab,
 } from "../lib/leagueHub";
 import "../styles/leagues.css";
 import "../styles/dashboard.css";
 import { isCompetition, type CompetitionCode } from "../lib/competitions";
-import { lazy, Suspense, useEffect, useMemo } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import { useStuck } from "../lib/useStuck";
 import { knockoutContext } from "../lib/matchInsights";
 import CompetitionTabs from "../components/CompetitionTabs";
 import RoundSelector from "../components/RoundSelector";
-import { Empty, MatchRow, PageTitle } from "../components/ui";
+import { Empty, MatchRow } from "../components/ui";
 import { preferredRound, type Match } from "../lib/domain";
 import { preferenceStore } from "../lib/preferences";
 import { roundOptions } from "../lib/roundOptions";
@@ -90,6 +97,30 @@ export default function MatchesPage({
     : preferences.competition;
   const round = params.get("round") || "";
   const tab = leagueTab(params.get("tab"));
+  const panel = useRef<HTMLDivElement>(null);
+  const previousTab = useRef(tab);
+  useLayoutEffect(() => {
+    const previous = previousTab.current;
+    previousTab.current = tab;
+    if (
+      previous === tab ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return;
+    const direction =
+      LEAGUE_TABS.findIndex((t) => t.id === tab) >
+      LEAGUE_TABS.findIndex((t) => t.id === previous)
+        ? 1
+        : -1;
+    const animation = panel.current?.animate(
+      [
+        { opacity: 0, transform: `translateX(${direction * 22}px)` },
+        { opacity: 1, transform: "translateX(0)" },
+      ],
+      { duration: 260, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+    );
+    return () => animation?.cancel();
+  }, [tab]);
   const seasons = useMemo(
     () => competitionSeasons(matches, competition),
     [matches, competition],
@@ -136,8 +167,8 @@ export default function MatchesPage({
     return [...byDay.values()];
   }, [filtered, selected]);
   return (
-    <section className="leagues-page">
-      <PageTitle eyebrow="FÚTBOL · TODO EN UN LUGAR" title="Ligas" />
+    <section className="leagues-page" aria-label="Ligas">
+      <h1 className="sr-only">Ligas</h1>
       <LeagueNavigation tab={tab} onChange={changeTab}>
         <div className="league-selection">
           <CompetitionTabs
@@ -156,36 +187,10 @@ export default function MatchesPage({
               );
             }}
           />
-          <label className="league-season">
-            <span>Temporada</span>
-            <select
-              aria-label="Temporada de la liga"
-              disabled={!seasons.length || loading}
-              value={seasonId}
-              onChange={(e) => {
-                const value = e.target.value;
-                setParams(
-                  (previous) => {
-                    const next = new URLSearchParams(previous);
-                    next.set("season", value);
-                    next.delete("round");
-                    return next;
-                  },
-                  { replace: true },
-                );
-              }}
-            >
-              {!seasons.length && <option value="">Sin temporada</option>}
-              {seasons.map((id) => (
-                <option key={id} value={id}>
-                  {seasonLabel(id)}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
       </LeagueNavigation>
       <div
+        ref={panel}
         id="league-panel"
         role="tabpanel"
         aria-labelledby={`league-tab-${tab}`}

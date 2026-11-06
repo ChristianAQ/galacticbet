@@ -47,8 +47,7 @@ export default function CompetitionTable({
           <div
             className="competition-table-scroll"
             role="region"
-            aria-label="Tabla completa; desplaza horizontalmente para ver todas las columnas"
-            tabIndex={0}
+            aria-label="Clasificación completa de equipos"
           >
             <LeagueTable rows={rows} code={competitionCode(competition)} full />
           </div>
