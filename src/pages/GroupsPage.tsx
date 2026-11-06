@@ -1,11 +1,12 @@
 import { competitionName } from "../lib/competitions";
 import { COMPETITION_CODES } from "../lib/competitions";
 import type { User } from "firebase/auth";
-import { ArrowRight, Copy, LockKeyhole, Plus, UserPlus } from "lucide-react";
+import { ArrowRight, Copy, LockKeyhole } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import CompetitionLogo from "../components/CompetitionLogo";
 import GroupList from "../components/GroupList";
+import GroupActions from "../components/GroupActions";
 import Modal from "../components/Modal";
 import { Empty, PageTitle, PrivateGate, readableError } from "../components/ui";
 import {
@@ -110,16 +111,10 @@ export default function GroupsPage({
               </Empty>
             </div>
           )}
-          <div className="group-bottom-actions">
-            <button className="button primary" onClick={() => open("create")}>
-              <Plus size={18} />
-              Crear grupo
-            </button>
-            <button className="button secondary" onClick={() => open("join")}>
-              <UserPlus size={18} />
-              Unirme a un grupo
-            </button>
-          </div>
+          <GroupActions
+            onCreate={() => open("create")}
+            onJoin={() => open("join")}
+          />
           {modal && (
             <GroupForm
               key={modal}

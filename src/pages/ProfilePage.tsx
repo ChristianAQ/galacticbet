@@ -1,8 +1,9 @@
 import type { User } from "firebase/auth";
 import { ArrowRight, LogOut, Target, Trophy, UserRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import GroupList from "../components/GroupList";
+import GroupActions from "../components/GroupActions";
 import { FormGuide } from "../components/TeamForm";
 import { Empty, PageTitle, readableError } from "../components/ui";
 import type { Group } from "../lib/data";
@@ -187,17 +188,12 @@ export default function ProfilePage({
               ) : (
                 <div className="panel">
                   <Empty title="Todavía no tienes grupo">
-                    Crea uno o únete al de tus amigos desde Mis grupos.
+                    Crea uno o únete al de tus amigos con su código de
+                    invitación.
                   </Empty>
                 </div>
               )}
-              <Link
-                className="button secondary profile-groups-link"
-                to="/grupos"
-              >
-                Ir a Mis grupos
-                <ArrowRight size={16} />
-              </Link>
+              <GroupActions />
             </>
           ) : (
             <div className="panel">

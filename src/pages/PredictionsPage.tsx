@@ -4,7 +4,8 @@ import type { User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { CalendarDays, ChevronDown, Save } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import GroupActions from "../components/GroupActions";
 import PageFilters from "../components/PageFilters";
 import ConfirmQuiniela from "../components/ConfirmQuiniela";
 import RoundDeliveryStatus from "../components/RoundDeliveryStatus";
@@ -606,27 +607,32 @@ export default function PredictionsPage({
           )}
         </>
       ) : (
-        <Empty
-          title={
-            demo || active
-              ? "Aún no hay partidos disponibles"
-              : groups.length
-                ? "Elige tu competición"
-                : "Primero, reúne a tu equipo"
+        <div
+          className={
+            !demo && user && !groups.length
+              ? "panel group-empty-state"
+              : undefined
           }
         >
-          {demo ? (
-            "La demo contiene únicamente una jornada de LaLiga."
-          ) : active ? (
-            "Los partidos aparecerán cuando se sincronice el calendario de esta competición."
-          ) : (
-            <>
-              <Link to="/grupos">
-                Crea un grupo o únete con un código de invitación.
-              </Link>
-            </>
-          )}
-        </Empty>
+          <Empty
+            title={
+              demo || active
+                ? "Aún no hay partidos disponibles"
+                : groups.length
+                  ? "Elige tu competición"
+                  : "Primero, reúne a tu equipo"
+            }
+          >
+            {demo
+              ? "La demo contiene únicamente una jornada de LaLiga."
+              : active
+                ? "Los partidos aparecerán cuando se sincronice el calendario de esta competición."
+                : groups.length
+                  ? "Selecciona tu grupo y una competición para ver tu quiniela."
+                  : "Crea un grupo o únete con un código de invitación."}
+          </Empty>
+          {!demo && user && !groups.length && <GroupActions />}
+        </div>
       )}
       {confirm && (
         <ConfirmQuiniela

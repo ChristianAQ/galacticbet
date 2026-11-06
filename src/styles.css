@@ -2797,6 +2797,12 @@ td {
   padding-top: 25px;
   border-top: 1px solid var(--border);
 }
+.group-empty-state .group-bottom-actions {
+  justify-content: center;
+  margin: 0 20px 24px;
+  padding-top: 0;
+  border-top: 0;
+}
 .group-form-modal h2 {
   padding-right: 20px;
   margin-bottom: 20px;
@@ -2950,7 +2956,8 @@ td {
   .group-detail-links > a {
     flex: 1 1 auto;
   }
-  .group-bottom-actions > button {
+  .group-bottom-actions > button,
+  .group-bottom-actions > a {
     flex: 1 1 140px;
     padding-left: 10px;
     padding-right: 10px;

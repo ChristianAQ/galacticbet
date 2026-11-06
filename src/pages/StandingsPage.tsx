@@ -2,7 +2,8 @@ import { competitionName } from "../lib/competitions";
 import type { User } from "firebase/auth";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import GroupActions from "../components/GroupActions";
 import { Empty, PageTitle, PrivateGate } from "../components/ui";
 import { type Group } from "../lib/data";
 import { useGroupRankings } from "../lib/useGroupRankings";
@@ -56,11 +57,12 @@ export default function StandingsPage({
       {!user ? (
         <PrivateGate onLogin={onLogin} />
       ) : (
-        <Empty title="Tu grupo, en la tabla">
-          <Link to="/grupos">
+        <div className="panel group-empty-state">
+          <Empty title="Tu grupo, en la tabla">
             Crea un grupo o únete con un código de invitación.
-          </Link>
-        </Empty>
+          </Empty>
+          <GroupActions />
+        </div>
       )}
     </>
   );
