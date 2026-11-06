@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useId } from "react";
 import { ArrowUpRight, Newspaper } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
@@ -10,7 +10,16 @@ const load = createNewsLoader(
   () => localStorage,
   async () => (db ? (await getDoc(doc(db, "news", "football"))).data() : null),
 );
-export default function NewsSection({ demo = false }: { demo?: boolean }) {
+export default function NewsSection({
+  demo = false,
+  competition,
+  seasonId,
+}: {
+  demo?: boolean;
+  competition?: string;
+  seasonId?: string;
+}) {
+  const titleId = useId();
   const [news, setNews] = useState<FootballNews | null>(null);
   const [loading, setLoading] = useState(!demo);
   const [error, setError] = useState(false);
@@ -39,15 +48,22 @@ export default function NewsSection({ demo = false }: { demo?: boolean }) {
       active = false;
     };
   }, [demo, attempt]);
-  const articles = news && !demo ? currentArticles(news) : [];
+  const articles =
+    news && !demo
+      ? currentArticles(news, Date.now(), competition, seasonId)
+      : [];
   return (
     <section
       className="news-section"
-      aria-labelledby="news-title"
+      aria-labelledby={titleId}
       aria-busy={loading}
     >
       <div className="section-heading">
-        <h2 id="news-title">Actualidad</h2>
+        <h2 id={titleId}>
+          {competition
+            ? `Noticias · ${competitionName(competition, true)}`
+            : "Actualidad"}
+        </h2>
         <Newspaper size={18} aria-hidden="true" />
       </div>
       <div className="panel news-feed">
@@ -67,7 +83,9 @@ export default function NewsSection({ demo = false }: { demo?: boolean }) {
           <p>
             {demo
               ? "Las noticias reales están disponibles fuera del modo demo."
-              : "No hay titulares recientes disponibles."}
+              : competition
+                ? "No hay titulares recientes disponibles para esta competición y temporada."
+                : "No hay titulares recientes disponibles."}
           </p>
         ) : (
           <>

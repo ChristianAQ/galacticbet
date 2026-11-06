@@ -1,11 +1,10 @@
-import { Copy, Download, LoaderCircle, Share2 } from "lucide-react";
+import { Download, LoaderCircle, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Modal from "./Modal";
 import "../styles/live.css";
 
 /**
- * Previews a locally generated PNG and offers the native share sheet, download and a
- * plain-text copy for chats. Nothing is uploaded by the app.
+ * Previews a locally generated PNG with native sharing and download. Nothing is uploaded.
  */
 export default function ShareDialog({
   title,
@@ -47,14 +46,6 @@ export default function ShareDialog({
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, []);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setMessage("Texto copiado. Pégalo en el chat de tu grupo.");
-    } catch {
-      setMessage("No se ha podido copiar. Usa Descargar imagen.");
-    }
-  }
   function download() {
     if (!url) return;
     const link = document.createElement("a");
@@ -73,7 +64,6 @@ export default function ShareDialog({
       if (file && navigator.share && navigator.canShare?.({ files: [file] }))
         await navigator.share({ title, text, files: [file] });
       else if (navigator.share) await navigator.share({ title, text });
-      else if (navigator.clipboard) await copy();
       else setMessage("Descarga la imagen para compartirla.");
     } catch (e) {
       if (!(e instanceof Error && e.name === "AbortError"))
@@ -114,13 +104,6 @@ export default function ShareDialog({
           disabled={!url}
         >
           <Download size={16} /> Descargar
-        </button>
-        <button
-          type="button"
-          className="button secondary"
-          onClick={() => void copy()}
-        >
-          <Copy size={16} /> Copiar texto
         </button>
       </div>
       {message && (

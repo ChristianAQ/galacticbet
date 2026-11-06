@@ -8,14 +8,14 @@ export function createNewsLoader(
   fetchNews: () => Promise<unknown>,
 ) {
   const cache = createMemoryCache(1);
-  const key = `galacticbet:news:v4:${project}`;
+  const key = `galacticbet:news:v5:${project}`;
   return () =>
     cache.read<FootballNews | null>(
       key,
       async () => {
         try {
           const raw = storage().getItem(key);
-          if (raw && raw.length <= 16000) {
+          if (raw && raw.length <= 64000) {
             const saved = JSON.parse(raw);
             if (
               typeof saved.at === "number" &&

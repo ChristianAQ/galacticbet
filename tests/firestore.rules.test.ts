@@ -49,6 +49,14 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
     await assertFails(setDoc(doc(db, "teamDirectory/featured"), { teams: [] }));
     await assertFails(setDoc(doc(env.authenticatedContext("alice").firestore(), "teamDirectory/featured"), { teams: [] }));
   });
+  it("permite obtener estadísticas de una temporada activa sin permitir listas ni escrituras", async () => {
+    const db = env.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(db, "leagueStats/CL-2026")));
+    await assertFails(getDoc(doc(db, "leagueStats/CDR-2026")));
+    await assertFails(getDocs(collection(db, "leagueStats")));
+    await assertFails(setDoc(doc(db, "leagueStats/CL-2026"), {rankings:{}}));
+    await assertFails(setDoc(doc(env.authenticatedContext("alice").firestore(), "leagueStats/CL-2026"), {rankings:{}}));
+  });
   beforeEach(async () => {
     await env.clearFirestore();
     await env.withSecurityRulesDisabled(async (c) => {

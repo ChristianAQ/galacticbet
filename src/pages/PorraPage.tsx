@@ -442,7 +442,7 @@ export default function PorraPage({
             {!upcoming.length && !editing && !loading && (
               <p className="porra-message">
                 No hay próximos partidos disponibles en el calendario.{" "}
-                <Link to="/partidos">Consultar partidos</Link>
+                <Link to="/ligas">Consultar partidos</Link>
               </p>
             )}
             <div className="porra-fields">

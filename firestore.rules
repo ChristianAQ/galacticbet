@@ -19,6 +19,7 @@ service cloud.firestore {
   // Complementary public match details, fetched only when a fixture is opened.
   match /teamDirectory/featured { allow get: if true; }
   match /news/football { allow get: if true; }
+  match /leagueStats/{id} { allow get: if id.matches('^(PD|CL|PL)-[0-9]{4}$'); }
   match /matchInsights/{id} { allow get: if true; }
   // Single public live board (scores, minute, goals and cards); backend writes only.
   match /live/football { allow get: if true; }

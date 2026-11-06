@@ -90,7 +90,7 @@ export default function MatchPage({
     ) : (
       <Empty title="Partido no encontrado">
         Puede que pertenezca a otra temporada.{" "}
-        <Link to="/partidos">Ver el calendario</Link>
+        <Link to="/ligas">Ver el calendario</Link>
       </Empty>
     );
   return (
@@ -217,7 +217,7 @@ function MatchView({
   function back() {
     // React Router keeps the history index: only go back inside the app.
     if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
-    else navigate(`/partidos?competition=${match.competition}`);
+    else navigate(`/ligas?competition=${match.competition}`);
   }
   const result = finishedMatchResult(match);
   const canPlay = !demo && canPredict(match.utcDate, now, match.status);

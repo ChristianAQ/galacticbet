@@ -117,10 +117,12 @@ export async function syncNews(
     validNews(previous) &&
     previous.linkPolicyVersion === 2 &&
     previous.contentVersion === 1 &&
+    previous.competitionArticles !== undefined &&
     Date.parse(previous.fetchedAt) <= now &&
     now - Date.parse(previous.fetchedAt) < 6 * 3_600_000;
   if (fresh) return;
   const all: FootballArticle[] = [];
+  const competitionArticles: FootballNews["competitionArticles"] = {};
   // A failed/empty response never replaces the last good feed. Fixed provider URLs only.
   for (const code of COMPETITION_CODES) {
     try {
@@ -139,6 +141,14 @@ export async function syncNews(
         const body = await response.text();
         if (body.length > 1_000_000) throw new Error("size");
         const articles = normalizeNews(JSON.parse(body), code, now, log);
+        if (articles.length)
+          competitionArticles[code] = [
+            ...new Map(articles.map((a) => [a.url, a])).values(),
+          ]
+            .sort(
+              (a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt),
+            )
+            .slice(0, 6);
         all.push(...articles);
         if (articles.length) break;
         if (suffix)
@@ -169,6 +179,7 @@ export async function syncNews(
     contentVersion: 1,
     fetchedAt: new Date(now).toISOString(),
     articles: unique,
+    competitionArticles,
   };
   await ref.set(news);
   log(`Noticias ESPN: ${unique.length} titulares guardados en un documento.`);

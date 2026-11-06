@@ -76,7 +76,7 @@ describe("Noticias: fuente, sincronización y caché", () => {
     expect(validNews(set.mock.calls[0][0])).toBe(true);
   });
   it("respeta seis horas de caché y conserva la edición anterior ante errores o vacío", async () => {
-    const { db, set } = database(feed);
+    const { db, set } = database({...feed, competitionArticles: {PD: feed.articles}});
     const request = vi.fn<typeof fetch>();
     await syncNews(db, { now: now + 3600000, request });
     expect(request).not.toHaveBeenCalled();

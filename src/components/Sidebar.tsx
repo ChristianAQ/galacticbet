@@ -152,7 +152,7 @@ export default function Sidebar({
         <div className="sidebar-competitions">
           <span className="sidebar-caption">COMPETICIONES</span>
           {COMPETITION_CODES.map((code) => (
-            <Link key={code} to={`/partidos?competition=${code}`}>
+            <Link key={code} to={`/ligas?competition=${code}`}>
               <span aria-hidden="true">
                 <CompetitionLogo code={code} small />
               </span>

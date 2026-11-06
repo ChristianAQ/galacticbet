@@ -343,3 +343,11 @@ Cada partido tiene su propia pantalla en `#/partido/{id}` (desde Inicio, Partido
 **Cuotas 1X2 (opcional):** crea una clave gratuita en [The Odds API](https://the-odds-api.com) y guárdala como repository secret `ODDS_API_KEY`. La sincronización consulta regiones `eu,uk` (2 créditos por competición) como máximo cada 12 horas por competición y solo si hay partidos en los próximos cuatro días, con un límite interno de 440 créditos/mes (plan gratuito: 500). Se publican en `odds/football` (lectura pública, sin listados ni escrituras de cliente). Las casas disponibles dependen del proveedor; bet365 no suele estar incluida. Información orientativa: GalacticBet no gestiona apuestas.
 
 Clasificación muestra solo la del grupo (las tablas de cada competición están en la pestaña «Clasificación» de cada partido). En «Total» se añaden los puntos de la última jornada puntuada y las flechas de puestos ganados o perdidos con ella. En Quiniela, el aviso de entregas solo aparece mientras la jornada está abierta y falta alguien por guardar.
+
+### Ligas: partidos, tabla, noticias y estadísticas
+
+La antigua sección Partidos pasa a **Ligas** (`/ligas`). Incluye cuatro pestañas con menú fijo bajo la cabecera, selector compartido de competición/temporada y navegación sin recargar. Conserva el calendario y las fichas; la clasificación muestra todas las columnas mediante desplazamiento horizontal en móvil. Los enlaces antiguos siguen funcionando.
+
+Los rankings de goleadores, asistencias y tarjetas se sincronizan desde SportAPI usando `SPORTAPI_KEY`, con caché de seis horas y cuota compartida. Se añaden participación en goles con cobertura identificada y rankings de equipos. Minutos y porterías a cero por portero muestran ausencia cuando no hay una fuente completa. Las noticias tienen un feed por competición dentro del documento existente. No hacen falta credenciales nuevas: esperar a Deploy frontend y Synchronize football and standings. [Fuentes, límites y comprobaciones](docs/ligas.md).
+
+Se retira «Copiar texto» del menú compartido de quinielas y clasificaciones, conservando Compartir y Descargar.

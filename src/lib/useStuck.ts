@@ -23,7 +23,13 @@ export function useStuck() {
     let observer: IntersectionObserver | undefined;
     const observe = () => {
       observer?.disconnect();
-      const offset = Math.ceil(stickyTopOffset()) + 1;
+      const hub = node
+        .closest(".leagues-page")
+        ?.querySelector(".league-navigation");
+      const offset =
+        Math.ceil(
+          stickyTopOffset() + (hub?.getBoundingClientRect().height || 0),
+        ) + 1;
       observer = new IntersectionObserver(
         ([entry]) =>
           setStuck(
@@ -34,10 +40,16 @@ export function useStuck() {
       observer.observe(node);
     };
     observe();
+    const header = node
+      .closest(".leagues-page")
+      ?.querySelector(".league-navigation");
+    const resize = new ResizeObserver(observe);
+    if (header) resize.observe(header, { box: "border-box" });
     const media = window.matchMedia(MOBILE_LAYOUT_QUERY);
     media.addEventListener("change", observe);
     return () => {
       observer?.disconnect();
+      resize.disconnect();
       media.removeEventListener("change", observe);
     };
   }, [node]);

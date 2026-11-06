@@ -24,6 +24,7 @@ import {
 } from "react";
 import {
   Link,
+  Navigate,
   Route,
   Routes,
   useNavigate,
@@ -48,7 +49,7 @@ import { LiveContext, useLiveBoard } from "./lib/useLiveBoard";
 const pageLoaders = {
   "/equipos": () => import("./pages/TeamsPage"),
   "/": () => import("./pages/HomePage"),
-  "/partidos": () => import("./pages/MatchesPage"),
+  "/ligas": () => import("./pages/MatchesPage"),
   "/quiniela": () => import("./pages/PredictionsPage"),
   "/grupos": () => import("./pages/GroupsPage"),
   "/clasificacion": () => import("./pages/StandingsPage"),
@@ -58,7 +59,7 @@ const pageLoaders = {
 };
 const TeamsPage = lazy(pageLoaders["/equipos"]);
 const HomePage = lazy(pageLoaders["/"]);
-const MatchesPage = lazy(pageLoaders["/partidos"]);
+const MatchesPage = lazy(pageLoaders["/ligas"]);
 const PredictionsPage = lazy(pageLoaders["/quiniela"]);
 const GroupsPage = lazy(pageLoaders["/grupos"]);
 const StandingsPage = lazy(pageLoaders["/clasificacion"]);
@@ -71,13 +72,17 @@ function preloadPage(path: string) {
 }
 const nav = [
   { to: "/", label: "Inicio", icon: Home },
-  { to: "/partidos", label: "Partidos", icon: CalendarDays },
+  { to: "/ligas", label: "Ligas", icon: CalendarDays },
   { to: "/quiniela", label: "Mi quiniela", short: "Quiniela", icon: Target },
   { to: "/clasificacion", label: "Clasificación", icon: Trophy },
   { to: "/grupos", label: "Mis grupos", short: "Grupos", icon: Users },
 ];
 // Groups stay in the side menu; the bottom bar keeps the four daily sections.
 const bottomNav = nav.filter((item) => item.to !== "/grupos");
+function LegacyMatchesRoute() {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: "/ligas", search, hash }} replace />;
+}
 export default function App() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -299,6 +304,7 @@ export default function App() {
             >
               <div className="route-view" key={pathname}>
                 <Routes>
+                  <Route path="/partidos" element={<LegacyMatchesRoute />} />
                   <Route
                     path="/equipos"
                     element={<TeamsPage matches={matches} demo={demo} />}
@@ -326,7 +332,7 @@ export default function App() {
                     }
                   />
                   <Route
-                    path="/partidos"
+                    path="/ligas"
                     element={
                       <MatchesPage
                         matches={matches}

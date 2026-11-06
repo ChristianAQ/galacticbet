@@ -26,8 +26,8 @@ export default function UpcomingSchedule({
     ["REGULAR_SEASON", "LEAGUE_STAGE", "GROUP_STAGE"].includes(next.stage);
   const roundName = isLeagueRound ? "jornada" : "ronda";
   const href = next
-    ? `/partidos?competition=${competition}&round=${encodeURIComponent(next.roundId)}`
-    : "/partidos";
+    ? `/ligas?competition=${competition}&round=${encodeURIComponent(next.roundId)}`
+    : "/ligas";
   return (
     <section
       className="schedule-board"
@@ -39,7 +39,7 @@ export default function UpcomingSchedule({
           <span className="eyebrow">AGENDA DE JUEGO</span>
           <h2>El próximo saque inicial</h2>
         </div>
-        <Link to="/partidos">
+        <Link to="/ligas">
           Calendario <ArrowRight size={15} />
         </Link>
       </div>

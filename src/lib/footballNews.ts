@@ -13,6 +13,7 @@ export interface FootballNews {
   contentVersion?: number;
   fetchedAt: string;
   articles: FootballArticle[];
+  competitionArticles?: Partial<Record<CompetitionCode, FootballArticle[]>>;
 }
 export const NEWS_MAX_AGE = 7 * 24 * 3_600_000;
 const ESPN_NEWS_DOMAINS = [
@@ -59,6 +60,18 @@ export function validNews(value: unknown): value is FootballNews {
     Number.isFinite(Date.parse(n.fetchedAt)) &&
     Array.isArray(n.articles) &&
     n.articles.length <= 6 &&
+    (n.competitionArticles === undefined ||
+      (typeof n.competitionArticles === "object" &&
+        n.competitionArticles !== null &&
+        !Array.isArray(n.competitionArticles) &&
+        Object.entries(n.competitionArticles).every(
+          ([code, articles]) =>
+            isCompetition(code) &&
+            Array.isArray(articles) &&
+            articles.length <= 6 &&
+            articles.every((a) => a?.competition === code) &&
+            validNews({ ...n, articles, competitionArticles: undefined }),
+        ))) &&
     n.articles.every(
       (a) =>
         a &&
@@ -74,10 +87,28 @@ export function validNews(value: unknown): value is FootballNews {
     )
   );
 }
-export function currentArticles(news: FootballNews, now = Date.now()) {
-  return news.articles.filter(
-    (a) =>
-      Date.parse(a.publishedAt) <= now &&
-      now - Date.parse(a.publishedAt) <= NEWS_MAX_AGE,
-  );
+export function currentArticles(
+  news: FootballNews,
+  now = Date.now(),
+  competition?: string,
+  seasonId?: string,
+) {
+  const year = seasonId ? Number(seasonId.split("-")[1]) : null;
+  const articles =
+    competition && isCompetition(competition)
+      ? (news.competitionArticles?.[competition] ??
+        news.articles.filter((a) => a.competition === competition))
+      : news.articles;
+  return articles
+    .filter(
+      (a) =>
+        Date.parse(a.publishedAt) <= now &&
+        now - Date.parse(a.publishedAt) <= NEWS_MAX_AGE &&
+        (!seasonId ||
+          (seasonId.split("-")[0] === competition &&
+            year !== null &&
+            Date.parse(a.publishedAt) >= Date.UTC(year, 6, 1) &&
+            Date.parse(a.publishedAt) < Date.UTC(year + 1, 6, 1))),
+    )
+    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 }

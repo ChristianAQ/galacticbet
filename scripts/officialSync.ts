@@ -1,3 +1,4 @@
+import { syncLeagueStats } from "./syncLeagueStats";
 import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { COMPETITION_CODES } from "../src/lib/competitions";
@@ -95,6 +96,17 @@ export async function officialSync(db: Firestore, token: string) {
       "No se pudo sincronizar ninguna competición. Revisa acceso y disponibilidad del proveedor.",
     );
   await recompute(db, cache, policies);
+  if (process.env.SPORTAPI_KEY?.trim()) {
+    try {
+      await syncLeagueStats(
+        db,
+        process.env.SPORTAPI_KEY,
+        [...cache.values()].flat(),
+      );
+    } catch {
+      console.warn("Estadísticas SportAPI: se conserva la edición anterior.");
+    }
+  }
   try {
     await syncTeamDirectory(db, api);
   } catch {

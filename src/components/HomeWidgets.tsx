@@ -86,7 +86,7 @@ export function QuinielaSpotlight({
             Las próximas quinielas aparecerán en cuanto se publique el
             calendario.
           </p>
-          <Link className="button secondary full" to="/partidos">
+          <Link className="button secondary full" to="/ligas">
             Ver calendario <ArrowRight size={16} />
           </Link>
         </>
@@ -118,7 +118,7 @@ export function MatchTicker({
             "Últimos resultados"
           )}
         </h2>
-        <Link to="/partidos">
+        <Link to="/ligas">
           Ver calendario <ArrowRight size={13} />
         </Link>
       </div>

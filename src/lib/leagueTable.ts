@@ -1,5 +1,9 @@
 import type { Match } from "./domain";
-import { hasRegulationResult, teamResult, type FormResult } from "./matchInsights";
+import {
+  hasRegulationResult,
+  teamResult,
+  type FormResult,
+} from "./matchInsights";
 
 export const LEAGUE_STAGES = ["REGULAR_SEASON", "LEAGUE_STAGE"];
 
@@ -57,6 +61,49 @@ export function leagueTable(results: Match[]): LeagueRow[] {
     }
   }
   return [...rows.values()].sort(
+    (a, b) =>
+      b.points - a.points ||
+      b.goalsFor - b.goalsAgainst - (a.goalsFor - a.goalsAgainst) ||
+      b.goalsFor - a.goalsFor ||
+      a.name.localeCompare(b.name, "es"),
+  );
+}
+
+/** A single selected season; scheduled league fixtures also supply the zero rows. */
+export function seasonLeagueTable(
+  matches: Match[],
+  competition: string,
+  seasonId: string,
+  now = Date.now(),
+) {
+  const own = matches.filter(
+    (m) =>
+      m.competition === competition &&
+      m.seasonId === seasonId &&
+      LEAGUE_STAGES.includes(m.stage),
+  );
+  const rows = leagueTable(own.filter((m) => Date.parse(m.utcDate) <= now));
+  const known = new Set(rows.map((r) => r.key));
+  for (const m of own)
+    for (const side of ["home", "away"] as const) {
+      const key = teamKey(m, side);
+      if (known.has(key) || !m[side] || m[side] === "Por determinar") continue;
+      known.add(key);
+      rows.push({
+        key,
+        name: m[side],
+        crest: side === "home" ? m.homeCrest : m.awayCrest,
+        played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        points: 0,
+        form: [],
+      });
+    }
+  return rows.sort(
     (a, b) =>
       b.points - a.points ||
       b.goalsFor - b.goalsAgainst - (a.goalsFor - a.goalsAgainst) ||

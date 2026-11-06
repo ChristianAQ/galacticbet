@@ -19,6 +19,16 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "news",
+      "fieldPath": "competitionArticles",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "leagueStats",
+      "fieldPath": "rankings",
+      "indexes": []
+    },
+    {
       "collectionGroup": "providerBudgets",
       "fieldPath": "reservations",
       "indexes": []

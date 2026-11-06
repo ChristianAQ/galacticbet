@@ -41,17 +41,19 @@ export default function LeagueTable({
   rows,
   code,
   highlight = [],
+  full = false,
 }: {
   rows: LeagueRow[];
   code: CompetitionCode;
   /** Team keys to mark, e.g. both sides of the open fixture. */
   highlight?: string[];
+  full?: boolean;
 }) {
   const config = leagueZones[code];
   const zones = config && rows.length === config.size ? config.zones : [];
   return (
     <>
-      <table className="league-table">
+      <table className={full ? "competition-table" : "league-table"}>
         <caption className="sr-only">
           Clasificación de {competitionName(code)}
         </caption>
@@ -62,25 +64,50 @@ export default function LeagueTable({
             <th scope="col" title="Partidos jugados">
               PJ
             </th>
-            <th scope="col" className="hide-sm" title="Ganados">
-              G
+            <th
+              scope="col"
+              className={full ? undefined : "hide-sm"}
+              title="Victorias"
+            >
+              {full ? "V" : "G"}
             </th>
-            <th scope="col" className="hide-sm" title="Empatados">
+            <th
+              scope="col"
+              className={full ? undefined : "hide-sm"}
+              title="Empatados"
+            >
               E
             </th>
-            <th scope="col" className="hide-sm" title="Perdidos">
-              P
+            <th
+              scope="col"
+              className={full ? undefined : "hide-sm"}
+              title="Derrotas"
+            >
+              {full ? "D" : "P"}
             </th>
-            <th scope="col" className="hide-sm" title="Goles">
-              Goles
-            </th>
+            {full ? (
+              <>
+                <th scope="col" title="Goles a favor">
+                  GF
+                </th>
+                <th scope="col" title="Goles en contra">
+                  GC
+                </th>
+              </>
+            ) : (
+              <th scope="col" className="hide-sm" title="Goles">
+                Goles
+              </th>
+            )}
             <th scope="col" title="Diferencia de goles">
               DG
             </th>
             <th scope="col">Pts</th>
-            <th scope="col" className="hide-md">
-              Forma
-            </th>
+            {!full && (
+              <th scope="col" className="hide-md">
+                Forma
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -112,30 +139,39 @@ export default function LeagueTable({
                   </span>
                 </th>
                 <td>{r.played}</td>
-                <td className="hide-sm">{r.wins}</td>
-                <td className="hide-sm">{r.draws}</td>
-                <td className="hide-sm">{r.losses}</td>
-                <td className="hide-sm">
-                  {r.goalsFor}:{r.goalsAgainst}
-                </td>
+                <td className={full ? undefined : "hide-sm"}>{r.wins}</td>
+                <td className={full ? undefined : "hide-sm"}>{r.draws}</td>
+                <td className={full ? undefined : "hide-sm"}>{r.losses}</td>
+                {full ? (
+                  <>
+                    <td>{r.goalsFor}</td>
+                    <td>{r.goalsAgainst}</td>
+                  </>
+                ) : (
+                  <td className="hide-sm">
+                    {r.goalsFor}:{r.goalsAgainst}
+                  </td>
+                )}
                 <td>{diff > 0 ? `+${diff}` : diff}</td>
                 <td>
                   <strong>{r.points}</strong>
                 </td>
-                <td className="hide-md">
-                  <span
-                    className="team-form"
-                    aria-label={r.form.map((f) => formNames[f]).join(", ")}
-                  >
-                    {r.form.map((f, j) => (
-                      <span
-                        key={j}
-                        className={`form-dot form-${f}`}
-                        title={formNames[f]}
-                      />
-                    ))}
-                  </span>
-                </td>
+                {!full && (
+                  <td className="hide-md">
+                    <span
+                      className="team-form"
+                      aria-label={r.form.map((f) => formNames[f]).join(", ")}
+                    >
+                      {r.form.map((f, j) => (
+                        <span
+                          key={j}
+                          className={`form-dot form-${f}`}
+                          title={formNames[f]}
+                        />
+                      ))}
+                    </span>
+                  </td>
+                )}
               </tr>
             );
           })}
