@@ -22,6 +22,7 @@ import {
 import { auth, db } from "./firebase";
 import { privateCache } from "./memoryCache";
 import type { SeasonRanking } from "./rankings";
+import { validPotCents } from "./pot";
 import { createPrivateGroup, prepareGroupCompetitions } from "./groupSetup";
 import { decodeCalendar } from "./calendar";
 import { createCalendarLoader } from "./calendarCache";
@@ -31,6 +32,8 @@ export interface Group {
   name: string;
   ownerId: string;
   memberIds: string[];
+  /** Informational contribution per player and round, in cents. 0 = no pot. */
+  potCents?: number;
 }
 function database() {
   if (!db) throw new Error("Firebase no está configurado.");
@@ -61,8 +64,13 @@ export async function loadGroups(uid: string) {
   );
   return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Group);
 }
-export async function createGroup(uid: string, name: string, mode: Mode) {
-  const id = await createPrivateGroup(database(), uid, name, mode);
+export async function createGroup(
+  uid: string,
+  name: string,
+  mode: Mode,
+  potCents = 0,
+) {
+  const id = await createPrivateGroup(database(), uid, name, mode, potCents);
   privateCache.clear();
   return id;
 }
@@ -250,5 +258,13 @@ async function fetchGroupRankings(group: Group) {
 
 export async function renameGroup(groupId: string, name: string) {
   await updateDoc(doc(database(), "groups", groupId), { name: name.trim() });
+  privateCache.clear();
+}
+
+/** Owner only. The pot is informational: no money moves through the app. */
+export async function setGroupPot(groupId: string, potCents: number) {
+  if (!validPotCents(potCents))
+    throw new Error("La aportación debe estar entre 0 y 1.000 €.");
+  await updateDoc(doc(database(), "groups", groupId), { potCents });
   privateCache.clear();
 }

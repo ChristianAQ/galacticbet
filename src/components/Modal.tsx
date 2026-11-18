@@ -1,7 +1,10 @@
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "../lib/useBodyScrollLock";
+import { MOBILE_LAYOUT_QUERY } from "../lib/mobileViewport";
+import { prefersReducedMotion } from "../lib/motion";
+import { useSheetGesture } from "../lib/useSheetGesture";
 
 export default function Modal({
   title,
@@ -17,8 +20,24 @@ export default function Modal({
   className?: string;
 }) {
   const panel = useRef<HTMLElement>(null);
+  const backdrop = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const [closing, setClosing] = useState(false);
   useBodyScrollLock(true);
+  // On phones the sheet slides away before unmounting; elsewhere it closes at once.
+  const requestClose = () => {
+    if (busy || closing) return;
+    if (
+      prefersReducedMotion() ||
+      !window.matchMedia(MOBILE_LAYOUT_QUERY).matches
+    ) {
+      onClose();
+      return;
+    }
+    setClosing(true);
+    window.setTimeout(onClose, 200);
+  };
+  useSheetGesture(panel, backdrop, { enabled: !busy, onDismiss: onClose });
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const root = document.getElementById("root");
@@ -36,10 +55,9 @@ export default function Modal({
   }, []);
   return createPortal(
     <div
-      className="modal-backdrop"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      ref={backdrop}
+      className={`modal-backdrop${closing ? " is-closing" : ""}`}
+      onClick={requestClose}
     >
       <section
         ref={panel}
@@ -53,7 +71,7 @@ export default function Modal({
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             e.preventDefault();
-            if (!busy) onClose();
+            requestClose();
           }
           if (e.key !== "Tab") return;
           const controls = panel.current?.querySelectorAll<HTMLElement>(
@@ -75,13 +93,14 @@ export default function Modal({
           }
         }}
       >
+        <span className="sheet-grabber" aria-hidden="true" />
         <h2 id={titleId}>{title}</h2>
         <button
           type="button"
           className="modal-close icon-button"
           aria-label="Cerrar ventana"
           disabled={busy}
-          onClick={onClose}
+          onClick={requestClose}
         >
           <X />
         </button>

@@ -8,6 +8,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import type { Mode } from "./domain";
+import { validPotCents } from "./pot";
 
 export function gameSeasonId(competition: string) {
   const now = new Date();
@@ -20,7 +21,10 @@ export async function createPrivateGroup(
   uid: string,
   name: string,
   mode: Mode,
+  potCents = 0,
 ) {
+  if (!validPotCents(potCents))
+    throw new Error("La aportación debe estar entre 0 y 1.000 €.");
   const trimmed = name.trim();
   if (trimmed.length < 3 || trimmed.length > 60)
     throw new Error("El nombre del grupo debe tener entre 3 y 60 caracteres.");
@@ -31,6 +35,7 @@ export async function createPrivateGroup(
     ownerId: uid,
     memberIds: [uid],
     createdAt: serverTimestamp(),
+    ...(potCents ? { potCents } : {}),
   });
   batch.set(doc(group, "members", uid), {
     userId: uid,

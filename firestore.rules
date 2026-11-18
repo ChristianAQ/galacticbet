@@ -5,6 +5,8 @@ service cloud.firestore {
   function member(gid) { return signed() && request.auth.uid in get(/databases/$(database)/documents/groups/$(gid)).data.memberIds; }
   function owner(gid) { return signed() && get(/databases/$(database)/documents/groups/$(gid)).data.ownerId == request.auth.uid; }
   function onlyMemberChange(before, after) { return after.diff(before).affectedKeys().hasOnly(['memberIds']); }
+  // Informational pot per player and round, in cents. The app never handles money.
+  function validPot(data) { return !('potCents' in data) || (data.potCents is int && data.potCents >= 0 && data.potCents <= 100000); }
   match /users/{uid} {
    allow read: if signed();
    allow create, update: if signed() && request.auth.uid == uid && request.resource.data.keys().hasOnly(['name','avatar','updatedAt']) && request.resource.data.name is string && request.resource.data.name.size() <= 100 && (request.resource.data.avatar == null || request.resource.data.avatar is string) && request.resource.data.updatedAt == request.time;
@@ -29,9 +31,9 @@ service cloud.firestore {
    // A high-entropy document ID is an invitation capability. Lists remain member-only.
    allow get: if signed();
    allow list: if signed() && request.auth.uid in resource.data.memberIds;
-   allow create: if signed() && request.resource.data.keys().hasOnly(['name','ownerId','memberIds','createdAt']) && request.resource.data.ownerId == request.auth.uid && request.resource.data.memberIds == [request.auth.uid] && getAfter(/databases/$(database)/documents/groups/$(gid)/members/$(request.auth.uid)).data.userId == request.auth.uid && request.resource.data.name is string && request.resource.data.name.size() >= 3 && request.resource.data.name.size() <= 60 && request.resource.data.createdAt == request.time;
+   allow create: if signed() && request.resource.data.keys().hasOnly(['name','ownerId','memberIds','createdAt','potCents']) && validPot(request.resource.data) && request.resource.data.ownerId == request.auth.uid && request.resource.data.memberIds == [request.auth.uid] && getAfter(/databases/$(database)/documents/groups/$(gid)/members/$(request.auth.uid)).data.userId == request.auth.uid && request.resource.data.name is string && request.resource.data.name.size() >= 3 && request.resource.data.name.size() <= 60 && request.resource.data.createdAt == request.time;
    allow update: if signed() && (
-    (owner(gid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']) && request.resource.data.name is string && request.resource.data.name.size() >= 3 && request.resource.data.name.size() <= 60)
+    (owner(gid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','potCents']) && validPot(request.resource.data) && request.resource.data.name is string && request.resource.data.name.size() >= 3 && request.resource.data.name.size() <= 60)
     || (onlyMemberChange(resource.data,request.resource.data) && request.resource.data.memberIds is list && request.resource.data.memberIds.size() <= 30 && (
       (!(request.auth.uid in resource.data.memberIds) && request.resource.data.memberIds.toSet() == resource.data.memberIds.toSet().union([request.auth.uid].toSet()) && request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1 && getAfter(/databases/$(database)/documents/groups/$(gid)/members/$(request.auth.uid)).data.userId == request.auth.uid)
       || (request.auth.uid in resource.data.memberIds && resource.data.ownerId != request.auth.uid && request.resource.data.memberIds.toSet() == resource.data.memberIds.toSet().difference([request.auth.uid].toSet()) && request.resource.data.memberIds.size() == resource.data.memberIds.size() - 1 && !existsAfter(/databases/$(database)/documents/groups/$(gid)/members/$(request.auth.uid)))

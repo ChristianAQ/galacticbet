@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, LocateFixed } from "lucide-react";
+import { haptic } from "../lib/motion";
 import { memo, useLayoutEffect, useRef } from "react";
 import {
   roundDateRange,
@@ -38,7 +39,9 @@ function RoundSelector({
   }, [value, rounds.length]);
   const go = (step: number) => {
     const next = rounds[index + step];
-    if (next) onChange(next.id);
+    if (!next) return;
+    haptic();
+    onChange(next.id);
   };
   if (!rounds.length)
     return (
@@ -117,7 +120,10 @@ function RoundSelector({
                 .join(", ")}
               tabIndex={i === Math.max(index, 0) ? 0 : -1}
               disabled={disabled}
-              onClick={() => onChange(r.id)}
+              onClick={() => {
+                if (r.id !== value) haptic();
+                onChange(r.id);
+              }}
             >
               <strong>{r.short}</strong>
               <small>{roundDateRange(r.start, r.end) || "—"}</small>

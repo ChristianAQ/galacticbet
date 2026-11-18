@@ -2,9 +2,15 @@ import { competitionCode, competitionName } from "../lib/competitions";
 import { COMPETITION_CODES } from "../lib/competitions";
 import type { User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
-import { CalendarDays, ChevronDown, Save } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  Coins,
+  Save,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
 import PageFilters from "../components/PageFilters";
 import ConfirmQuiniela from "../components/ConfirmQuiniela";
@@ -35,6 +41,12 @@ import { roundOptions } from "../lib/roundOptions";
 import { useGroupSelection } from "../lib/useGroupSelection";
 import { useRoundDelivery } from "../lib/useRoundDelivery";
 import { useStuck } from "../lib/useStuck";
+import { PotAmount } from "../components/PotCard";
+import { euroShort, groupPotCents } from "../lib/pot";
+import { euro } from "../lib/porra";
+
+/** Demo groups show a 5 € pot so the feature can be explored without an account. */
+const DEMO_POT_CENTS = 500;
 
 const demoPlayers: Participant[] = [
   { id: "demo-me", name: "Tú", avatar: null },
@@ -135,6 +147,15 @@ export default function PredictionsPage({
   });
   const deadlineClosed =
     delivery.deadline !== null && clock >= delivery.deadline;
+  const potCents = demo ? DEMO_POT_CENTS : groupPotCents(selectedGroup);
+  const potMembers = new Set(
+    demo
+      ? demoPlayers.map((p) => p.id).concat(uid)
+      : selectedGroup?.memberIds || [],
+  );
+  const potPlayers = delivery.completedIds.filter((id) =>
+    potMembers.has(id),
+  ).length;
   const required = list.filter((match) =>
     delivery.requiredIds.includes(match.id),
   );
@@ -474,6 +495,32 @@ export default function PredictionsPage({
         )}
       {list.length ? (
         <>
+          {potCents > 0 && (
+            <Link
+              className="pot-chip"
+              to={
+                demo
+                  ? "/perfil?tab=play"
+                  : `/clasificacion?group=${encodeURIComponent(group)}`
+              }
+              aria-label={`Bote de la jornada: ${euro(potCents * potPlayers)}, ${potPlayers} ${potPlayers === 1 ? "jugador" : "jugadores"}. Ver detalle`}
+            >
+              <Coins size={18} aria-hidden="true" />
+              <span className="pot-chip-text" aria-hidden="true">
+                <strong>Bote de la jornada</strong>
+                <small>
+                  {potPlayers} × {euroShort(potCents)} ·{" "}
+                  {delivery.completedIds.includes(uid)
+                    ? "Ya estás dentro"
+                    : deadlineClosed
+                      ? "No entraste esta jornada"
+                      : "Entras al guardar tu quiniela"}
+                </small>
+              </span>
+              <PotAmount cents={potCents * potPlayers} />
+              <ChevronRight size={16} aria-hidden="true" />
+            </Link>
+          )}
           <RoundDeliveryStatus
             key={`${group}:${list[0]?.roundId}`}
             memberIds={

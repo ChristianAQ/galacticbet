@@ -1,9 +1,9 @@
 import { competitionName } from "../lib/competitions";
 import { COMPETITION_CODES } from "../lib/competitions";
 import type { User } from "firebase/auth";
-import { ArrowRight, Copy, LockKeyhole } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { ArrowRight, Coins, Copy, LockKeyhole } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import CompetitionLogo from "../components/CompetitionLogo";
 import GroupList from "../components/GroupList";
 import GroupActions from "../components/GroupActions";
@@ -15,12 +15,17 @@ import {
   leaveGroup,
   loadGameSeasons,
   renameGroup,
+  setGroupPot,
   gameSeasonId,
   type Group,
   type Participant,
 } from "../lib/data";
 import { preferenceStore } from "../lib/preferences";
 import type { Mode } from "../lib/domain";
+import { PotField, PotIntro } from "../components/PotSettings";
+import { groupPotCents, parsePotInput, potInputValue } from "../lib/pot";
+import { euro } from "../lib/porra";
+import { haptic } from "../lib/motion";
 
 export default function GroupsPage({
   user,
@@ -157,18 +162,22 @@ function GroupForm({
   const [name, setName] = useState("");
   const [code, setCode] = useState(initialCode);
   const [mode, setMode] = useState<Mode>("classic");
+  const [pot, setPot] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
+    const potCents = parsePotInput(pot);
+    if (kind === "create" && potCents === null) return;
     setBusy(true);
     setError("");
     try {
       const id =
         kind === "create"
-          ? await createGroup(user.uid, name, mode)
+          ? await createGroup(user.uid, name, mode, potCents || 0)
           : await joinGroup(user.uid, code);
+      haptic();
       await onComplete(id);
     } catch (e) {
       setError(readableError(e));
@@ -224,6 +233,15 @@ function GroupForm({
               La modalidad se aplica a las tres competiciones y queda fija
               durante la temporada.
             </p>
+            <fieldset className="pot-settings">
+              <legend className="sr-only">Bote por jornada (opcional)</legend>
+              <strong>
+                <Coins size={14} aria-hidden="true" /> Bote por jornada{" "}
+                <small className="muted">· opcional</small>
+              </strong>
+              <PotIntro />
+              <PotField value={pot} onChange={setPot} disabled={busy} />
+            </fieldset>
           </>
         ) : (
           <>
@@ -252,7 +270,10 @@ function GroupForm({
             {error}
           </p>
         )}
-        <button className="button primary full" disabled={busy}>
+        <button
+          className="button primary full"
+          disabled={busy || (kind === "create" && parsePotInput(pot) === null)}
+        >
           {busy
             ? "Guardando…"
             : kind === "create"
@@ -392,6 +413,12 @@ function GroupDetails({
           })}
         </div>
       )}
+      <GroupPot
+        group={group}
+        owner={group.ownerId === user.uid}
+        refresh={refresh}
+        notify={notify}
+      />
       <h3>Invita a tus amigos</h3>
       <div className="invite-code">
         <code>{group.id}</code>
@@ -478,5 +505,100 @@ function GroupDetails({
         </button>
       )}
     </div>
+  );
+}
+
+function GroupPot({
+  group,
+  owner,
+  refresh,
+  notify,
+}: {
+  group: Group;
+  owner: boolean;
+  refresh: () => Promise<void>;
+  notify: (value: string) => void;
+}) {
+  const current = groupPotCents(group);
+  const [value, setValue] = useState(potInputValue(current));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const section = useRef<HTMLElement>(null);
+  const { hash } = useLocation();
+  useEffect(() => setValue(potInputValue(current)), [current]);
+  useEffect(() => {
+    if (hash !== "#bote") return;
+    const frame = requestAnimationFrame(() =>
+      section.current?.scrollIntoView({ block: "center", behavior: "smooth" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [hash]);
+  const cents = parsePotInput(value);
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (cents === null || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await setGroupPot(group.id, cents);
+      await refresh();
+      haptic();
+      notify(
+        cents
+          ? `Bote activado: ${euro(cents)} por jugador y jornada.`
+          : "Bote desactivado para este grupo.",
+      );
+    } catch (e) {
+      setError(readableError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section ref={section} id="bote" aria-labelledby={`pot-${group.id}`}>
+      <h3 id={`pot-${group.id}`}>Bote por jornada</h3>
+      {owner ? (
+        <form className="pot-settings" onSubmit={save}>
+          <PotIntro />
+          <PotField
+            value={value}
+            onChange={setValue}
+            disabled={busy}
+            members={group.memberIds.length}
+          />
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="pot-settings-actions">
+            <button
+              className="button secondary"
+              disabled={busy || cents === null || cents === current}
+            >
+              {busy ? "Guardando…" : "Guardar bote"}
+            </button>
+            <span className="muted footnote">
+              Se aplica a todas las jornadas que se muestren a partir de ahora.
+            </span>
+          </div>
+        </form>
+      ) : (
+        <div className="pot-settings">
+          <p>
+            {current ? (
+              <>
+                Cada jugador que entrega la jornada pone{" "}
+                <strong className="group-pot-badge">{euro(current)}</strong>.
+                Quien más puntúe se lleva el bote; los empates se reparten.
+              </>
+            ) : (
+              "Este grupo no tiene bote. Solo el administrador puede activarlo."
+            )}
+          </p>
+          <PotIntro />
+        </div>
+      )}
+    </section>
   );
 }

@@ -7,7 +7,14 @@ import GroupActions from "../components/GroupActions";
 import { Empty, PageTitle, PrivateGate } from "../components/ui";
 import { type Group } from "../lib/data";
 import { useGroupRankings } from "../lib/useGroupRankings";
-import { type Match } from "../lib/domain";
+import {
+  hasMatchStarted,
+  isRoundComplete,
+  type Match,
+} from "../lib/domain";
+import PotCard from "../components/PotCard";
+import { groupPotCents, potText, roundPot } from "../lib/pot";
+import { useRoundAttendance } from "../lib/useRoundAttendance";
 import PageFilters, { Segmented } from "../components/PageFilters";
 import RoundSelector from "../components/RoundSelector";
 import ShareTrigger from "../components/ShareTrigger";
@@ -177,6 +184,20 @@ function GroupStandings({
     scope,
     period === "round" ? selectedRound : "",
   );
+  const potCents = groupPotCents(selectedGroup);
+  const potRound = period === "round" && potCents > 0 ? selectedRound : "";
+  const attendance = useRoundAttendance(groupId, potRound, Boolean(potRound));
+  const pot = useMemo(() => {
+    if (!potRound || !data) return null;
+    const fixtures = matches.filter((m) => m.roundId === potRound);
+    return roundPot({
+      contributionCents: potCents,
+      rows,
+      participantIds: attendance.ids,
+      started: fixtures.some((m) => hasMatchStarted(m, Date.now())),
+      complete: isRoundComplete(fixtures),
+    });
+  }, [potRound, data, matches, potCents, rows, attendance.ids]);
   const hasPoints = rows.some((r) => r.points > 0);
   const shareGroup = selectedGroup?.name || "";
   const leaderPoints = rows[0]?.points || 0;
@@ -208,6 +229,7 @@ function GroupStandings({
               title,
               rows,
               showHits,
+              pot: pot ? potText(pot) : "",
             })}
             render={() =>
               import("../lib/shareImage").then((m) =>
@@ -289,6 +311,22 @@ function GroupStandings({
             className="ranking-view"
             key={`${groupId}:${scope}:${period}:${selectedRound}`}
           >
+            {pot && attendance.ready && !attendance.error && (
+              <PotCard
+                pot={pot}
+                userId={user.uid}
+                manageTo={
+                  selectedGroup.ownerId === user.uid
+                    ? `/grupos?group=${encodeURIComponent(selectedGroup.id)}#bote`
+                    : undefined
+                }
+              />
+            )}
+            {attendance.error && potRound && (
+              <p className="setup-notice" role="status">
+                No se pudo leer quién ha entrado en el bote: {attendance.error}
+              </p>
+            )}
             {hasPoints && rows.length >= 2 && (
               <Podium rows={rows} userId={user.uid} />
             )}

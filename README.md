@@ -1,6 +1,6 @@
 # GalacticBet ⚡
 
-Quinielas privadas de LaLiga y UEFA Champions League. React 19, TypeScript estricto, Vite, Tailwind 4 y Firebase. Sin apuestas de dinero.
+Quinielas privadas de LaLiga y UEFA Champions League. React 19, TypeScript estricto, Vite, Tailwind 4 y Firebase. Sin apuestas de dinero: el bote por jornada es solo informativo.
 
 ## Arranque
 
@@ -127,7 +127,7 @@ seasons/{PD-2026|CL-2026}            temporada y fechas
 rounds/{competition-year-stage-day} fase + jornada, requiredMatchIds y submissionDeadline del backend
 matches/{providerId}                kickoffAt Timestamp, utcDate, estado, marcador de 90 min
 calendars/{competition-year}        copia pública normalizada por temporada, solo escritura backend
-groups/{groupId}                    ownerId inmutable, memberIds, nombre
+groups/{groupId}                    ownerId inmutable, memberIds, nombre, potCents opcional (bote informativo)
   members/{uid}                    membresía y fecha de unión
   gameSeasons/{competition-year}    modalidad fija, temporada y estado de recálculo backend
     predictions/{uid_matchId}      usuario, partido, jornada, valor y updatedAt
@@ -237,6 +237,22 @@ Se guardan hasta 20 porras en `localStorage`, separadas por cuenta y con un espa
 Al guardar se muestra una tarjeta compacta con diseño claro. `porraImage` genera un PNG completo, con todos los nombres, marcadores, importe por persona y bote total; usa Canvas y tipografía local, sin librerías, imágenes externas ni problemas de CORS. La vista para captura ajusta esa imagen a la pantalla. Compartir usa el menú nativo de archivos cuando está disponible, con alternativa de texto y copia al portapapeles; también se puede descargar el PNG. Las porras creadas en modo demo se identifican como ejemplos en la tarjeta, el texto y la imagen. Las aportaciones son anotaciones: no se procesan cobros ni pagos.
 
 La página y sus estilos se cargan bajo demanda. No requiere credenciales, reglas ni índices nuevos. `tests/porra.test.ts` cubre importes, validación, aislamiento de cuentas, persistencia editable, límites, corrupción y fallos de almacenamiento. Se comprueban también el PNG, compartir, captura y las pantallas de 320, 390, 768 y 1440 píxeles mediante navegador local.
+
+## Bote informativo por jornada
+
+El administrador de un grupo puede fijar, al crearlo o desde Mis grupos, una aportación por jugador y jornada (`potCents`, entero en céntimos entre 0 y 100 000; 0 desactiva el bote). Solo él puede cambiarla y las reglas rechazan importes negativos, decimales, textos o cualquier otro campo nuevo, como una comisión.
+
+Entran en el bote los miembros que guardan su quiniela de esa jornada (`roundAttendance`, que ya se escribía al entregar). En Clasificación → Jornada se muestra el bote (jugadores × aportación), quién ha entrado, quién va ganando mientras la jornada está en juego y, al completarse con los mismos criterios de `isRoundComplete`, quién se lo lleva. Los empates se reparten a partes iguales en céntimos enteros y se indica el sobrante que no se puede dividir. Mi quiniela muestra un acceso compacto con el bote acumulado y si ya estás dentro. El texto compartido de la clasificación añade la línea del bote.
+
+Es una anotación: GalacticBet no cobra, no guarda ni paga dinero y no se queda comisión; los pagos los organiza el grupo por su cuenta. El cálculo vive en `src/lib/pot.ts` y lo cubre `tests/pot.test.ts`; las reglas, `tests/firestore.rules.test.ts`.
+
+## Experiencia iPhone
+
+- Las ventanas se abren como hojas inferiores con asa: se cierran deslizando hacia abajo desde arriba del contenido, con la X o tocando fuera, y acompañan al dedo con resistencia.
+- Cambiar de pestaña en la barra inferior usa View Transitions (Safari 18+): la página se desliza en la dirección de la pestaña mientras la barra superior y la inferior quedan fijas. Volver a tocar la pestaña activa sube al inicio.
+- Respuesta háptica ligera al cambiar de pestaña, competición, jornada o periodo y al guardar el bote (interruptor nativo de Safari 18 en iPhone; vibración en Android).
+- Respuesta visual al pulsar botones, tarjetas y chips, sin selección de texto ni menús de pulsación larga en los controles.
+- Todo respeta «Reducir movimiento» y «Reducir transparencia».
 
 ## Ficha ampliada de partidos
 

@@ -1,4 +1,5 @@
 import { ChevronDown, Users } from "lucide-react";
+import { haptic } from "../lib/motion";
 import type { ReactNode } from "react";
 import type { CompetitionCode } from "../lib/competitions";
 import CompetitionTabs from "./CompetitionTabs";
@@ -67,7 +68,9 @@ export default function PageFilters({
         value={competition}
         available={available}
         onChange={(code) => {
-          if (!disabled) onCompetition(code);
+          if (disabled) return;
+          if (code !== competition) haptic();
+          onCompetition(code);
         }}
         onAll={onAll && !disabled ? onAll : undefined}
       />
@@ -95,7 +98,10 @@ export function Segmented<T extends string>({
           key={o.value}
           type="button"
           aria-pressed={value === o.value}
-          onClick={() => onChange(o.value)}
+          onClick={() => {
+            if (o.value !== value) haptic();
+            onChange(o.value);
+          }}
         >
           {o.label}
         </button>

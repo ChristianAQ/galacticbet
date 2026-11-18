@@ -16,6 +16,8 @@ export interface StandingsShare {
   rows: RankingRow[];
   showHits: boolean;
   demo?: boolean;
+  /** Informational pot line, already formatted. */
+  pot?: string;
 }
 
 const marks = { hit: " ✅", miss: " ❌", "live-hit": " 🟢", "live-miss": "" };
@@ -77,6 +79,7 @@ export function standingsText(s: StandingsShare) {
     lines.push(
       `${r.position}. ${r.name} · ${points(r.points)}${s.showHits ? ` · ${r.hits} ${r.hits === 1 ? "acierto" : "aciertos"}` : ""}`,
     );
+  if (s.pot) lines.push("", `💰 ${s.pot}`);
   return lines.join("\n");
 }
 

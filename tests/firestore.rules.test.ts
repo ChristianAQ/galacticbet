@@ -311,6 +311,46 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
     await assertSucceeds(getDocs(query(ref, where("userId", "==", "bob"))));
     await assertFails(getDocs(ref));
   });
+  it("solo el administrador fija un bote informativo válido", async () => {
+    const alice = env.authenticatedContext("alice").firestore();
+    const bob = env.authenticatedContext("bob").firestore();
+    await assertSucceeds(updateDoc(doc(alice, "groups/g"), { potCents: 500 }));
+    await assertSucceeds(updateDoc(doc(alice, "groups/g"), { potCents: 0 }));
+    await assertSucceeds(
+      updateDoc(doc(alice, "groups/g"), { name: "Amigos 2", potCents: 250 }),
+    );
+    await assertFails(updateDoc(doc(bob, "groups/g"), { potCents: 500 }));
+    for (const potCents of [-1, 100001, 2.5, "5"])
+      await assertFails(updateDoc(doc(alice, "groups/g"), { potCents }));
+    await assertFails(
+      updateDoc(doc(alice, "groups/g"), { potCents: 500, commission: 50 }),
+    );
+  });
+  it("permite crear un grupo con bote y rechaza aportaciones inválidas", async () => {
+    const db = env.authenticatedContext("charlie").firestore();
+    const id = await createPrivateGroup(
+      doc(db, "groups/g").firestore,
+      "charlie",
+      "Con bote",
+      "classic",
+      500,
+    );
+    expect((await getDoc(doc(db, `groups/${id}`))).data()?.potCents).toBe(500);
+    const invalid = writeBatch(db);
+    const ref = doc(collection(db, "groups"));
+    invalid.set(ref, {
+      name: "Bote raro",
+      ownerId: "charlie",
+      memberIds: ["charlie"],
+      createdAt: serverTimestamp(),
+      potCents: 999999,
+    });
+    invalid.set(doc(ref, "members", "charlie"), {
+      userId: "charlie",
+      joinedAt: serverTimestamp(),
+    });
+    await assertFails(invalid.commit());
+  });
   it("impide suplantación, puntos enviados y autoasignación de admin", async () => {
     const db = env.authenticatedContext("bob").firestore();
     await assertFails(updateDoc(doc(db, "groups/g"), { ownerId: "bob" }));

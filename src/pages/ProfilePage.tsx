@@ -261,8 +261,8 @@ export default function ProfilePage({
               </ol>
               <p>La modalidad queda fija durante la temporada.</p>
               <p>
-                Sin dinero de por medio. Solo intuición, fútbol y rivalidad
-                entre amigos.
+                Sin dinero de por medio en la app. Solo intuición, fútbol y
+                rivalidad entre amigos.
               </p>
               {!user && (
                 <button className="button primary" onClick={onLogin}>
@@ -270,6 +270,24 @@ export default function ProfilePage({
                   <ArrowRight size={16} />
                 </button>
               )}
+            </div>
+            <div className="panel form-panel" id="bote">
+              <h2>Bote por jornada</h2>
+              <p>
+                El administrador puede fijar una aportación por jugador (por
+                ejemplo, 5 €). Cada miembro que guarda su quiniela de una
+                jornada entra en el bote de esa jornada.
+              </p>
+              <p>
+                Con 3 jugadores a 5 € el bote es de 15 €. Al terminar la
+                jornada, quien más puntos haya sumado se lo lleva; si hay
+                empate, se reparte a partes iguales.
+              </p>
+              <p>
+                Es solo informativo: GalacticBet no cobra, no guarda ni paga
+                dinero, y no se queda ninguna comisión. Los pagos los organizáis
+                entre vosotros.
+              </p>
             </div>
             <div className="panel form-panel match-help-panel">
               <h2>Forma y datos de los partidos</h2>

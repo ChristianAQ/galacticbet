@@ -3,6 +3,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { loadParticipants, type Group, type Participant } from "../lib/data";
 import { readableError } from "./ui";
+import { euroShort, groupPotCents } from "../lib/pot";
+import "../styles/pot.css";
 
 export default function GroupList({
   groups,
@@ -65,6 +67,14 @@ export default function GroupList({
               <span>
                 {g.memberIds.length} participantes ·{" "}
                 {g.ownerId === uid ? "Administrador" : "Miembro"}
+                {groupPotCents(g) > 0 && (
+                  <>
+                    {" "}
+                    <span className="group-pot-badge">
+                      Bote {euroShort(groupPotCents(g))}
+                    </span>
+                  </>
+                )}
               </span>
               <span
                 className="group-member-preview"

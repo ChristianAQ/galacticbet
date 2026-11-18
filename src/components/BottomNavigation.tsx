@@ -1,5 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { flushSync } from "react-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { haptic, prefersReducedMotion } from "../lib/motion";
 import type { LucideIcon } from "lucide-react";
 
 function useKeyboardOpen() {
@@ -50,7 +52,8 @@ export default function BottomNavigation({
   inactive: boolean;
   onPrefetch: (path: string) => void;
 }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
   const keyboardOpen = useKeyboardOpen();
   const index = items.findIndex((item) =>
     item.to === "/"
@@ -77,11 +80,32 @@ export default function BottomNavigation({
           className={`bottom-nav-indicator${index < 0 ? " is-hidden" : ""}`}
           aria-hidden="true"
         />
-        {items.map((item) => (
+        {items.map((item, position) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === "/"}
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+              event.preventDefault();
+              // iOS tab bar: tapping the active tab again scrolls to the top.
+              if (position === index && !search) {
+                window.scrollTo({
+                  top: 0,
+                  behavior: prefersReducedMotion() ? "auto" : "smooth",
+                });
+                return;
+              }
+              haptic();
+              navigateWithTransition(
+                () => navigate(item.to),
+                index < 0 || position === index
+                  ? "fade"
+                  : position > index
+                    ? "forward"
+                    : "back",
+              );
+            }}
             onPointerEnter={() => onPrefetch(item.to)}
             onPointerDown={() => onPrefetch(item.to)}
             onFocus={() => onPrefetch(item.to)}
@@ -93,4 +117,26 @@ export default function BottomNavigation({
       </div>
     </nav>
   );
+}
+
+type Direction = "forward" | "back" | "fade";
+/**
+ * Same-document View Transition (Safari 18+, Chrome): the page slides in the
+ * direction of the tab while the app bar and the tab bar stay still. Browsers
+ * without support, or with reduced motion, just navigate.
+ */
+export function navigateWithTransition(go: () => void, direction: Direction) {
+  const root = document.documentElement;
+  if (!document.startViewTransition || prefersReducedMotion()) {
+    go();
+    return;
+  }
+  root.dataset.navDirection = direction;
+  const transition = document.startViewTransition(() => {
+    flushSync(go);
+    window.scrollTo(0, 0);
+  });
+  void transition.finished.finally(() => {
+    if (root.dataset.navDirection === direction) delete root.dataset.navDirection;
+  });
 }
