@@ -8,7 +8,7 @@ export function createNewsLoader(
   fetchNews: () => Promise<unknown>,
 ) {
   const cache = createMemoryCache(1);
-  const key = `galacticbet:news:v5:${project}`;
+  const key = `galacticbet:news:v6:${project}`;
   return () =>
     cache.read<FootballNews | null>(
       key,

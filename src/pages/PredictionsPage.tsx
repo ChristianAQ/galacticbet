@@ -183,6 +183,17 @@ export default function PredictionsPage({
       sealed.key !== sealKey);
   const completed = required.filter((m) => values[m.id]).length;
   const missingOpen = delivery.requiredIds.length - completed;
+  const saveStatus = deadlineClosed
+    ? "Plazo cerrado"
+    : pending
+      ? "Comprobando…"
+      : savingCount > 0
+        ? "Anotando…"
+        : missingOpen > 0
+          ? null
+          : completed > 0
+            ? "Listo para sellar"
+            : "Boleto en blanco";
   const canSubmit =
     delivery.requiredIds.length > 0 &&
     delivery.deadline !== null &&
@@ -629,19 +640,9 @@ export default function PredictionsPage({
                   <small>/{total}</small>
                 </strong>
                 <div className="round-progress-row">
-                  <span>
-                    {deadlineClosed
-                      ? "Plazo cerrado"
-                      : pending
-                        ? "Comprobando…"
-                        : savingCount > 0
-                          ? "Anotando…"
-                          : missingOpen > 0
-                            ? `${missingOpen} ${missingOpen === 1 ? "signo pendiente" : "signos pendientes"}`
-                            : completed > 0
-                              ? "Listo para sellar"
-                              : "Boleto en blanco"}
-                  </span>
+                  {/* The count already says what is missing; only states that
+                      the number cannot tell get a line. */}
+                  {saveStatus && <span>{saveStatus}</span>}
                   <div
                     className="round-progress-track"
                     role="progressbar"

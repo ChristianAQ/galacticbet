@@ -150,18 +150,55 @@
   position: sticky;
   z-index: 20;
   top: var(--sticky-top);
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 14px;
   margin: 14px calc(-1 * var(--pad-r)) 0 calc(-1 * var(--pad-l));
-  padding: 10px var(--pad-r) 10px var(--pad-l);
+  padding: 10px var(--pad-r) 12px var(--pad-l);
   background: var(--paper);
   box-shadow: 0 1px 0 var(--rule);
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
-.round-save-panel.is-stuck {
+/* Pinned under the bar: a card drops from it with a spring, so the moment it
+   sticks is visible. Only paint and transforms move; the list does not shift. */
+.round-save-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 0 0 22px 22px;
+  background: var(--card);
   box-shadow:
     0 1px 0 var(--rule),
-    0 14px 24px -20px var(--scrim-strong);
+    0 18px 30px -18px var(--scrim-strong);
+  opacity: 0;
+  transform: translate3d(0, -10px, 0) scaleY(0.55);
+  transform-origin: 50% 0;
+  transition:
+    opacity 140ms ease,
+    transform 200ms ease-out;
+}
+.round-save-panel.is-stuck {
+  background: transparent;
+  box-shadow: none;
+}
+.round-save-panel.is-stuck::before {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 120ms ease,
+    transform var(--spring-bouncy-ms) var(--spring-bouncy);
+}
+.round-save-panel.is-stuck .round-save-count {
+  animation: pin-count var(--spring-bouncy-ms) var(--spring-bouncy);
+}
+@keyframes pin-count {
+  from {
+    transform: scale(0.8);
+  }
 }
 .round-save-progress {
   display: flex;
@@ -172,6 +209,7 @@
 }
 .round-save-count {
   flex-shrink: 0;
+  transform-origin: 0 70%;
   font-family: var(--font-display);
   font-stretch: var(--stretch-tight);
   font-size: 38px;

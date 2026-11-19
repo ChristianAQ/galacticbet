@@ -187,7 +187,7 @@
 .group-summary,
 .pot-chip,
 .home-spotlight a,
-.news-feed a {
+.news-card {
   transition: transform 220ms var(--spring-snappy);
 }
 .pressable:active,
@@ -197,7 +197,7 @@
 .group-summary:active,
 .pot-chip:active,
 .home-spotlight a:active,
-.news-feed a:active {
+.news-card:active {
   transform: scale(0.975);
   transition-duration: 90ms;
 }

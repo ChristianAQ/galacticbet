@@ -6,19 +6,21 @@ import {
 } from "../src/lib/competitions";
 import {
   NEWS_MAX_AGE,
+  newsImageUrl,
   newsUrl,
   validNews,
   type FootballArticle,
   type FootballNews,
+  type NewsImage,
 } from "../src/lib/footballNews";
 
-// Keep the provider's excerpt as plain text; never render provider HTML.
-export function newsDescription(
-  value: unknown,
-  title: string,
-): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const text = value
+/** Bumped when articles gain fields, so a cached edition is refreshed. */
+export const NEWS_CONTENT_VERSION = 2;
+
+// Provider text is kept as plain text; provider HTML is never rendered.
+function plainText(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
     .slice(0, 10000)
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
@@ -37,12 +39,52 @@ export function newsDescription(
     )
     .replace(/\s+/g, " ")
     .trim();
+}
+/** Short text, cut at a word boundary with an ellipsis. */
+function clip(text: string, max: number) {
+  if (text.length <= max) return text;
+  const excerpt = text.slice(0, max - 1);
+  const boundary = excerpt.lastIndexOf(" ");
+  return `${excerpt.slice(0, boundary > max * 0.75 ? boundary : max - 1).trimEnd()}…`;
+}
+export function newsDescription(
+  value: unknown,
+  title: string,
+): string | undefined {
+  const text = plainText(value);
   if (!text || text.toLocaleLowerCase("es") === title.toLocaleLowerCase("es"))
     return undefined;
-  if (text.length <= 240) return text;
-  const excerpt = text.slice(0, 239);
-  const boundary = excerpt.lastIndexOf(" ");
-  return `${excerpt.slice(0, boundary > 180 ? boundary : 239).trimEnd()}…`;
+  return clip(text, 240);
+}
+/** The story's lead photo (header first), from ESPN's CDN only. */
+export function newsImage(value: unknown): NewsImage | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const photos = value
+    .slice(0, 12)
+    .filter((image) => image && typeof image === "object" && newsImageUrl(image.url))
+    .sort(
+      (a, b) =>
+        Number(b.type === "header") - Number(a.type === "header") ||
+        Number((b.width ?? 0) >= 400) - Number((a.width ?? 0) >= 400),
+    );
+  const photo = photos[0];
+  if (!photo) return undefined;
+  const alt = clip(plainText(photo.alt) || plainText(photo.caption), 300);
+  return { url: newsImageUrl(photo.url)!, ...(alt ? { alt } : {}) };
+}
+/** Teams and players named by ESPN's categories, at most three. */
+export function newsTags(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const tags = [
+    ...new Set(
+      value
+        .slice(0, 30)
+        .filter((c) => c && ["team", "athlete"].includes(c.type))
+        .map((c) => plainText(c.description))
+        .filter((name) => name && name.length <= 60),
+    ),
+  ].slice(0, 3);
+  return tags.length ? tags : undefined;
 }
 
 export function normalizeNews(
@@ -85,6 +127,9 @@ export function normalizeNews(
       return [];
     }
     const description = newsDescription(a.description, title);
+    const image = newsImage(a.images);
+    const byline = clip(plainText(a.byline), 120);
+    const tags = newsTags(a.categories);
     return [
       {
         title,
@@ -92,6 +137,9 @@ export function normalizeNews(
         url,
         publishedAt: new Date(published).toISOString(),
         competition,
+        ...(image ? { image } : {}),
+        ...(byline ? { byline } : {}),
+        ...(tags ? { tags } : {}),
       },
     ];
   });
@@ -116,7 +164,7 @@ export async function syncNews(
   const fresh =
     validNews(previous) &&
     previous.linkPolicyVersion === 2 &&
-    previous.contentVersion === 1 &&
+    previous.contentVersion === NEWS_CONTENT_VERSION &&
     previous.competitionArticles !== undefined &&
     Date.parse(previous.fetchedAt) <= now &&
     now - Date.parse(previous.fetchedAt) < 6 * 3_600_000;
@@ -176,7 +224,7 @@ export async function syncNews(
     version: 1,
     provider: "ESPN",
     linkPolicyVersion: 2,
-    contentVersion: 1,
+    contentVersion: NEWS_CONTENT_VERSION,
     fetchedAt: new Date(now).toISOString(),
     articles: unique,
     competitionArticles,

@@ -1,8 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Firestore } from "firebase-admin/firestore";
-import { normalizeNews, newsDescription, syncNews } from "../scripts/syncNews";
+import {
+  NEWS_CONTENT_VERSION,
+  newsDescription,
+  newsImage,
+  newsTags,
+  normalizeNews,
+  syncNews,
+} from "../scripts/syncNews";
 import {
   currentArticles,
+  newsImageUrl,
+  newsPhoto,
   newsUrl,
   validNews,
   type FootballNews,
@@ -18,7 +27,7 @@ const feed: FootballNews = {
   version: 1,
   provider: "ESPN",
   linkPolicyVersion: 2,
-  contentVersion: 1,
+  contentVersion: NEWS_CONTENT_VERSION,
   fetchedAt: new Date(now).toISOString(),
   articles: normalizeNews({ articles: [article] }, "PD", now),
 };
@@ -225,5 +234,71 @@ it("renueva una edición sin descripciones aunque todavía esté en caché", asy
   await syncNews(db, { now, request, log: vi.fn() });
   expect(request).toHaveBeenCalledTimes(3);
   expect(set.mock.calls[0][0].articles[0].description).toBe("Resumen de ESPN");
-  expect(set.mock.calls[0][0].contentVersion).toBe(1);
+  expect(set.mock.calls[0][0].contentVersion).toBe(NEWS_CONTENT_VERSION);
+});
+
+it("guarda la foto de cabecera de ESPN, el autor y los protagonistas como texto", () => {
+  const [story] = normalizeNews(
+    {
+      articles: [
+        {
+          ...article,
+          byline: "Redacción <b>ESPN</b>",
+          images: [
+            { type: "inline", url: "https://a.espncdn.com/photo/2026/1028/small.jpg", width: 300 },
+            {
+              type: "header",
+              url: "http://a.espncdn.com/photo/2026/1028/header_16-9.jpg",
+              width: 1296,
+              caption: "Vinícius celebra <i>el gol</i>",
+            },
+          ],
+          categories: [
+            { type: "league", description: "LaLiga" },
+            { type: "team", description: "Real Madrid" },
+            { type: "athlete", description: "Vinícius Júnior" },
+            { type: "team", description: "Real Madrid" },
+          ],
+        },
+      ],
+    },
+    "PD",
+    now,
+  );
+  expect(story.image).toEqual({
+    url: "https://a.espncdn.com/photo/2026/1028/header_16-9.jpg",
+    alt: "Vinícius celebra el gol",
+  });
+  expect(story.byline).toBe("Redacción ESPN");
+  expect(story.tags).toEqual(["Real Madrid", "Vinícius Júnior"]);
+  expect(validNews({ ...feed, articles: [story] })).toBe(true);
+});
+it("descarta fotos fuera del CDN de ESPN y sigue aceptando ediciones sin fotos", () => {
+  expect(newsImage([{ type: "header", url: "https://evil.test/espncdn.com/a.jpg" }])).toBeUndefined();
+  expect(newsImage([{ url: "javascript:alert(1)" }])).toBeUndefined();
+  expect(newsImage("nope")).toBeUndefined();
+  expect(newsTags([{ type: "league", description: "LaLiga" }])).toBeUndefined();
+  expect(newsImageUrl("https://a.espncdn.com.evil.test/a.jpg")).toBeNull();
+  const [story] = feed.articles;
+  expect(story.image).toBeUndefined();
+  expect(validNews(feed)).toBe(true);
+  expect(
+    validNews({
+      ...feed,
+      articles: [{ ...story, image: { url: "https://evil.test/a.jpg" } }],
+    }),
+  ).toBe(false);
+  expect(
+    validNews({ ...feed, articles: [{ ...story, tags: ["a", "b", "c", "d", "e"] }] }),
+  ).toBe(false);
+});
+it("pide a ESPN una copia ligera de la foto y deja intactas las demás", () => {
+  const photo = newsPhoto("https://a.espncdn.com/photo/2026/1028/header_16-9.jpg", 640, 360);
+  const url = new URL(photo);
+  expect(url.origin + url.pathname).toBe("https://a.espncdn.com/combiner/i");
+  expect(url.searchParams.get("img")).toBe("/photo/2026/1028/header_16-9.jpg");
+  expect(url.searchParams.get("w")).toBe("640");
+  expect(newsPhoto("https://a1.espncdn.com/other/x.png", 10, 10)).toBe(
+    "https://a1.espncdn.com/other/x.png",
+  );
 });

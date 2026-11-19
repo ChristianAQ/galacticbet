@@ -1,10 +1,20 @@
 import { isCompetition, type CompetitionCode } from "./competitions";
+export interface NewsImage {
+  /** ESPN's CDN only (see newsImageUrl). */
+  url: string;
+  alt?: string;
+}
 export interface FootballArticle {
   title: string;
   description?: string;
   url: string;
   publishedAt: string;
   competition: CompetitionCode;
+  /** Since content version 2; older editions simply lack them. */
+  image?: NewsImage;
+  byline?: string;
+  /** Teams and players the story is about. */
+  tags?: string[];
 }
 export interface FootballNews {
   version: 1;
@@ -50,6 +60,60 @@ export function newsUrl(value: unknown): string | null {
     return null;
   }
 }
+/** Photos come from ESPN's image CDN over HTTPS, nothing else. */
+export function newsImageUrl(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 600) return null;
+  try {
+    const url = new URL(value);
+    if (
+      !["https:", "http:"].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.port ||
+      !(url.hostname === "espncdn.com" || url.hostname.endsWith(".espncdn.com"))
+    )
+      return null;
+    url.protocol = "https:";
+    url.hash = "";
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+/**
+ * A lighter copy of an ESPN photo, resized and cropped by ESPN's own image
+ * service; the original stays as the fallback if that copy fails.
+ */
+export function newsPhoto(url: string, width: number, height: number) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "a.espncdn.com" || !parsed.pathname.startsWith("/photo/"))
+      return url;
+    const query = new URLSearchParams({
+      img: parsed.pathname,
+      w: String(width),
+      h: String(height),
+      scale: "crop",
+      cquality: "70",
+      location: "origin",
+    });
+    return `https://a.espncdn.com/combiner/i?${query}`;
+  } catch {
+    return url;
+  }
+}
+const optionalText = (value: unknown, max: number) =>
+  value === undefined || (typeof value === "string" && value.length <= max);
+const validExtras = (a: FootballArticle) =>
+  (a.image === undefined ||
+    (Boolean(a.image) &&
+      newsImageUrl(a.image.url) !== null &&
+      optionalText(a.image.alt, 300))) &&
+  optionalText(a.byline, 120) &&
+  (a.tags === undefined ||
+    (Array.isArray(a.tags) &&
+      a.tags.length <= 4 &&
+      a.tags.every((tag) => typeof tag === "string" && tag.length <= 60)));
 export function validNews(value: unknown): value is FootballNews {
   if (!value || typeof value !== "object") return false;
   const n = value as FootballNews;
@@ -83,7 +147,8 @@ export function validNews(value: unknown): value is FootballNews {
         newsUrl(a.url) !== null &&
         typeof a.publishedAt === "string" &&
         Number.isFinite(Date.parse(a.publishedAt)) &&
-        isCompetition(a.competition),
+        isCompetition(a.competition) &&
+        validExtras(a),
     )
   );
 }
