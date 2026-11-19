@@ -13,12 +13,12 @@
   "dir": "ltr",
   "categories": ["sports", "entertainment"],
   "icons": [
-    { "src": "icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icon-ink-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" },
+    { "src": "icon-ink-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-ink-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Mi quiniela", "url": "./#/quiniela", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
-    { "name": "Clasificación", "url": "./#/clasificacion", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+    { "name": "Mi quiniela", "url": "./#/quiniela", "icons": [{ "src": "icon-ink-192.png", "sizes": "192x192" }] },
+    { "name": "Clasificación", "url": "./#/clasificacion", "icons": [{ "src": "icon-ink-192.png", "sizes": "192x192" }] }
   ]
 }
