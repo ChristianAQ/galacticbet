@@ -1,13 +1,13 @@
 /* Light palette isolated to the standalone porra route. */
 .porra-tool {
-  --porra-paper: #eef4ed;
+  --porra-paper: #f0f2ef;
   --porra-ink: #173b2d;
-  --porra-muted: #5f7665;
-  --porra-line: #cbd9c5;
+  --porra-muted: #697560;
+  --porra-line: #ced5c9;
   max-width: 1000px;
   margin: 0 auto;
   padding: 26px;
-  border: 1px solid #d6e3ce;
+  border: 1px solid #d8ddd4;
   border-radius: 18px;
   background: var(--porra-paper);
   color: var(--porra-ink);
@@ -23,7 +23,7 @@
   font-size: 9px;
   font-weight: 650;
   letter-spacing: 1px;
-  color: #637d64;
+  color: #6e7b65;
 }
 .porra-tool-heading h2 {
   margin: 8px 0 0;
@@ -49,10 +49,10 @@
   padding: 10px 12px;
 }
 .porra-tool input::placeholder {
-  color: #8a9a86;
+  color: #8e9a86;
 }
 .porra-tool :is(button, input, select, summary, a):focus-visible {
-  outline: 2px solid #466e4e;
+  outline: 2px solid #586351;
   outline-offset: 3px;
 }
 .porra-editor {
@@ -60,7 +60,7 @@
   gap: 20px;
 }
 .porra-editor label {
-  color: #43634b;
+  color: #525b4b;
   font-size: 12px;
   font-weight: 550;
   gap: 8px;
@@ -134,11 +134,11 @@
   justify-content: center;
   width: 38px;
   min-height: 44px;
-  color: #647b65;
+  color: #6e7b64;
   border-radius: 7px;
 }
 .porra-remove:hover:not(:disabled) {
-  background: #e4dcd2;
+  background: #dadfd7;
   color: #8a4b37;
 }
 .porra-add {
@@ -149,7 +149,7 @@
   min-height: 44px;
   font-size: 12px;
   font-weight: 600;
-  color: #365f41;
+  color: #495243;
 }
 .porra-button {
   display: inline-flex;
@@ -159,23 +159,23 @@
   min-height: 44px;
   padding: 12px 16px;
   border-radius: 9px;
-  border: 1px solid #244b36;
-  background: #244b36;
+  border: 1px solid #373d32;
+  background: #373d32;
   color: #fff;
   font-size: 12px;
   font-weight: 600;
   line-height: 1.5;
 }
 .porra-button:hover:not(:disabled) {
-  background: #315f44;
+  background: #474f41;
 }
 .porra-button.secondary {
   background: #fff;
   border-color: var(--porra-line);
-  color: #365f41;
+  color: #495243;
 }
 .porra-button.secondary:hover:not(:disabled) {
-  background: #e1ebdb;
+  background: #e2e6e0;
 }
 .porra-editor-total {
   display: flex;
@@ -184,7 +184,7 @@
   padding: 17px;
   border: 1px solid var(--porra-line);
   border-radius: 11px;
-  background: #e2ecdc;
+  background: #e3e7e1;
 }
 .porra-editor-total > div {
   display: grid;
@@ -193,7 +193,7 @@
 .porra-editor-total span,
 .porra-editor-total small {
   font-size: 11px;
-  color: #56705a;
+  color: #616d59;
 }
 .porra-editor-total strong {
   font-size: 24px;
@@ -216,17 +216,17 @@
 .porra-message {
   padding: 12px 14px;
   margin: 12px 0;
-  background: #e1ebda;
-  border: 1px solid #c5d6bc;
+  background: #e2e6df;
+  border: 1px solid #c8cfc3;
   border-radius: 9px;
-  color: #3e6146;
+  color: #4e5748;
   font-size: 12px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
 .porra-message.error-note {
   background: #f5e6da;
-  border-color: #dcc5b4;
+  border-color: #c7cfc1;
   color: #834b33;
 }
 .porra-message a {
@@ -236,10 +236,10 @@
   max-width: 640px;
   margin: 22px auto 0;
   background: #fff;
-  border: 1px solid #c8d7bf;
+  border: 1px solid #cad1c5;
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 8px 25px #27452c09;
+  box-shadow: 0 8px 25px #353b3109;
 }
 .porra-ticket-header {
   display: flex;
@@ -247,24 +247,24 @@
   justify-content: space-between;
   gap: 12px;
   padding: 15px 20px;
-  background: #e0ebd9;
-  border-bottom: 1px solid #c8d7bf;
+  background: #e1e5df;
+  border-bottom: 1px solid #cad1c5;
 }
 .porra-ticket-header > strong {
   font-size: 17px;
   letter-spacing: -0.6px;
 }
 .porra-ticket-header > strong > span {
-  color: #648344;
+  color: #626d5a;
 }
 .porra-ticket-header small {
   font-size: 8px;
-  color: #637b61;
+  color: #6c7963;
   letter-spacing: 0.8px;
 }
 .porra-ticket-header > span {
   font-size: 8px;
-  color: #637b61;
+  color: #6c7963;
   font-weight: 600;
 }
 .porra-ticket-match {
@@ -272,7 +272,7 @@
   text-align: center;
 }
 .porra-competition {
-  color: #627c62;
+  color: #6d7a64;
   font-size: 10px;
 }
 .porra-ticket-match h2 {
@@ -298,8 +298,8 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #e1ebdc;
-  color: #3e6146;
+  background: #e3e7e0;
+  color: #4e5748;
   font-size: 12px;
   font-weight: 700;
 }
@@ -309,14 +309,14 @@
   overflow-wrap: anywhere;
 }
 .porra-teams > span {
-  color: #8a9a86;
+  color: #8e9a86;
   font-size: 10px;
 }
 .porra-ticket-match > time {
   display: block;
   margin-top: 15px;
   font-size: 10px;
-  color: #627c62;
+  color: #6d7a64;
 }
 .porra-ticket-players {
   display: grid;
@@ -334,8 +334,8 @@
   justify-content: space-between;
   gap: 10px;
   padding: 9px 12px;
-  background: #f0f5ed;
-  border: 1px solid #e1eada;
+  background: #f1f3ef;
+  border: 1px solid #e1e5df;
   border-radius: 7px;
   min-width: 0;
 }
@@ -353,10 +353,10 @@
   flex-shrink: 0;
   font-size: 17px;
   font-variant-numeric: tabular-nums;
-  color: #244a34;
+  color: #363d32;
 }
 .porra-ticket-players strong > span {
-  color: #8a9a86;
+  color: #8e9a86;
   font-weight: 400;
 }
 .porra-ticket-total {
@@ -366,8 +366,8 @@
   flex-wrap: wrap;
   gap: 10px;
   padding: 17px 20px;
-  background: #244b36;
-  color: #f3f6ed;
+  background: #373d32;
+  color: #f1f3f0;
 }
 .porra-ticket-total > div {
   display: grid;
@@ -375,7 +375,7 @@
 }
 .porra-ticket-total span {
   font-size: 10px;
-  color: #d4e0cc;
+  color: #d5dbd1;
 }
 .porra-ticket-total strong {
   font-size: 13px;
@@ -390,7 +390,7 @@
   margin: 0;
   padding: 10px 16px;
   font-size: 9px;
-  color: #6b7e67;
+  color: #717e67;
   text-align: center;
 }
 .porra-saved {
@@ -533,8 +533,8 @@
 .porra-capture-modal {
   width: 740px;
   padding: 16px;
-  background: #eef4ed;
-  border-color: #cbd9c5;
+  background: #f0f2ef;
+  border-color: #ced5c9;
   color: #173b2d;
 }
 .porra-capture-modal h2 {
@@ -544,7 +544,7 @@
 .porra-capture-modal .modal-close {
   top: 7px;
   right: 7px;
-  color: #365f41;
+  color: #495243;
 }
 .porra-capture-modal > img {
   display: block;
