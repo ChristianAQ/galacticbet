@@ -1,6 +1,6 @@
 import { competitionName } from "../lib/competitions";
 import type { User } from "firebase/auth";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Crown } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
@@ -22,7 +22,6 @@ import ShareTrigger from "../components/ShareTrigger";
 import { shareFileName, standingsText } from "../lib/shareSummary";
 import {
   MyRankCard,
-  Podium,
   RankAvatar,
   RankBadge,
 } from "../components/RankingWidgets";
@@ -315,9 +314,6 @@ function GroupStandings({
             key={`${groupId}:${scope}:${period}:${selectedRound}`}
           >
             <MyRankCard rows={rows} userId={user.uid} showHits={showHits} />
-            {hasPoints && rows.length >= 2 && (
-              <Podium rows={rows} userId={user.uid} />
-            )}
             {pot && attendance.ready && !attendance.error && (
               <PotCard
                 pot={pot}
@@ -339,7 +335,19 @@ function GroupStandings({
                 Esta jornada todavía no tiene participantes con boleto.
               </Empty>
             )}
-            <div className="standings-card" hidden={!rows.length}>
+            <section
+              className="standings-card"
+              hidden={!rows.length}
+              aria-labelledby="standings-table-title"
+            >
+              <header className="standings-heading">
+                <h2 id="standings-table-title">
+                  {period === "all" ? "La temporada" : "La jornada"}
+                </h2>
+                <span>
+                  {rows.length} {rows.length === 1 ? "jugador" : "jugadores"}
+                </span>
+              </header>
               <table
                 className={`standings-table${showHits ? "" : " standings-points-only"}${latest ? " has-latest" : ""}`}
               >
@@ -396,6 +404,14 @@ function GroupStandings({
                             <RankAvatar name={r.name} avatar={r.avatar} />
                             <span className="standings-name">
                               <span>
+                                {r.position === 1 && hasPoints && (
+                                  <Crown
+                                    className="standings-crown"
+                                    size={14}
+                                    strokeWidth={2.4}
+                                    aria-label="Líder"
+                                  />
+                                )}
                                 {r.name}
                                 {r.id === user.uid && <small> · Tú</small>}
                               </span>
@@ -428,7 +444,7 @@ function GroupStandings({
                   })}
                 </tbody>
               </table>
-            </div>
+            </section>
             {latest && (
               <p className="standings-footnote">
                 «Últ.»: lo que sumó cada uno en {latestLabel}. Las flechas

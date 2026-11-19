@@ -419,7 +419,9 @@ function MatchView({
           </button>
         ))}
         </div>
-        {/* Not a tab: opens Porra rápida with this fixture already chosen. */}
+        {/* Not a tab: opens Porra rápida with this fixture already chosen.
+            Only before kick-off: a porra on a played match makes no sense. */}
+        {upcoming && (
         <Link
           className="match-tabs-porra"
           to={`/porra?partido=${encodeURIComponent(match.id)}`}
@@ -427,6 +429,7 @@ function MatchView({
           <NotebookPen size={15} aria-hidden="true" />
           Porra rápida
         </Link>
+        )}
       </div>
 
       <section

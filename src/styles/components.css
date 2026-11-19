@@ -167,9 +167,10 @@
   font-weight: 600;
   transition: transform 160ms var(--press);
 }
+/* On the masthead it stays secondary to the title. */
 .masthead .share-trigger {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: #ffffff14;
+  color: var(--masthead-ink);
 }
 .share-trigger:active:not(:disabled) {
   transform: scale(0.94);
