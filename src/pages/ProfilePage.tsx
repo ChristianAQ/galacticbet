@@ -2,11 +2,8 @@ import type { User } from "firebase/auth";
 import {
   ArrowRight,
   ChevronRight,
-  CircleHelp,
-  LogIn,
   LogOut,
   NotebookPen,
-  Plus,
   Shirt,
   SunMoon,
 } from "lucide-react";
@@ -14,21 +11,22 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { useSearchParams } from "react-router-dom";
 import GroupList from "../components/GroupList";
 import GroupActions from "../components/GroupActions";
-import CompetitionLogo from "../components/CompetitionLogo";
 import Segmented from "../components/Segmented";
 import { FormGuide } from "../components/TeamForm";
 import { Empty, PageTitle, readableError } from "../components/ui";
-import { COMPETITION_CODES, competitionName } from "../lib/competitions";
 import type { Group } from "../lib/data";
 import { logout, saveDisplayName } from "../lib/firebase";
-import { haptic, prefersReducedMotion } from "../lib/motion";
+import { haptic } from "../lib/motion";
 import { setTheme, useTheme, type Theme } from "../lib/theme";
 import "../styles/profile.css";
 
-type Tab = "profile" | "groups" | "play";
+/**
+ * Two views, nothing twice: «Mi cuenta» (ficha, grupos, ajustes, herramientas,
+ * sesión) and «Cómo jugar» (reglas). Old links (?tab=profile|groups) open the account.
+ */
+type Tab = "account" | "play";
 const tabs: { value: Tab; label: string }[] = [
-  { value: "profile", label: "Mi ficha" },
-  { value: "groups", label: "Mis grupos" },
+  { value: "account", label: "Mi cuenta" },
   { value: "play", label: "Cómo jugar" },
 ];
 
@@ -45,11 +43,7 @@ export default function ProfilePage({
 }) {
   const [params, setParams] = useSearchParams();
   const requested = params.get("tab");
-  const tab: Tab = tabs.some((t) => t.value === requested)
-    ? (requested as Tab)
-    : user
-      ? "profile"
-      : "play";
+  const tab: Tab = requested === "play" ? "play" : "account";
   const [name, setName] = useState(user?.displayName || "");
   const [busy, setBusy] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -101,14 +95,6 @@ export default function ProfilePage({
   function select(id: Tab) {
     setParams({ tab: id }, { replace: true });
   }
-  function openHelp() {
-    haptic();
-    select("play");
-    window.scrollTo({
-      top: 0,
-      behavior: prefersReducedMotion() ? "auto" : "smooth",
-    });
-  }
   const initial = (user?.displayName || "Tú").trim().charAt(0).toUpperCase();
   return (
     <>
@@ -119,7 +105,7 @@ export default function ProfilePage({
         description={
           user
             ? user.email || "Jugador de GalacticBet"
-            : "Entra para tener ficha, grupo y sitio en la tabla."
+            : "Tu cuenta, tus ajustes y las reglas del juego."
         }
         titleControl={
           <span className="profile-avatar" aria-hidden="true">
@@ -147,178 +133,144 @@ export default function ProfilePage({
         tabIndex={0}
         key={tab}
       >
-        {tab === "profile" ? (
-          user ? (
-            <div className="profile-editor">
-              <form onSubmit={save}>
-                <label>
-                  Nombre visible
-                  <input
-                    autoComplete="nickname"
-                    autoCapitalize="words"
-                    enterKeyHint="done"
-                    required
-                    maxLength={100}
-                    value={name}
-                    disabled={busy}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Como te llaman en el grupo"
-                  />
-                </label>
-                <p className="muted">
-                  Así aparecerás en tus grupos, pronósticos y clasificaciones.
-                </p>
-                <button
-                  className="button primary"
-                  disabled={busy || !name.trim()}
-                >
-                  {busy ? "Guardando…" : "Guardar nombre"}
-                </button>
-              </form>
-              {message && (
-                <p className="form-message" role="status">
-                  {message}
-                </p>
-              )}
-              {error && (
-                <p className="error" role="alert">
-                  {error}
-                </p>
-              )}
-            </div>
-          ) : (
-            <Empty
-              art="bench"
-              title="Banquillo sin ficha"
-              action={
-                <button className="button primary" onClick={onLogin}>
-                  Entrar <ArrowRight size={16} aria-hidden="true" />
-                </button>
-              }
-            >
-              Entra para elegir tu nombre de juego y ver tus grupos.
-            </Empty>
-          )
-        ) : tab === "groups" ? (
-          user ? (
-            <>
-              {groups.length ? (
-                <GroupList groups={groups} uid={user.uid} />
-              ) : (
-                <Empty art="bench" title="Ningún grupo en la convocatoria">
-                  Crea uno o únete al de tus amigos con su código de
-                  invitación.
-                </Empty>
-              )}
-              <GroupActions />
-            </>
-          ) : (
-            <Empty
-              art="bench"
-              title="El fútbol se comparte"
-              action={
-                <button className="button primary" onClick={onLogin}>
-                  Entrar <ArrowRight size={16} aria-hidden="true" />
-                </button>
-              }
-            >
-              Entra para ver los grupos a los que perteneces.
-            </Empty>
-          )
-        ) : (
+        {tab === "play" ? (
           <HowToPlay user={user} onLogin={onLogin} />
-        )}
-      </section>
-
-      <section className="profile-more" aria-labelledby="profile-more-title">
-        <div className="section-heading">
-          <h2 id="profile-more-title">Más</h2>
-        </div>
-        <ul className="more-list">
-          <MoreLink
-            href="#/porra"
-            icon={<NotebookPen size={20} aria-hidden="true" />}
-            label="Porra rápida"
-            detail="Un partido, vuestros marcadores"
-          />
-          <MoreLink
-            href="#/equipos"
-            icon={<Shirt size={20} aria-hidden="true" />}
-            label="Equipos y jugadores"
-            detail="Plantillas y alineaciones"
-          />
-        </ul>
-        <p className="more-caption">Apariencia</p>
-        <ul className="more-list">
-          <li>
-            <ThemeRow />
-          </li>
-        </ul>
-        <p className="more-caption">Competiciones</p>
-        <ul className="more-list">
-          {COMPETITION_CODES.map((code) => (
-            <MoreLink
-              key={code}
-              href={`#/ligas?competition=${code}`}
-              icon={<CompetitionLogo code={code} small />}
-              label={competitionName(code)}
-            />
-          ))}
-        </ul>
-        <p className="more-caption">Grupos</p>
-        <ul className="more-list">
-          <MoreLink
-            href="#/grupos?action=create"
-            icon={<Plus size={20} aria-hidden="true" />}
-            label="Crear grupo"
-            detail="Tú pones las reglas del vestuario"
-          />
-          <MoreLink
-            href="#/grupos?join=1"
-            icon={<LogIn size={20} aria-hidden="true" />}
-            label="Unirme con un código"
-          />
-        </ul>
-        <ul className="more-list">
-          <li>
-            <button type="button" className="more-row" onClick={openHelp}>
-              <span className="more-icon">
-                <CircleHelp size={20} aria-hidden="true" />
-              </span>
-              <span className="more-label">Ayuda y cómo jugar</span>
-              <ChevronRight className="more-chevron" size={18} aria-hidden="true" />
-            </button>
-          </li>
-          <li>
+        ) : (
+          <>
             {user ? (
-              <button
-                type="button"
-                className="more-row is-destructive"
-                disabled={signingOut || busy}
-                onClick={() => void signOut()}
-              >
-                <span className="more-icon">
-                  <LogOut size={20} aria-hidden="true" />
-                </span>
-                <span className="more-label">
-                  {signingOut ? "Cerrando sesión…" : "Cerrar sesión"}
-                </span>
-              </button>
+              <>
+                <section
+                  className="profile-section"
+                  aria-labelledby="profile-name-title"
+                >
+                  <div className="section-heading">
+                    <h2 id="profile-name-title">Tu ficha</h2>
+                  </div>
+                  <form className="profile-editor" onSubmit={save}>
+                    <label>
+                      Nombre visible
+                      <input
+                        autoComplete="nickname"
+                        autoCapitalize="words"
+                        enterKeyHint="done"
+                        required
+                        maxLength={100}
+                        value={name}
+                        disabled={busy}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Como te llaman en el grupo"
+                      />
+                    </label>
+                    <p className="muted">
+                      Así aparecerás en tus grupos, pronósticos y
+                      clasificaciones.
+                    </p>
+                    <button
+                      className="button primary"
+                      disabled={busy || !name.trim() || name === user.displayName}
+                    >
+                      {busy ? "Guardando…" : "Guardar nombre"}
+                    </button>
+                  </form>
+                  {message && (
+                    <p className="form-message" role="status">
+                      {message}
+                    </p>
+                  )}
+                  {error && (
+                    <p className="error" role="alert">
+                      {error}
+                    </p>
+                  )}
+                </section>
+                <section
+                  className="profile-section"
+                  aria-labelledby="profile-groups-title"
+                >
+                  <div className="section-heading">
+                    <h2 id="profile-groups-title">Mis grupos</h2>
+                  </div>
+                  {groups.length ? (
+                    <GroupList groups={groups} uid={user.uid} />
+                  ) : (
+                    <p className="muted profile-groups-empty">
+                      Aún no estás en ningún grupo. Crea uno o únete al de tus
+                      amigos con su código de invitación.
+                    </p>
+                  )}
+                  <GroupActions />
+                </section>
+              </>
             ) : (
-              <button type="button" className="more-row is-primary" onClick={onLogin}>
-                <span className="more-icon">
-                  <LogIn size={20} aria-hidden="true" />
-                </span>
-                <span className="more-label">Entrar o crear cuenta</span>
-                <ChevronRight className="more-chevron" size={18} aria-hidden="true" />
-              </button>
+              <Empty
+                art="bench"
+                title="Banquillo sin ficha"
+                action={
+                  <button className="button primary" onClick={onLogin}>
+                    Entrar o crear cuenta{" "}
+                    <ArrowRight size={16} aria-hidden="true" />
+                  </button>
+                }
+              >
+                Entra para elegir tu nombre de juego, crear o unirte a un grupo
+                y tener sitio en la tabla.
+              </Empty>
             )}
-          </li>
-        </ul>
-        {logoutError && (
-          <p className="error" role="alert">
-            {logoutError}
-          </p>
+
+            <section
+              className="profile-more"
+              aria-labelledby="profile-more-title"
+            >
+              <div className="section-heading">
+                <h2 id="profile-more-title">Ajustes y más</h2>
+              </div>
+              <p className="more-caption">Apariencia</p>
+              <ul className="more-list">
+                <li>
+                  <ThemeRow />
+                </li>
+              </ul>
+              <p className="more-caption">Herramientas</p>
+              <ul className="more-list">
+                <MoreLink
+                  href="#/porra"
+                  icon={<NotebookPen size={20} aria-hidden="true" />}
+                  label="Porra rápida"
+                  detail="Un partido, vuestros marcadores"
+                />
+                <MoreLink
+                  href="#/equipos"
+                  icon={<Shirt size={20} aria-hidden="true" />}
+                  label="Equipos y jugadores"
+                  detail="Plantillas y alineaciones"
+                />
+              </ul>
+              {user && (
+                <ul className="more-list">
+                  <li>
+                    <button
+                      type="button"
+                      className="more-row is-destructive"
+                      disabled={signingOut || busy}
+                      onClick={() => void signOut()}
+                    >
+                      <span className="more-icon">
+                        <LogOut size={20} aria-hidden="true" />
+                      </span>
+                      <span className="more-label">
+                        {signingOut ? "Cerrando sesión…" : "Cerrar sesión"}
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              )}
+              {logoutError && (
+                <p className="error" role="alert">
+                  {logoutError}
+                </p>
+              )}
+            </section>
+          </>
         )}
       </section>
     </>

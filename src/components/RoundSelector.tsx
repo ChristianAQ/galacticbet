@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, LocateFixed } from "lucide-react";
 import { haptic } from "../lib/motion";
-import { memo, useLayoutEffect, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useRef } from "react";
 import {
   roundDateRange,
   roundStateLabel,
@@ -24,19 +24,44 @@ function RoundSelector({
   const index = rounds.findIndex((r) => r.id === value);
   const selected = rounds[index];
   const animate = useRef(false);
-  useLayoutEffect(() => {
+  /**
+   * Centre the selected chip. Positions come from layout boxes, not offsetLeft
+   * (relative to the selector, not the strip), and snapping is off on the strip:
+   * iOS re-snapped a smooth programmatic scroll and the chip jumped at the end.
+   */
+  const centre = (smooth: boolean) => {
     const strip = stripRef.current;
     const chip = strip?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    if (!strip || !chip) return;
+    if (!strip || !chip || !strip.clientWidth) return;
     const reduce = window.matchMedia?.(
       "(prefers-reduced-motion: reduce)",
     ).matches;
+    const offset =
+      chip.getBoundingClientRect().left -
+      strip.getBoundingClientRect().left +
+      strip.scrollLeft;
     strip.scrollTo({
-      left: chip.offsetLeft - strip.clientWidth / 2 + chip.clientWidth / 2,
-      behavior: animate.current && !reduce ? "smooth" : "auto",
+      left: offset - (strip.clientWidth - chip.offsetWidth) / 2,
+      behavior: smooth && !reduce ? "smooth" : "auto",
     });
+  };
+  useLayoutEffect(() => {
+    centre(animate.current);
     animate.current = true;
   }, [value, rounds.length]);
+  // A page prepared off screen has no width yet: centre once it gets one.
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip || typeof ResizeObserver === "undefined") return;
+    let width = strip.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (strip.clientWidth === width) return;
+      width = strip.clientWidth;
+      centre(false);
+    });
+    observer.observe(strip);
+    return () => observer.disconnect();
+  }, []);
   const go = (step: number) => {
     const next = rounds[index + step];
     if (!next) return;

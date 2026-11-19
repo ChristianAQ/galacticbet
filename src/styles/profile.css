@@ -41,8 +41,14 @@
     transform: translate3d(0, 10px, 0);
   }
 }
-.profile-editor form {
+.profile-panel > :first-child > .section-heading:first-child {
+  margin-top: 8px;
+}
+.profile-editor {
   gap: 10px;
+}
+.profile-groups-empty {
+  margin-bottom: 4px;
 }
 .profile-editor .button {
   justify-self: start;
@@ -52,6 +58,9 @@
 /* «Más»: grouped list, separators inset after the icon like Settings. */
 .profile-more {
   margin-top: 12px;
+}
+.profile-more .more-caption:first-of-type {
+  margin-top: 0;
 }
 .more-caption {
   margin: 20px 4px 8px;

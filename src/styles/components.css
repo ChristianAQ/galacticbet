@@ -768,12 +768,13 @@
   opacity: 0.25;
 }
 .round-strip {
+  position: relative;
   display: flex;
   gap: 6px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   padding: 2px 14px;
-  scroll-snap-type: x proximity;
-  scroll-padding-inline: 14px;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
 }
@@ -791,7 +792,6 @@
   border-radius: var(--r-sm);
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--rule);
-  scroll-snap-align: center;
   transition:
     background-color 200ms ease,
     transform 180ms var(--press);
