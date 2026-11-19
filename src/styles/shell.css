@@ -97,28 +97,39 @@ body {
   opacity: calc(1 - var(--swipe, 0));
   transform: none;
 }
-/* Inicio: the brand lockup where other screens put «‹ Atrás». */
+/* Brand and compact title share the middle of the bar. */
+.nav-bar-center {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+.nav-bar-center > * {
+  grid-area: 1 / 1;
+}
+/* Tab roots: the brand lockup in the middle of the bar. */
 .nav-brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   min-height: 44px;
-  margin-left: calc(var(--gutter) - 4px);
   color: var(--masthead-ink);
-  transition: transform 160ms var(--press);
+  transition:
+    opacity 180ms ease,
+    transform var(--spring-snappy-ms) var(--spring-snappy);
 }
 .nav-brand:active {
   transform: scale(0.96);
+  transition-duration: 90ms;
 }
 .nav-brand .brand-mark {
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   box-shadow: 0 0 0 1px #ffffff14;
 }
 .nav-brand-word {
   font-family: var(--font-display);
   font-stretch: var(--stretch-condensed);
-  font-size: 23px;
+  font-size: 22px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.01em;
@@ -127,8 +138,14 @@ body {
   color: var(--accent);
   font-weight: 900;
 }
-/* The brand already says where you are; no compact «Inicio» beside it. */
-.nav-bar.has-brand .nav-bar-title {
+/* Scrolled: the brand steps aside and the compact title takes its place… */
+.nav-bar.is-collapsed:not(.keeps-brand) .nav-brand {
+  opacity: 0;
+  transform: translate3d(0, -8px, 0) scale(0.96);
+  pointer-events: none;
+}
+/* …except on Inicio, where the brand stays and the title never shows. */
+.nav-bar.keeps-brand .nav-bar-title {
   visibility: hidden;
 }
 .nav-avatar {
@@ -570,7 +587,7 @@ body {
   .nav-brand {
     display: none;
   }
-  .nav-bar.has-brand .nav-bar-title {
+  .nav-bar.keeps-brand .nav-bar-title {
     visibility: visible;
   }
   .demo-pill {

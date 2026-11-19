@@ -3,8 +3,10 @@
 // cached: content-hashed assets (cache first) and the app shell, index.html,
 // which opens from the cache at once and is refreshed in the background, so a
 // launch from the home screen never waits for the network.
-const STATIC = "galacticbet-static-v2";
-const SHELL = "galacticbet-shell-v1";
+// v3/v2: drop copies kept by earlier workers (an old index.html still
+// pointed at the 180 px icon, and icons were cached forever).
+const STATIC = "galacticbet-static-v3";
+const SHELL = "galacticbet-shell-v2";
 const MAX_ENTRIES = 120;
 const scope = self.registration.scope;
 const scopePath = new URL(scope).pathname;
@@ -25,15 +27,32 @@ self.addEventListener("activate", (event) =>
   ),
 );
 
-const isStatic = (url) =>
+// Content-hashed build files never change under the same name: cache first.
+const isHashed = (url) =>
+  url.origin === self.location.origin && url.pathname.startsWith(`${scopePath}assets/`);
+// Icons and launch screens keep their names across versions: serve the copy at
+// hand and refresh it, so a new icon reaches the device on the next request.
+const isArtwork = (url) =>
   url.origin === self.location.origin &&
-  (url.pathname.startsWith(`${scopePath}assets/`) ||
-    url.pathname.startsWith(`${scopePath}splash/`) ||
+  (url.pathname.startsWith(`${scopePath}splash/`) ||
     /\/icon[\w-]*\.(png|svg)$/.test(url.pathname));
 
 async function trim(cache) {
   const keys = await cache.keys();
   await Promise.all(keys.slice(0, Math.max(0, keys.length - MAX_ENTRIES)).map((key) => cache.delete(key)));
+}
+
+async function staleWhileRevalidate(event) {
+  const cache = await caches.open(STATIC);
+  const hit = await cache.match(event.request);
+  const refresh = fetch(event.request).then(async (response) => {
+    if (response.ok && response.type === "basic")
+      await cache.put(event.request, response.clone());
+    return response;
+  });
+  if (!hit) return refresh;
+  event.waitUntil(refresh.catch(() => {}));
+  return hit;
 }
 
 async function cacheFirst(request) {
@@ -105,5 +124,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   const url = new URL(request.url);
-  if (isStatic(url)) event.respondWith(cacheFirst(request));
+  if (isHashed(url)) event.respondWith(cacheFirst(request));
+  else if (isArtwork(url)) event.respondWith(staleWhileRevalidate(event));
 });

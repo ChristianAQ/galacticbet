@@ -28,32 +28,18 @@ export default function NavBar({ user }: { user: User | null }) {
       ? previous?.title || "Atrás"
       : routeTitle(parentOf(pathname)) || "Inicio";
   const title = top.title || routeTitle(pathname);
-  // Inicio wears the brand: on a phone there is no sidebar to carry it.
-  const branded = pathname === "/" && depth <= 1;
+  // The four tab roots wear the brand in the middle (a phone has no sidebar
+  // to carry it). Scrolling hands the spot to the compact title, except on
+  // Inicio, where the brand stays.
+  const branded = root && depth <= 1;
+  const keepsBrand = branded && pathname === "/";
+  const brandHidden = branded && !keepsBrand && Boolean(top.collapsed);
   return (
     <header
-      className={`nav-bar topbar${top.collapsed ? " is-collapsed" : ""}${branded ? " has-brand" : ""}`}
+      className={`nav-bar topbar${top.collapsed ? " is-collapsed" : ""}${branded ? " has-brand" : ""}${keepsBrand ? " keeps-brand" : ""}`}
     >
       <div className="nav-bar-inner">
         <div className="nav-bar-leading">
-          {branded && (
-            <button
-              type="button"
-              className="nav-brand"
-              aria-label="GalacticBet, volver arriba"
-              onClick={() =>
-                window.scrollTo({
-                  top: 0,
-                  behavior: prefersReducedMotion() ? "auto" : "smooth",
-                })
-              }
-            >
-              <BrandMark size={30} />
-              <span className="nav-brand-word" aria-hidden="true">
-                galactic<b>bet</b>
-              </span>
-            </button>
-          )}
           {canGoBack && (
             <button
               type="button"
@@ -69,8 +55,33 @@ export default function NavBar({ user }: { user: User | null }) {
             </button>
           )}
         </div>
-        <div className="nav-bar-title" aria-hidden={!top.collapsed}>
-          {title}
+        <div className="nav-bar-center">
+          {branded && (
+            <button
+              type="button"
+              className="nav-brand"
+              aria-label="GalacticBet, volver arriba"
+              aria-hidden={brandHidden || undefined}
+              tabIndex={brandHidden ? -1 : undefined}
+              onClick={() =>
+                window.scrollTo({
+                  top: 0,
+                  behavior: prefersReducedMotion() ? "auto" : "smooth",
+                })
+              }
+            >
+              <BrandMark size={28} />
+              <span className="nav-brand-word" aria-hidden="true">
+                galactic<b>bet</b>
+              </span>
+            </button>
+          )}
+          <div
+            className="nav-bar-title"
+            aria-hidden={!top.collapsed || keepsBrand}
+          >
+            {title}
+          </div>
         </div>
         <div className="nav-bar-trailing" id="nav-actions">
           {root && (
