@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { MOBILE_LAYOUT_QUERY } from "./mobileViewport";
 
-/** Height of the app bar when it sticks (mobile layout); zero on desktop. */
+/** Height of the fixed navigation bar (safe area included). */
 function stickyTopOffset() {
-  const bar = document.querySelector<HTMLElement>(".topbar");
-  return bar && getComputedStyle(bar).position === "sticky"
+  const bar = document.querySelector<HTMLElement>(".nav-bar");
+  return bar && ["sticky", "fixed"].includes(getComputedStyle(bar).position)
     ? bar.getBoundingClientRect().height
     : 0;
 }
@@ -18,7 +18,6 @@ export function useStuck() {
   const [node, sentinel] = useState<HTMLElement | null>(null);
   const [stuck, setStuck] = useState(false);
   useEffect(() => {
-    setStuck(false);
     if (!node || typeof IntersectionObserver === "undefined") return;
     let observer: IntersectionObserver | undefined;
     const observe = () => {

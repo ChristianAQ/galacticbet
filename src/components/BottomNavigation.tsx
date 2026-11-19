@@ -1,8 +1,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { flushSync } from "react-dom";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { haptic, prefersReducedMotion } from "../lib/motion";
 import type { LucideIcon } from "lucide-react";
+import { useChrome } from "../lib/chrome";
+import { haptic, prefersReducedMotion } from "../lib/motion";
+import { go, popToRoot, tabHref, tabIndex } from "../lib/navigation";
 
 function useKeyboardOpen() {
   const [open, setOpen] = useState(false);
@@ -23,8 +23,8 @@ function useKeyboardOpen() {
         setOpen(
           Boolean(
             editing &&
-            viewport.scale === 1 &&
-            window.innerHeight - viewport.height > 150,
+              viewport.scale === 1 &&
+              window.innerHeight - viewport.height > 150,
           ),
         );
       });
@@ -43,6 +43,11 @@ function useKeyboardOpen() {
   return open;
 }
 
+/**
+ * Floating tab bar. The tab of the screen at the bottom of the stack stays lit
+ * while you browse deeper; tapping it again pops back to that first screen, and
+ * once there, scrolls to the top — like UITabBarController.
+ */
 export default function BottomNavigation({
   items,
   inactive,
@@ -52,20 +57,17 @@ export default function BottomNavigation({
   inactive: boolean;
   onPrefetch: (path: string) => void;
 }) {
-  const { pathname, search } = useLocation();
-  const navigate = useNavigate();
+  const { rootPath, depth } = useChrome();
   const keyboardOpen = useKeyboardOpen();
-  const index = items.findIndex((item) =>
-    item.to === "/"
-      ? pathname === "/"
-      : pathname === item.to || pathname.startsWith(`${item.to}/`),
-  );
+  const index = tabIndex(rootPath);
+  const hidden = inactive || keyboardOpen;
   return (
     <nav
       className={`bottom-nav${keyboardOpen ? " keyboard-open" : ""}`}
-      aria-label="Navegación inferior"
-      inert={inactive || keyboardOpen}
-      aria-hidden={inactive || keyboardOpen || undefined}
+      aria-label="Secciones"
+      inert={hidden || undefined}
+      aria-hidden={hidden || undefined}
+      data-no-intercept
     >
       <div
         className="bottom-nav-items"
@@ -80,63 +82,45 @@ export default function BottomNavigation({
           className={`bottom-nav-indicator${index < 0 ? " is-hidden" : ""}`}
           aria-hidden="true"
         />
-        {items.map((item, position) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            onClick={(event) => {
-              if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-              event.preventDefault();
-              // iOS tab bar: tapping the active tab again scrolls to the top.
-              if (position === index && !search) {
-                window.scrollTo({
-                  top: 0,
-                  behavior: prefersReducedMotion() ? "auto" : "smooth",
-                });
-                return;
-              }
-              haptic();
-              navigateWithTransition(
-                () => navigate(item.to),
-                index < 0 || position === index
-                  ? "fade"
-                  : position > index
-                    ? "forward"
-                    : "back",
-              );
-            }}
-            onPointerEnter={() => onPrefetch(item.to)}
-            onPointerDown={() => onPrefetch(item.to)}
-            onFocus={() => onPrefetch(item.to)}
-          >
-            <item.icon size={21} aria-hidden="true" />
-            <span>{item.short ?? item.label}</span>
-          </NavLink>
-        ))}
+        {items.map((item, position) => {
+          const active = position === index;
+          return (
+            <a
+              key={item.to}
+              href={`#${item.to}`}
+              className={active ? "active" : undefined}
+              aria-current={active && depth === 1 ? "page" : undefined}
+              onClick={(event) => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+                event.preventDefault();
+                if (active) {
+                  if (depth > 1) {
+                    haptic();
+                    popToRoot();
+                  } else
+                    window.scrollTo({
+                      top: 0,
+                      behavior: prefersReducedMotion() ? "auto" : "smooth",
+                    });
+                  return;
+                }
+                haptic();
+                go(tabHref(item.to), { reset: true });
+              }}
+              onPointerEnter={() => onPrefetch(item.to)}
+              onPointerDown={() => onPrefetch(item.to)}
+              onFocus={() => onPrefetch(item.to)}
+            >
+              <item.icon
+                size={22}
+                strokeWidth={active ? 2.4 : 1.9}
+                aria-hidden="true"
+              />
+              <span>{item.short ?? item.label}</span>
+            </a>
+          );
+        })}
       </div>
     </nav>
   );
-}
-
-type Direction = "forward" | "back" | "fade";
-/**
- * Same-document View Transition (Safari 18+, Chrome): the page slides in the
- * direction of the tab while the app bar and the tab bar stay still. Browsers
- * without support, or with reduced motion, just navigate.
- */
-export function navigateWithTransition(go: () => void, direction: Direction) {
-  const root = document.documentElement;
-  if (!document.startViewTransition || prefersReducedMotion()) {
-    go();
-    return;
-  }
-  root.dataset.navDirection = direction;
-  const transition = document.startViewTransition(() => {
-    flushSync(go);
-    window.scrollTo(0, 0);
-  });
-  void transition.finished.finally(() => {
-    if (root.dataset.navDirection === direction) delete root.dataset.navDirection;
-  });
 }

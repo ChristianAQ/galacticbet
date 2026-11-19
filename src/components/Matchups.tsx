@@ -1,4 +1,12 @@
 import type { Matchup } from "../lib/matchInsightsData";
+
+const day = new Intl.DateTimeFormat("es", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/** Head-to-head: a compact ruled results list, winner in bold. */
 export default function Matchups({
   matches,
   source = "ESPN",
@@ -9,21 +17,15 @@ export default function Matchups({
   if (!matches.length) return null;
   return (
     <section
-      className="matchup-history"
+      className="match-block matchup-history"
       aria-label="Últimos enfrentamientos entre ambos equipos"
     >
-      <h4>Últimos enfrentamientos</h4>
+      <h3 className="match-block-title">Cara a cara</h3>
       <ul>
         {matches.map((m) => (
           <li key={m.id}>
             <div className="matchup-meta">
-              <time dateTime={m.date}>
-                {new Intl.DateTimeFormat("es", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                }).format(new Date(m.date))}
-              </time>
+              <time dateTime={m.date}>{day.format(new Date(m.date))}</time>
               {m.competition && <span>{m.competition}</span>}
             </div>
             <div className="matchup-scoreline">
@@ -35,7 +37,9 @@ export default function Matchups({
               <strong
                 aria-label={`${m.home}: ${m.homeScore}; ${m.away}: ${m.awayScore}`}
               >
-                {m.homeScore} <span>–</span> {m.awayScore}
+                {m.homeScore}
+                <span aria-hidden="true">–</span>
+                {m.awayScore}
               </strong>
               <span
                 className={m.awayScore > m.homeScore ? "matchup-winner" : ""}

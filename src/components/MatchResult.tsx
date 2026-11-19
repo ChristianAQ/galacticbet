@@ -3,7 +3,9 @@ import { ChevronDown } from "lucide-react";
 import MatchStatistics from "./MatchStatistics";
 import { useMatchInsight } from "../lib/useMatchInsight";
 import type { MatchInsight } from "../lib/matchInsightsData";
+// MatchStatistics content keeps its match-page styles; the result strip is ours.
 import "../styles/matchExtras.css";
+import "../styles/quiniela.css";
 import { Trophy } from "lucide-react";
 import type { Match } from "../lib/domain";
 import { finishedMatchResult } from "../lib/matchResult";
@@ -20,7 +22,11 @@ function StatisticsContent({
   return (
     <>
       {loading ? (
-        <p role="status">Cargando estadísticas…</p>
+        <p role="status" className="result-statistics-loading">
+          <span className="sr-only">Cargando estadísticas</span>
+          <span className="skeleton" aria-hidden="true" />
+          <span className="skeleton" aria-hidden="true" />
+        </p>
       ) : insight?.statistics.length ? (
         <>
           <MatchStatistics match={match} statistics={insight.statistics} />
@@ -40,9 +46,11 @@ function StatisticsContent({
 function LoadedStatistics({ match }: { match: Match }) {
   const state = useMatchInsight(match);
   return state.error ? (
-    <p role="alert">
+    <p role="alert" className="match-data-note">
       No se pudieron cargar las estadísticas.{" "}
-      <button onClick={state.onRetry}>Reintentar</button>
+      <button className="text-button" onClick={state.onRetry}>
+        Reintentar
+      </button>
     </p>
   ) : (
     <StatisticsContent

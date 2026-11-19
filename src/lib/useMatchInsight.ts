@@ -49,9 +49,10 @@ export function useMatchInsight(match: Match, demo = false) {
   }, [playing]);
   useEffect(() => {
     let active = true;
-    // Background live refreshes keep the current details visible meanwhile.
+    // Background refreshes, and a stacked page shown again, keep the current
+    // details visible meanwhile; only a new fixture or a retry starts blank.
     setState((previous) =>
-      previous.key === key && tick > 0
+      previous.key === key && !previous.error && (tick > 0 || !previous.loading)
         ? previous
         : { key, insight: null, loading: !demo, error: "" },
     );
@@ -67,7 +68,7 @@ export function useMatchInsight(match: Match, demo = false) {
         () => {
           if (active)
             setState((previous) =>
-              previous.key === key && previous.insight && tick > 0
+              previous.key === key && previous.insight
                 ? { ...previous, loading: false }
                 : {
                     key,

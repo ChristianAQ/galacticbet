@@ -1,6 +1,6 @@
-import { Crown, Medal, TrendingUp } from "lucide-react";
+import { Crown, TrendingDown, TrendingUp } from "lucide-react";
 import { rankingSummary, type RankingRow } from "../lib/rankings";
-import "../styles/dashboard.css";
+import "../styles/standings.css";
 
 export function RankAvatar({
   name,
@@ -33,6 +33,7 @@ export function RankBadge({ position }: { position: number }) {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
+/** Top three on real steps: the winner stands tallest. */
 export function Podium({
   rows,
   userId,
@@ -48,19 +49,17 @@ export function Podium({
       {order.map((r) => (
         <li
           key={r.id}
-          className={`podium-step podium-${r.position}${r.id === userId ? " is-me" : ""}`}
+          className={`podium-step podium-${Math.min(r.position, 3)}${r.id === userId ? " is-me" : ""}`}
         >
           <span className="podium-avatar">
-            <RankAvatar name={r.name} avatar={r.avatar} />
-            {r.position === 1 ? (
-              <Crown size={16} aria-hidden="true" />
-            ) : (
-              <Medal size={14} aria-hidden="true" />
+            {r.position === 1 && (
+              <Crown size={18} strokeWidth={2.4} aria-hidden="true" />
             )}
+            <RankAvatar name={r.name} avatar={r.avatar} />
           </span>
           <strong className="podium-name">
             {r.name}
-            {r.id === userId && <small> Tú</small>}
+            {r.id === userId && <small> · Tú</small>}
           </strong>
           <span className="podium-points">
             {r.points} <small>pts</small>
@@ -74,6 +73,7 @@ export function Podium({
   );
 }
 
+/** Your place in the table, big enough to brag about (or to motivate). */
 export function MyRankCard({
   rows,
   userId,
@@ -85,37 +85,48 @@ export function MyRankCard({
 }) {
   const s = rankingSummary(rows, userId);
   if (!s.me) return null;
-  const status = !rows.some((r) => r.points > 0)
-    ? "Los puntos aparecerán cuando se puntúen los partidos."
-    : s.me.position === 1
+  const scored = rows.some((r) => r.points > 0);
+  const leading = s.me.position === 1;
+  const status = !scored
+    ? "Todavía no ha puntuado nadie. Todo el mundo empata a cero."
+    : leading
       ? s.sharedLead
-        ? "Compartes el liderato"
+        ? "Compartes el liderato. Nadie se relaja."
         : s.total > 1
-          ? `Líder con ${plural(s.me.points - (rows.find((r) => r.position > 1)?.points ?? 0), "punto")} de ventaja`
-          : "Líder del grupo"
-      : `A ${plural(s.gapToLeader, "punto")} del líder · ${plural(s.gapToAbove, "punto")} para subir`;
+          ? `Líder con ${plural(s.me.points - (rows.find((r) => r.position > 1)?.points ?? 0), "punto")} de colchón.`
+          : "Líder del grupo (y único participante)."
+      : `A ${plural(s.gapToLeader, "punto")} del líder · ${plural(s.gapToAbove, "punto")} para adelantar al de arriba.`;
   return (
-    <section className="my-rank-card" aria-label="Tu posición">
+    <section
+      className={`my-rank-card${leading && scored ? " is-leader" : ""}`}
+      aria-label="Tu posición"
+    >
       <span className="my-rank-position">
-        <small>Tu posición</small>
+        <small>Tu puesto</small>
         <strong>
-          {s.me.position}º<small> de {s.total}</small>
+          {s.me.position}
+          <i aria-hidden="true">º</i>
         </strong>
+        <small className="my-rank-of">de {s.total}</small>
       </span>
       <span className="my-rank-stats">
         <span>
           <strong>{s.me.points}</strong>
-          <small>puntos</small>
+          <small>{s.me.points === 1 ? "punto" : "puntos"}</small>
         </span>
         {showHits && (
           <span>
             <strong>{s.me.hits}</strong>
-            <small>aciertos</small>
+            <small>{s.me.hits === 1 ? "acierto" : "aciertos"}</small>
           </span>
         )}
       </span>
       <p className="my-rank-status">
-        <TrendingUp size={14} aria-hidden="true" />
+        {leading || !scored ? (
+          <TrendingUp size={15} aria-hidden="true" />
+        ) : (
+          <TrendingDown size={15} aria-hidden="true" />
+        )}
         {status}
       </p>
     </section>

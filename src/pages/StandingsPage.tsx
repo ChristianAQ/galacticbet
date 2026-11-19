@@ -5,6 +5,7 @@ import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
 import { Empty, PageTitle, PrivateGate } from "../components/ui";
+import { SkeletonRows } from "../components/Skeleton";
 import { type Group } from "../lib/data";
 import { useGroupRankings } from "../lib/useGroupRankings";
 import {
@@ -40,6 +41,7 @@ import {
   roundShortLabel,
   type RoundOption,
 } from "../lib/roundOptions";
+import "../styles/standings.css";
 
 const ShareDialog = lazy(() => import("../components/ShareDialog"));
 
@@ -64,12 +66,14 @@ export default function StandingsPage({
       {!user ? (
         <PrivateGate onLogin={onLogin} />
       ) : (
-        <div className="panel group-empty-state">
-          <Empty title="Tu grupo, en la tabla">
-            Crea un grupo o únete con un código de invitación.
-          </Empty>
-          <GroupActions />
-        </div>
+        <Empty
+          art="podium"
+          title="Un podio sin nadie encima"
+          action={<GroupActions />}
+        >
+          La tabla cobra vida con un grupo. Crea el tuyo o únete con el código
+          de un amigo y que empiece el pique.
+        </Empty>
       )}
     </>
   );
@@ -78,7 +82,7 @@ export default function StandingsPage({
 function StandingsTitle({ action }: { action?: ReactNode }) {
   return (
     <PageTitle
-      eyebrow="CADA ACIERTO SUMA"
+      eyebrow="Cada acierto suma"
       title="Clasificación"
       titleControl={action}
     />
@@ -284,33 +288,36 @@ function GroupStandings({
         aria-busy={Boolean(selectedGroup && !data && !error)}
       >
         {!selectedGroup ? (
-          <Empty title="Tu grupo, en la tabla">
-            Selecciona un grupo para ver a todos sus participantes y sus puntos.
+          <Empty art="podium" title="¿Qué tabla miramos?">
+            Elige un grupo arriba y verás a todos sus jugadores con sus puntos.
           </Empty>
         ) : error ? (
-          <div role="alert" className="empty panel">
-            <h3>No se pudo cargar la clasificación</h3>
-            <p>{error}</p>
-            <button className="button secondary" onClick={retry}>
-              Reintentar
-            </button>
+          <div role="alert">
+            <Empty
+              art="whistle"
+              title="El árbitro ha parado el partido"
+              action={
+                <button className="button secondary" onClick={retry}>
+                  Reintentar
+                </button>
+              }
+            >
+              No se pudo cargar la clasificación. {error}
+            </Empty>
           </div>
         ) : !data ? (
-          <div
-            className="standings-skeleton"
-            role="status"
-            aria-label="Cargando clasificación"
-          >
-            <span />
-            <span />
-            <span />
-            <span />
+          <div className="standings-skeleton">
+            <SkeletonRows rows={6} variant="line" label="Cargando clasificación" />
           </div>
         ) : (
           <div
             className="ranking-view"
             key={`${groupId}:${scope}:${period}:${selectedRound}`}
           >
+            <MyRankCard rows={rows} userId={user.uid} showHits={showHits} />
+            {hasPoints && rows.length >= 2 && (
+              <Podium rows={rows} userId={user.uid} />
+            )}
             {pot && attendance.ready && !attendance.error && (
               <PotCard
                 pot={pot}
@@ -327,11 +334,12 @@ function GroupStandings({
                 No se pudo leer quién ha entrado en el bote: {attendance.error}
               </p>
             )}
-            {hasPoints && rows.length >= 2 && (
-              <Podium rows={rows} userId={user.uid} />
+            {!rows.length && (
+              <Empty art="podium" title="Tabla en blanco">
+                Esta jornada todavía no tiene participantes con boleto.
+              </Empty>
             )}
-            <MyRankCard rows={rows} userId={user.uid} showHits={showHits} />
-            <div className="panel standings-card">
+            <div className="standings-card" hidden={!rows.length}>
               <table
                 className={`standings-table${showHits ? "" : " standings-points-only"}${latest ? " has-latest" : ""}`}
               >
@@ -389,7 +397,7 @@ function GroupStandings({
                             <span className="standings-name">
                               <span>
                                 {r.name}
-                                {r.id === user.uid && <small> Tú</small>}
+                                {r.id === user.uid && <small> · Tú</small>}
                               </span>
                               <span
                                 className="standings-bar"
@@ -397,7 +405,7 @@ function GroupStandings({
                               >
                                 <i
                                   style={{
-                                    width: `${leaderPoints ? (r.points / leaderPoints) * 100 : 0}%`,
+                                    transform: `scaleX(${leaderPoints ? r.points / leaderPoints : 0})`,
                                   }}
                                 />
                               </span>
@@ -423,8 +431,8 @@ function GroupStandings({
             </div>
             {latest && (
               <p className="standings-footnote">
-                «Últ.»: puntos de {latestLabel}. Las flechas indican los puestos
-                ganados o perdidos con esa jornada.
+                «Últ.»: lo que sumó cada uno en {latestLabel}. Las flechas
+                cuentan los puestos ganados o perdidos con esa jornada.
               </p>
             )}
           </div>

@@ -1,0 +1,580 @@
+/*
+ * Perfil and Grupos: an iOS grouped list for «Más», the rules printed like the
+ * back of a quiniela slip, and groups as ruled rows you can swipe.
+ */
+
+/* ---------- Perfil ---------- */
+.profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 3px var(--masthead), 0 0 0 4.5px var(--masthead-rule);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+}
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.profile-tabs {
+  margin-top: 14px;
+}
+.profile-panel {
+  margin-top: 18px;
+  animation: panel-in var(--spring-snappy-ms) var(--spring-snappy) both;
+}
+.profile-panel:focus-visible {
+  outline-offset: 6px;
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+}
+.profile-editor form {
+  gap: 10px;
+}
+.profile-editor .button {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+/* «Más»: grouped list, separators inset after the icon like Settings. */
+.profile-more {
+  margin-top: 12px;
+}
+.more-caption {
+  margin: 20px 4px 8px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.more-list {
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.more-list + .more-list {
+  margin-top: 14px;
+}
+.more-list li {
+  position: relative;
+}
+.more-list li + li::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 60px;
+  right: 0;
+  height: 1px;
+  background: var(--rule);
+}
+.more-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 14px;
+  color: var(--ink);
+  text-align: left;
+  transition: background-color 120ms ease;
+}
+.more-row:active:not(:disabled) {
+  background: var(--paper-2);
+  transition-duration: 0ms;
+}
+.more-row:disabled {
+  opacity: 0.5;
+}
+.more-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.more-icon:has(.competition-logo) {
+  background: none;
+}
+.more-label {
+  display: grid;
+  min-width: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.25;
+}
+.more-label small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.more-chevron {
+  color: var(--ink-3);
+}
+.more-row.is-destructive,
+.more-row.is-destructive .more-icon {
+  color: var(--loss);
+}
+.more-row.is-destructive .more-icon {
+  background: var(--loss-soft);
+}
+.more-row.is-primary .more-icon {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---------- Cómo jugar ---------- */
+.how-to-play > section:first-child .section-heading {
+  margin-top: 6px;
+}
+.rules-table {
+  width: 100%;
+  border-top: 3px solid var(--rule-strong);
+  font-size: var(--text-sm);
+}
+.rules-table thead th {
+  padding: 10px 0 8px;
+  border-bottom: 1px solid var(--rule-strong);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.rules-table thead th:last-child,
+.rules-table td:last-child {
+  width: 52px;
+  text-align: right;
+}
+.rules-table tbody th,
+.rules-table td {
+  padding: 12px 10px 12px 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+  text-align: left;
+}
+.rules-table tbody th {
+  width: 34%;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+.rules-table tbody th small {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-text);
+  font-stretch: var(--stretch-normal);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.rules-table td {
+  color: var(--ink-2);
+  line-height: 1.35;
+}
+.rules-table td:last-child {
+  padding-right: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-tight);
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 0.9;
+  color: var(--ink);
+}
+.rules-table tr.is-miss td:last-child {
+  color: var(--ink-3);
+}
+.rules-note {
+  margin-top: 12px;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.how-to-steps {
+  display: grid;
+}
+.how-to-steps li {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.step-number {
+  justify-self: start;
+  align-self: start;
+  padding: 0 2px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-tight);
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 0.85;
+  /* The highlighter stroke under each number. */
+  box-shadow: inset 0 -0.3em 0 var(--accent);
+}
+.how-to-steps p {
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+.how-to-play .button {
+  margin-top: 16px;
+}
+.rules-prose {
+  display: grid;
+  gap: 12px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.rules-callout {
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--ink);
+  font-weight: 550;
+}
+.rules-prose .form-guide {
+  padding: 12px 0 4px;
+}
+
+/* ---------- Grupos ---------- */
+.groups-page {
+  padding-top: 6px;
+}
+.groups-hint {
+  margin: 6px 0 12px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.group-list {
+  border-top: 3px solid var(--rule-strong);
+}
+.group-list > .form-message {
+  margin-top: 10px;
+}
+.group-row {
+  border-bottom: 1px solid var(--rule);
+}
+.group-summary {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 76px;
+  padding: 14px 0;
+  color: var(--ink);
+  text-align: left;
+}
+.group-monogram {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 26px;
+  font-weight: 900;
+  transition: transform var(--spring-bouncy-ms) var(--spring-bouncy);
+}
+.group-row.is-open .group-monogram {
+  background: var(--accent);
+  color: var(--accent-ink);
+  transform: rotate(-4deg);
+}
+.group-summary-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.group-summary-body strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 22px;
+  font-weight: 850;
+  line-height: 1.05;
+}
+.group-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: var(--text-sm);
+  font-weight: 550;
+  color: var(--ink-2);
+}
+.group-row-pot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: var(--r-xs);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--text-xs);
+  font-weight: 750;
+}
+.group-member-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.group-chevron {
+  color: var(--ink-3);
+  transition: transform var(--spring-snappy-ms) var(--spring-snappy);
+}
+.group-chevron.rotated {
+  transform: rotate(180deg);
+}
+.group-list-error {
+  margin: 0 0 12px;
+  font-size: var(--text-sm);
+  color: var(--loss);
+}
+.group-details {
+  padding: 2px 0 22px;
+}
+.group-details:not([hidden]) {
+  animation: panel-in var(--spring-snappy-ms) var(--spring-snappy) both;
+}
+.group-detail-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.group-detail-links .button {
+  padding: 0 12px;
+}
+.group-section {
+  margin-top: 24px;
+}
+.group-section h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 20px;
+  font-weight: 850;
+}
+.group-section h3 small {
+  font-family: var(--font-text);
+  font-stretch: var(--stretch-normal);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--ink-3);
+}
+.members-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  border-bottom: 1px solid var(--rule);
+}
+.member-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.member-role {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: var(--r-xs);
+  background: var(--paper-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.group-competition-rules li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--rule);
+}
+.group-competition-rules strong {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: 650;
+}
+.group-competition-rules small {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.group-competition-rules svg {
+  color: var(--ink-3);
+}
+.group-detail-content .pot-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+/* The invite code as a torn-off stub: dashed edge, mono print. */
+.invite-code {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 0;
+}
+.invite-code code {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1.5px dashed var(--ink-3);
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+  -webkit-user-select: all;
+  user-select: all;
+}
+.invite-code .icon-button {
+  color: var(--ink);
+}
+.invite-code + .footnote {
+  margin-top: 6px;
+}
+.group-rename-form {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+  gap: 10px;
+}
+.group-rename-form .button {
+  justify-self: start;
+}
+.group-leave {
+  margin-top: 16px;
+  color: var(--loss);
+  text-decoration-color: var(--loss);
+}
+.group-leave-confirm {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: var(--r-sm);
+  background: var(--loss-soft);
+}
+.group-leave-confirm p {
+  color: var(--ink);
+  font-weight: 550;
+}
+.group-bottom-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 22px;
+}
+.group-bottom-actions .button {
+  padding: 0 12px;
+}
+@media (max-width: 359px) {
+  .group-bottom-actions,
+  .group-detail-links {
+    grid-template-columns: 1fr;
+  }
+}
+/* Confirmation bubble above the tab bar. */
+.group-toast {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: calc(var(--tabbar-space) + 6px);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 12px 18px;
+  border-radius: var(--r-md);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: var(--shadow-lift);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: toast-rise var(--spring-bouncy-ms) var(--spring-bouncy) both;
+}
+@keyframes toast-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 18px) scale(0.96);
+  }
+}
+
+/* Create / join sheet. */
+.group-form-sheet .included-competitions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.group-form-sheet .included-competitions li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 12px 4px 5px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.group-form-sheet .included-competitions .competition-logo.small {
+  border-radius: 50%;
+}
+.form-field {
+  display: grid;
+  gap: 6px;
+}
+.form-field-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.code-input {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.02em;
+}

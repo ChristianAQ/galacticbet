@@ -1,12 +1,12 @@
-import { LockKeyhole, ShieldCheck } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { useBodyScrollLock } from "../lib/useBodyScrollLock";
+import { ShieldCheck } from "lucide-react";
 import {
   predictionSummary,
   type Match,
   type PredictionValue,
 } from "../lib/domain";
+import Modal from "./Modal";
 
+/** Last look at the slip before sealing it: once saved, the round is closed. */
 export default function ConfirmQuiniela({
   matches,
   values,
@@ -24,100 +24,19 @@ export default function ConfirmQuiniela({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const panel = useRef<HTMLElement>(null);
-  useBodyScrollLock(true);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    panel.current?.querySelector<HTMLButtonElement>("[data-cancel]")?.focus();
-    return () => previous?.focus({ preventScroll: true });
-  }, []);
-  function keyboard(event: React.KeyboardEvent<HTMLElement>) {
-    if (event.key === "Escape" && !busy) onCancel();
-    if (event.key !== "Tab") return;
-    const buttons = panel.current?.querySelectorAll<HTMLButtonElement>(
-      "button:not(:disabled)",
-    );
-    if (!buttons?.length) {
-      event.preventDefault();
-      return;
-    }
-    const first = buttons[0],
-      last = buttons[buttons.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
-  const omitted = matches.filter((m) => !values[m.id]).length;
+  const picked = matches.filter((m) => values[m.id]);
+  const omitted = matches.length - picked.length;
   return (
-    <div
-      className="modal-backdrop"
-      onClick={() => {
-        if (!busy) onCancel();
-      }}
-    >
-      <section
-        ref={panel}
-        className="modal panel confirm-quiniela"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-quiniela-title"
-        aria-describedby="confirm-quiniela-description"
-        aria-busy={busy}
-        onKeyDown={keyboard}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <span className="confirm-icon">
-          <LockKeyhole size={25} />
-        </span>
-        <h2 id="confirm-quiniela-title">¿Guardamos tu quiniela?</h2>
-        <p id="confirm-quiniela-description">
-          Una vez guardada,{" "}
-          <strong>no podrás modificar ningún pronóstico de esta jornada</strong>
-          , aunque los partidos todavía no hayan empezado.
-        </p>
-        <ul className="confirmation-summary">
-          {matches
-            .filter((m) => values[m.id])
-            .map((m) => (
-              <li key={m.id}>
-                <span>
-                  {m.home}
-                  <small>vs {m.away}</small>
-                </span>
-                <strong>{predictionSummary(values[m.id])}</strong>
-              </li>
-            ))}
-        </ul>
-        {omitted > 0 && (
-          <p className="confirmation-note">
-            {omitted}{" "}
-            {omitted === 1
-              ? "partido sin pronóstico quedará"
-              : "partidos sin pronóstico quedarán"}{" "}
-            en blanco. Los encuentros cerrados o no disponibles no se pueden
-            completar.
-          </p>
-        )}
-        <p className="confirmation-privacy">
-          <ShieldCheck size={16} />
-          Solo compartirás tus pronósticos con los miembros que también hayan
-          completado y guardado esta jornada.
-        </p>
-        {demo && (
-          <p className="setup-notice">
-            Modo demo: este cierre solo se conserva durante esta sesión de
-            prueba.
-          </p>
-        )}
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
+    <Modal
+      title="¿Sellamos tu boleto?"
+      role="alertdialog"
+      describedBy="confirm-quiniela-description"
+      busy={busy}
+      onClose={onCancel}
+      detents={["medium", "large"]}
+      className="confirm-quiniela"
+      initialFocus="[data-cancel]"
+      footer={
         <div className="confirm-buttons">
           <button
             className="button secondary"
@@ -127,15 +46,56 @@ export default function ConfirmQuiniela({
           >
             Seguir editando
           </button>
-          <button
-            className="button primary"
-            disabled={busy}
-            onClick={onConfirm}
-          >
-            {busy ? "Guardando…" : "Sí, guardar y cerrar"}
+          <button className="button primary" disabled={busy} onClick={onConfirm}>
+            {busy ? "Sellando…" : "Sí, sellar quiniela"}
           </button>
         </div>
-      </section>
-    </div>
+      }
+    >
+      <p id="confirm-quiniela-description" className="confirm-lede">
+        Una vez sellada,{" "}
+        <strong>no podrás cambiar ningún pronóstico de esta jornada</strong>,
+        aunque los partidos aún no hayan empezado.
+      </p>
+      <ol className="confirmation-summary">
+        {picked.map((m, i) => (
+          <li key={m.id}>
+            <span className="confirmation-number">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <span className="confirmation-teams">
+              {m.home}
+              <small>{m.away}</small>
+            </span>
+            <strong>{predictionSummary(values[m.id])}</strong>
+          </li>
+        ))}
+      </ol>
+      {omitted > 0 && (
+        <p className="confirmation-note">
+          {omitted}{" "}
+          {omitted === 1
+            ? "partido sin pronóstico quedará"
+            : "partidos sin pronóstico quedarán"}{" "}
+          en blanco. Los encuentros cerrados o no disponibles no se pueden
+          completar.
+        </p>
+      )}
+      <p className="confirmation-privacy">
+        <ShieldCheck size={16} aria-hidden="true" />
+        Solo verás los pronósticos de quienes también hayan sellado esta
+        jornada, y solo ellos verán los tuyos.
+      </p>
+      {demo && (
+        <p className="setup-notice">
+          Modo demo: el sello solo dura lo que dure esta sesión de prueba.
+        </p>
+      )}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </Modal>
   );
 }

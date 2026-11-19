@@ -1,556 +1,495 @@
-/* Light palette isolated to the standalone porra route. */
+/*
+ * Porra rápida: an editor like filling in a slip, and the result as a paper
+ * ticket with notched edges, ink header and the total marked in highlighter.
+ */
 .porra-tool {
-  --porra-paper: #eef4ed;
-  --porra-ink: #173b2d;
-  --porra-muted: #5f7665;
-  --porra-line: #cbd9c5;
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 26px;
-  border: 1px solid #d6e3ce;
-  border-radius: 18px;
-  background: var(--porra-paper);
-  color: var(--porra-ink);
+  padding-top: 8px;
 }
 .porra-tool-heading {
   display: flex;
+  align-items: flex-end;
   justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
   gap: 12px;
 }
-.porra-kicker {
-  font-size: 9px;
-  font-weight: 650;
-  letter-spacing: 1px;
-  color: #637d64;
+.porra-tool-heading .eyebrow {
+  margin-bottom: 6px;
 }
 .porra-tool-heading h2 {
-  margin: 8px 0 0;
-  font-size: 23px;
-  letter-spacing: -0.5px;
+  font-size: var(--display-md);
+  font-weight: 850;
+}
+.porra-tool-heading h2:focus {
+  outline: none;
+}
+.porra-new {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 14px;
 }
 .porra-local-note,
 .porra-preview-status {
-  margin: 12px 0 22px;
-  font-size: 11px;
-  color: var(--porra-muted);
-  line-height: 1.6;
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
-.porra-tool input,
-.porra-tool select {
-  border-color: var(--porra-line);
-  background: #fff;
-  color: var(--porra-ink);
-  font-size: 14px;
-  width: 100%;
-  min-height: 46px;
-  border-radius: 9px;
-  padding: 10px 12px;
-}
-.porra-tool input::placeholder {
-  color: #8a9a86;
-}
-.porra-tool :is(button, input, select, summary, a):focus-visible {
-  outline: 2px solid #466e4e;
-  outline-offset: 3px;
-}
+
+/* ---------- Editor ---------- */
 .porra-editor {
-  display: grid;
-  gap: 20px;
-}
-.porra-editor label {
-  color: #43634b;
-  font-size: 12px;
-  font-weight: 550;
-  gap: 8px;
+  margin-top: 18px;
+  gap: 16px;
 }
 .porra-fields {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 12px;
 }
 .porra-money-input {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-right: 14px;
-  border: 1px solid var(--porra-line);
-  border-radius: 9px;
-  background: #fff;
+  position: relative;
+  display: block;
 }
 .porra-money-input input {
-  border: 0;
+  padding-right: 34px;
+  font-variant-numeric: tabular-nums;
+}
+.porra-money-input > span {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--ink-3);
+  font-weight: 700;
+  pointer-events: none;
 }
 .porra-editor-heading {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-  margin-top: 5px;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 3px solid var(--rule-strong);
 }
 .porra-editor-heading h3 {
-  font-size: 15px;
-  margin: 0;
+  font-size: var(--display-sm);
+  font-weight: 850;
 }
 .porra-editor-heading > span {
-  color: var(--porra-muted);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
 }
+/* One slip row per friend: number · name · score – score · remove. */
 .porra-player-labels,
 .porra-player-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px 72px 38px;
+  grid-template-columns: 24px minmax(0, 1fr) 54px 10px 54px 44px;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 .porra-player-labels {
-  color: var(--porra-muted);
+  margin-bottom: -8px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
   font-size: 10px;
-  text-align: center;
-  margin: -7px 0 -12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
-.porra-player-labels > span:first-child {
-  text-align: left;
+.porra-player-labels > span:nth-child(3),
+.porra-player-labels > span:nth-child(5) {
+  text-align: center;
 }
 .porra-player-fields {
   display: grid;
-  gap: 9px;
+  gap: 8px;
+}
+.porra-player-field {
+  animation: player-in var(--spring-snappy-ms) var(--spring-snappy) both;
+}
+@keyframes player-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0);
+  }
+}
+.porra-player-number {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink-3);
 }
 .porra-player-field input[type="number"] {
+  padding: 8px 4px;
   text-align: center;
-  padding: 10px 5px;
-  font-variant-numeric: tabular-nums;
-  appearance: textfield;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 22px;
+  font-weight: 900;
 }
-.porra-player-field input::-webkit-inner-spin-button,
-.porra-player-field input::-webkit-outer-spin-button {
-  appearance: none;
+.porra-player-field input[type="number"]:not(:placeholder-shown) {
+  border-color: var(--rule-strong);
+}
+.porra-dash {
+  text-align: center;
+  color: var(--ink-3);
+  font-weight: 700;
 }
 .porra-remove {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  min-height: 44px;
-  color: #647b65;
-  border-radius: 7px;
-}
-.porra-remove:hover:not(:disabled) {
-  background: #e4dcd2;
-  color: #8a4b37;
+  color: var(--ink-3);
 }
 .porra-add {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 44px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #365f41;
-}
-.porra-button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 12px 16px;
-  border-radius: 9px;
-  border: 1px solid #244b36;
-  background: #244b36;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.5;
+  min-height: 50px;
+  border: 1.5px dashed var(--ink-3);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  font-size: var(--text-md);
+  font-weight: 700;
+  transition:
+    transform 180ms var(--press),
+    background-color 160ms ease;
 }
-.porra-button:hover:not(:disabled) {
-  background: #315f44;
+.porra-add:active:not(:disabled) {
+  transform: scale(0.98);
+  background: var(--paper-2);
 }
-.porra-button.secondary {
-  background: #fff;
-  border-color: var(--porra-line);
-  color: #365f41;
-}
-.porra-button.secondary:hover:not(:disabled) {
-  background: #e1ebdb;
+.porra-add:disabled {
+  opacity: 0.4;
 }
 .porra-editor-total {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 17px;
-  border: 1px solid var(--porra-line);
-  border-radius: 11px;
-  background: #e2ecdc;
-}
-.porra-editor-total > div {
   display: grid;
-  gap: 5px;
+  gap: 4px;
+  padding: 16px 0 4px;
+  border-top: 1px solid var(--rule);
 }
-.porra-editor-total span,
+.porra-editor-total .numeral {
+  justify-self: start;
+  padding: 0 4px;
+  font-size: var(--display-xl);
+  box-shadow: inset 0 -0.28em 0 var(--accent);
+}
 .porra-editor-total small {
-  font-size: 11px;
-  color: #56705a;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
 }
-.porra-editor-total strong {
-  font-size: 24px;
-  font-variant-numeric: tabular-nums;
-}
-.porra-editor-total small {
-  margin-left: auto;
-}
-.porra-editor-actions,
-.porra-preview-actions {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
+.porra-editor-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 10px;
 }
+
+/* ---------- Preview ---------- */
 .porra-preview-actions {
-  justify-content: flex-start;
-  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
 }
-.porra-message {
-  padding: 12px 14px;
-  margin: 12px 0;
-  background: #e1ebda;
-  border: 1px solid #c5d6bc;
-  border-radius: 9px;
-  color: #3e6146;
-  font-size: 12px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
+.porra-preview-actions .button {
+  padding: 0 10px;
 }
-.porra-message.error-note {
-  background: #f5e6da;
-  border-color: #dcc5b4;
-  color: #834b33;
+.porra-share,
+.porra-delete {
+  grid-column: 1 / -1;
 }
-.porra-message a {
-  text-decoration: underline;
+.porra-delete.button.secondary {
+  border-color: var(--loss);
+  color: var(--loss);
 }
+
+/* ---------- The ticket ---------- */
 .porra-ticket {
-  max-width: 640px;
-  margin: 22px auto 0;
-  background: #fff;
-  border: 1px solid #c8d7bf;
-  border-radius: 14px;
+  --seam: 56px;
+  --notch: 11px;
+  position: relative;
+  margin: 18px 0 4px;
   overflow: hidden;
-  box-shadow: 0 8px 25px #27452c09;
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  /* Punched notches where the stub meets the body. */
+  -webkit-mask:
+    radial-gradient(circle at 0 var(--seam), transparent var(--notch), black calc(var(--notch) + 0.5px))
+      left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% var(--seam), transparent var(--notch), black calc(var(--notch) + 0.5px))
+      right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle at 0 var(--seam), transparent var(--notch), black calc(var(--notch) + 0.5px))
+      left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% var(--seam), transparent var(--notch), black calc(var(--notch) + 0.5px))
+      right / 51% 100% no-repeat;
+  animation: ticket-in var(--spring-bouncy-ms) var(--spring-bouncy) both;
+}
+@keyframes ticket-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) rotate(-1.2deg);
+  }
 }
 .porra-ticket-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 15px 20px;
-  background: #e0ebd9;
-  border-bottom: 1px solid #c8d7bf;
+  height: var(--seam);
+  padding: 0 20px;
+  background: var(--masthead);
+  color: var(--masthead-ink);
 }
-.porra-ticket-header > strong {
-  font-size: 17px;
-  letter-spacing: -0.6px;
+.porra-ticket-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
-.porra-ticket-header > strong > span {
-  color: #648344;
+.porra-ticket-brand strong {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 20px;
+  font-weight: 800;
 }
-.porra-ticket-header small {
-  font-size: 8px;
-  color: #637b61;
-  letter-spacing: 0.8px;
+.porra-ticket-brand b {
+  color: var(--accent);
+  font-weight: 900;
 }
-.porra-ticket-header > span {
-  font-size: 8px;
-  color: #637b61;
-  font-weight: 600;
+.porra-ticket-kind {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--masthead-ink-2);
 }
 .porra-ticket-match {
-  padding: 17px 20px;
-  text-align: center;
-}
-.porra-competition {
-  color: #627c62;
-  font-size: 10px;
+  display: grid;
+  gap: 8px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--rule);
 }
 .porra-ticket-match h2 {
-  font-size: 20px;
-  line-height: 1.4;
-  margin: 7px 0 16px;
+  font-size: var(--display-md);
+  font-weight: 850;
   overflow-wrap: anywhere;
 }
 .porra-teams {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 25px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
   gap: 10px;
-  align-items: center;
-}
-.porra-teams > div {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-}
-.porra-team-badge {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #e1ebdc;
-  color: #3e6146;
-  font-size: 12px;
-  font-weight: 700;
 }
 .porra-teams strong {
-  font-size: 12px;
-  line-height: 1.4;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.05;
   overflow-wrap: anywhere;
 }
+.porra-teams strong:last-child {
+  text-align: right;
+}
 .porra-teams > span {
-  color: #8a9a86;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
   font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 .porra-ticket-match > time {
-  display: block;
-  margin-top: 15px;
-  font-size: 10px;
-  color: #627c62;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
 }
 .porra-ticket-players {
   display: grid;
-  gap: 6px;
-  padding: 0 16px 16px;
-  margin: 0;
-  list-style: none;
+  padding: 6px 20px;
+}
+.porra-ticket-players li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--rule);
+}
+.porra-ticket-players li:last-child {
+  border-bottom: 0;
 }
 .porra-ticket-players.is-dense {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr 1fr;
+  column-gap: 18px;
 }
-.porra-ticket-players > li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 9px 12px;
-  background: #f0f5ed;
-  border: 1px solid #e1eada;
-  border-radius: 7px;
+.porra-ticket-players.is-dense li:nth-last-child(2):nth-child(odd) {
+  border-bottom: 0;
+}
+.porra-ticket-index {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+.porra-ticket-name {
   min-width: 0;
-}
-.porra-ticket-players > li > span {
-  font-size: 12px;
-  font-weight: 550;
-  line-height: 1.5;
   overflow-wrap: anywhere;
-  min-width: 0;
+  font-weight: 620;
+  line-height: 1.2;
 }
-.porra-ticket-players strong {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-shrink: 0;
-  font-size: 17px;
-  font-variant-numeric: tabular-nums;
-  color: #244a34;
+.porra-ticket-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-tight);
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
 }
-.porra-ticket-players strong > span {
-  color: #8a9a86;
-  font-weight: 400;
+.porra-ticket-score span {
+  color: var(--ink-3);
+  font-size: 18px;
+}
+.is-dense .porra-ticket-score {
+  font-size: 22px;
 }
 .porra-ticket-total {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 17px 20px;
-  background: #244b36;
-  color: #f3f6ed;
+  gap: 12px;
+  margin: 4px 20px 0;
+  padding: 16px 0 6px;
+  /* Perforation: tear here. */
+  border-top: 2px dashed var(--rule);
 }
 .porra-ticket-total > div {
   display: grid;
-  gap: 5px;
-}
-.porra-ticket-total span {
-  font-size: 10px;
-  color: #d4e0cc;
+  gap: 2px;
 }
 .porra-ticket-total strong {
-  font-size: 13px;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.porra-ticket-total span {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 .porra-ticket-total > b {
-  font-size: 28px;
-  color: #f1edc6;
-  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
+  font-size: 44px;
+  box-shadow: inset 0 -0.3em 0 var(--accent);
 }
 .porra-ticket-note {
-  margin: 0;
-  padding: 10px 16px;
-  font-size: 9px;
-  color: #6b7e67;
-  text-align: center;
+  padding: 8px 20px 16px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
+
+/* ---------- Mis porras ---------- */
 .porra-saved {
-  margin-top: 24px;
-  border-top: 1px solid var(--porra-line);
+  margin-top: 8px;
 }
-.porra-saved > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 18px 0;
-  min-height: 44px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
+.porra-saved-count {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--ink-3);
 }
-.porra-saved > summary > span:last-child,
-.porra-saved > p {
-  color: var(--porra-muted);
-  font-size: 11px;
-  line-height: 1.6;
+.porra-saved-hint {
+  margin: -4px 0 6px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
-.porra-saved > ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.porra-saved-list > li {
+  border-bottom: 1px solid var(--rule);
+}
+.porra-saved-row {
   display: grid;
-  gap: 8px;
-}
-.porra-saved li {
-  display: flex;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 6px 9px;
-  border: 1px solid var(--porra-line);
-  border-radius: 9px;
-  background: #fff;
-}
-.porra-saved li > button:first-child {
-  display: grid;
-  gap: 5px;
-  flex: 1;
-  min-width: 0;
-  padding: 8px;
+  gap: 12px;
+  width: 100%;
+  min-height: 68px;
+  padding: 12px 0;
+  color: var(--ink);
   text-align: left;
 }
-.porra-saved li strong {
-  font-size: 12px;
-  overflow-wrap: anywhere;
+.porra-saved-row.is-current {
+  padding-left: 12px;
+  box-shadow: inset 4px 0 0 var(--accent);
 }
-.porra-saved li span,
-.porra-saved li small {
-  font-size: 11px;
-  color: var(--porra-muted);
-  overflow-wrap: anywhere;
+.porra-saved-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
 }
-@media (max-width: 760px) {
-  .porra-tool {
-    padding: 18px 14px;
-    border-radius: 14px;
-  }
-  .porra-tool-heading h2 {
-    font-size: 21px;
-  }
+.porra-saved-main strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1.05;
+}
+.porra-saved-main > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.porra-saved-total {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+.porra-saved-total .numeral {
+  font-size: 24px;
+}
+.porra-saved-total small {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* ---------- Capture sheet ---------- */
+.porra-capture-modal img {
+  width: 100%;
+  border-radius: var(--r-xs);
+  box-shadow:
+    0 0 0 1px var(--rule),
+    var(--shadow-lift);
+  -webkit-touch-callout: default;
+}
+
+@media (max-width: 359px) {
   .porra-fields {
     grid-template-columns: 1fr;
   }
-  .porra-tool input,
-  .porra-tool select {
-    font-size: 16px;
-  }
-  .porra-player-field,
-  .porra-player-labels {
-    grid-template-columns: minmax(0, 1fr) 47px 47px 32px;
-    gap: 6px;
-  }
-  .porra-player-field input:first-child {
-    padding-left: 9px;
-    padding-right: 6px;
-  }
-  .porra-remove {
-    width: 32px;
-  }
-  .porra-preview-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-  .porra-preview-actions > .porra-button {
-    padding: 10px 6px;
-    font-size: 11px;
-  }
-  .porra-ticket-header,
-  .porra-ticket-match,
-  .porra-ticket-total {
-    padding-left: 13px;
-    padding-right: 13px;
-  }
-  .porra-ticket-header {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .porra-ticket-match h2 {
-    font-size: 18px;
-  }
-  .porra-ticket-players {
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-  .porra-ticket-players > li {
-    padding: 8px 9px;
-  }
-  .porra-ticket-players.is-dense > li {
-    padding: 7px;
-    gap: 5px;
-  }
-  .porra-ticket-players.is-dense > li > span {
-    font-size: 10px;
-  }
-  .porra-ticket-players.is-dense strong {
-    font-size: 14px;
+  .porra-player-labels,
+  .porra-player-field {
+    grid-template-columns: 20px minmax(0, 1fr) 46px 8px 46px 44px;
     gap: 4px;
   }
-  .porra-home-link {
-    padding: 14px;
-    gap: 11px;
+}
+@media (min-width: 761px) {
+  .porra-preview-actions {
+    grid-template-columns: repeat(4, 1fr);
   }
-  .porra-home-icon {
-    width: 34px;
-    height: 37px;
-  }
-}
-
-.porra-tool {
-  scroll-margin-top: calc(88px + var(--safe-area-top));
-}
-.porra-tool-heading h2:focus {
-  outline: 0;
-}
-.porra-capture-modal {
-  width: 740px;
-  padding: 16px;
-  background: #eef4ed;
-  border-color: #cbd9c5;
-  color: #173b2d;
-}
-.porra-capture-modal h2 {
-  margin: 0 32px 12px 0;
-  font-size: 14px;
-}
-.porra-capture-modal .modal-close {
-  top: 7px;
-  right: 7px;
-  color: #365f41;
-}
-.porra-capture-modal > img {
-  display: block;
-  width: 100%;
-  max-height: calc(
-    100dvh - 130px - var(--safe-area-top) - var(--safe-area-bottom)
-  );
-  object-fit: contain;
 }

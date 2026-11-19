@@ -1,22 +1,31 @@
-import { ArrowRight, Flag, Target } from "lucide-react";
-import type { ReactNode } from "react";
+import { ArrowRight, Flag } from "lucide-react";
+import { useContext, useEffect, useRef, type ReactNode } from "react";
 import { matchStatusLabel, type Match } from "../lib/domain";
 import { finishedMatchResult } from "../lib/matchResult";
 import { kickoffLabel } from "../lib/matchInsights";
+import { chrome, EntryContext, useNavTitle } from "../lib/chrome";
 import TeamForm from "./TeamForm";
 import { LiveMinute } from "./LiveStatus";
+import EmptyArt, { type EmptyArtKind } from "./EmptyArt";
+
+/** Empty state: an illustration, a line with some voice and what to do next. */
 export function Empty({
   title,
   children,
+  art = "net",
+  action,
 }: {
   title: string;
-  children: ReactNode;
+  children?: ReactNode;
+  art?: EmptyArtKind;
+  action?: ReactNode;
 }) {
   return (
     <div className="empty">
-      <Target size={30} />
+      <EmptyArt kind={art} />
       <h3>{title}</h3>
-      <p>{children}</p>
+      {children && <p>{children}</p>}
+      {action && <div className="empty-actions">{action}</div>}
     </div>
   );
 }
@@ -45,36 +54,80 @@ export const readableError = (e: unknown) => {
       : "No se pudo completar la operación. Inténtalo otra vez.")
   );
 };
+
+/**
+ * Reports when an element scrolls under the fixed navigation bar, so the bar
+ * can fade in its compact title (iOS large-title behaviour).
+ */
+export function useCollapsingTitle<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const id = useContext(EntryContext);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || !id || typeof IntersectionObserver === "undefined") return;
+    const bar = document.querySelector<HTMLElement>(".nav-bar");
+    const offset = Math.round(bar?.getBoundingClientRect().height || 0);
+    const observer = new IntersectionObserver(
+      ([entry]) =>
+        chrome.set(id, {
+          collapsed:
+            !entry.isIntersecting && entry.boundingClientRect.top < offset,
+        }),
+      { rootMargin: `-${offset}px 0px 0px 0px`, threshold: 0 },
+    );
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      chrome.set(id, { collapsed: false });
+    };
+  }, [id]);
+  return ref;
+}
+
+/**
+ * Large title on an ink masthead. It shrinks as it scrolls under the bar (CSS
+ * scroll timeline where supported) and hands its name to the compact bar.
+ */
 export function PageTitle({
   eyebrow,
   title,
   description,
   titleControl,
+  children,
+  navTitle,
 }: {
-  eyebrow: string;
+  eyebrow?: ReactNode;
   title: string;
-  description?: string;
+  description?: ReactNode;
   titleControl?: ReactNode;
+  children?: ReactNode;
+  /** Shorter name for the compact bar, when the large title is long. */
+  navTitle?: string;
 }) {
+  useNavTitle(navTitle || title);
+  const heading = useCollapsingTitle<HTMLHeadingElement>();
   return (
-    <div className="page-heading">
-      <div>
-        <div className="eyebrow">{eyebrow}</div>
-        <div className="page-title-row">
-          <h1>{title}</h1>
-          {titleControl}
+    <header className="masthead page-heading">
+      <div className="large-title">
+        <div className="large-title-text">
+          {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+          <h1 ref={heading}>{title}</h1>
         </div>
-        {description && <p>{description}</p>}
+        {titleControl && <div className="large-title-control">{titleControl}</div>}
       </div>
-    </div>
+      {description && <p className="masthead-description">{description}</p>}
+      {children}
+    </header>
   );
 }
+
 export function Crest({ src }: { src?: string }) {
   return src ? (
     <img
       src={src}
       alt=""
       loading="lazy"
+      decoding="async"
       onError={(e) => {
         e.currentTarget.style.visibility = "hidden";
       }}
@@ -83,7 +136,16 @@ export function Crest({ src }: { src?: string }) {
     <span className="crest-placeholder" aria-hidden="true" />
   );
 }
-export function Team({ name, crest }: { name: string; crest?: string }) {
+export function Team({
+  name,
+  crest,
+  part,
+}: {
+  name: string;
+  crest?: string;
+  /** Shared-element name used when the fixture morphs into the match page. */
+  part?: "home-crest" | "away-crest";
+}) {
   return (
     <span className="team">
       {crest ? (
@@ -91,12 +153,14 @@ export function Team({ name, crest }: { name: string; crest?: string }) {
           src={crest}
           alt=""
           loading="lazy"
+          decoding="async"
+          data-vt-part={part}
           onError={(e) => {
             e.currentTarget.style.display = "none";
           }}
         />
       ) : (
-        <Flag size={20} />
+        <Flag size={20} data-vt-part={part} />
       )}
       <span>{name}</span>
     </span>
@@ -112,31 +176,41 @@ export function MatchRow({
   as?: "div" | "span";
 }) {
   const result = finishedMatchResult(m);
+  const live = ["IN_PLAY", "PAUSED"].includes(m.status);
   return (
-    <Container className={`match-row ${history ? "with-form" : ""}`}>
+    <Container
+      className={`match-row${history ? " with-form" : ""}${live ? " is-live" : ""}`}
+      data-vt-match={m.id}
+    >
       <span className="match-date">{kickoffLabel(m.utcDate)}</span>
       {history ? (
         <span className="match-team-block home-team">
-          <Team name={m.home} crest={m.homeCrest} />
+          <Team name={m.home} crest={m.homeCrest} part="home-crest" />
           <TeamForm match={m} side="home" matches={history} />
         </span>
       ) : (
-        <Team name={m.home} crest={m.homeCrest} />
+        <Team name={m.home} crest={m.homeCrest} part="home-crest" />
       )}
-      <span className="match-score">
-        {m.homeScore !== null && m.awayScore !== null
-          ? `${m.homeScore} : ${m.awayScore}`
-          : m.status === "FINISHED"
-            ? "—"
-            : "vs"}
+      <span className="match-score" data-vt-part="score">
+        {m.homeScore !== null && m.awayScore !== null ? (
+          <>
+            <b>{m.homeScore}</b>
+            <i aria-hidden="true">:</i>
+            <b>{m.awayScore}</b>
+          </>
+        ) : m.status === "FINISHED" ? (
+          "—"
+        ) : (
+          <small>vs</small>
+        )}
       </span>
       {history ? (
         <span className="match-team-block away-team">
-          <Team name={m.away} crest={m.awayCrest} />
+          <Team name={m.away} crest={m.awayCrest} part="away-crest" />
           <TeamForm match={m} side="away" matches={history} />
         </span>
       ) : (
-        <Team name={m.away} crest={m.awayCrest} />
+        <Team name={m.away} crest={m.awayCrest} part="away-crest" />
       )}
       <span
         className={`match-status ${result?.winnerName ? "match-status-winner" : ""}`}
@@ -152,8 +226,10 @@ export function MatchRow({
             </span>
             <small>{result.decision}</small>
           </>
-        ) : ["IN_PLAY", "PAUSED"].includes(m.status) ? (
+        ) : live ? (
           <LiveMinute match={m} />
+        ) : m.status === "TIMED" ? null : m.status === "SCHEDULED" ? (
+          "Horario por confirmar"
         ) : (
           matchStatusLabel[m.status] || m.status
         )}
@@ -169,19 +245,24 @@ export function PrivateGate({
   onDemo?: () => void;
 }) {
   return (
-    <Empty title="Tu quiniela te espera">
-      <span className="private-gate-text">
-        Inicia sesión para jugar con tus amigos y conservar tus pronósticos en
-        todos tus dispositivos.
-      </span>
-      <button className="button primary" onClick={onLogin}>
-        Iniciar sesión <ArrowRight size={16} />
-      </button>
-      {onDemo && (
-        <button className="button secondary" onClick={onDemo}>
-          Probar en modo demo
-        </button>
-      )}
+    <Empty
+      art="slip"
+      title="Tu boleto está en blanco"
+      action={
+        <>
+          <button className="button primary" onClick={onLogin}>
+            Entrar y jugar <ArrowRight size={16} />
+          </button>
+          {onDemo && (
+            <button className="button secondary" onClick={onDemo}>
+              Probar sin cuenta
+            </button>
+          )}
+        </>
+      }
+    >
+      Entra para jugar con tus amigos y llevar tus pronósticos en el bolsillo,
+      en este y en cualquier dispositivo.
     </Empty>
   );
 }

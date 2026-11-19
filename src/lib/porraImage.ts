@@ -1,17 +1,48 @@
 import { competitionName } from "./competitions";
 import { euro, porraTotal, type Porra } from "./porra";
+import { loadShareFonts } from "./shareImage";
 
-/** A local, complete PNG with no remote assets or canvas-tainting image requests. */
+const DISPLAY = '"Anybody Variable", "Arial Narrow", sans-serif';
+const TEXT = '"Instrument Sans Variable", "Helvetica Neue", Arial, sans-serif';
+const colors = {
+  paper: "#f2efe6",
+  card: "#fbfaf5",
+  rule: "#d5d0c1",
+  ink: "#15140f",
+  ink2: "#48453d",
+  muted: "#645f56",
+  mastInk: "#f2efe6",
+  mastMuted: "#a8a396",
+  accent: "#ffd100",
+};
+
+/**
+ * The porra as a paper ticket PNG: ink header with punched notches, numbered
+ * rows and the total marked in yellow. Local only: no remote assets.
+ */
 export async function porraImage(p: Porra): Promise<Blob> {
+  await loadShareFonts();
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Tu navegador no ha podido preparar la imagen.");
   const width = 1000,
+    pad = 56,
+    header = 100,
     twoColumns = p.players.length > 8,
-    columns = twoColumns ? 2 : 1;
-  const colWidth = (width - 112 - (twoColumns ? 20 : 0)) / columns;
-  function font(size: number, weight = 500) {
-    ctx!.font = `${weight} ${size}px system-ui, -apple-system, sans-serif`;
+    columns = twoColumns ? 2 : 1,
+    gap = twoColumns ? 36 : 0;
+  const colWidth = (width - pad * 2 - gap) / columns;
+  type Face = "display" | "text";
+  function font(
+    size: number,
+    weight = 500,
+    face: Face = "text",
+    stretch: CanvasFontStretch = "condensed",
+  ) {
+    ctx!.font = `${weight} ${size}px ${face === "display" ? DISPLAY : TEXT}`;
+    // Anybody is width-variable; browsers without canvas fontStretch ignore it.
+    if ("fontStretch" in ctx!)
+      ctx!.fontStretch = face === "display" ? stretch : "normal";
   }
   function lines(value: string, maxWidth: number) {
     const result: string[] = [];
@@ -25,9 +56,10 @@ export async function porraImage(p: Porra): Promise<Blob> {
     if (current) result.push(current.trim());
     return result;
   }
-  const playerFont = twoColumns ? 26 : 34;
-  const playerLine = twoColumns ? 32 : 40;
-  const nameWidth = colWidth - (twoColumns ? 180 : 220);
+  const playerFont = twoColumns ? 25 : 32;
+  const playerLine = twoColumns ? 30 : 38;
+  const scoreWidth = twoColumns ? 120 : 160;
+  const nameWidth = colWidth - scoreWidth - 64;
   font(playerFont, 600);
   const rowHeights = Array.from(
     { length: Math.ceil(p.players.length / columns) },
@@ -37,175 +69,190 @@ export async function porraImage(p: Porra): Promise<Blob> {
           .slice(row * columns, row * columns + columns)
           .map((player) =>
             Math.max(
-              twoColumns ? 74 : 88,
-              lines(player.name, nameWidth).length * playerLine + 24,
+              twoColumns ? 70 : 84,
+              lines(player.name, nameWidth).length * playerLine + 26,
             ),
           ),
       ),
   );
-  font(36, 750);
-  const titleLines = lines(p.title, 880);
-  font(30, 650);
-  const homeLines = lines(p.fixture.home, 365),
-    awayLines = lines(p.fixture.away, 365);
-  const headingHeight =
-    374 +
-    titleLines.length * 44 +
-    Math.max(homeLines.length, awayLines.length) * 36;
-  const height =
-    headingHeight + rowHeights.reduce((sum, size) => sum + size + 10, 0) + 205;
+  font(50, 850, "display");
+  const titleLines = lines(p.title, width - pad * 2);
+  font(34, 800, "display");
+  const homeLines = lines(p.fixture.home, 380),
+    awayLines = lines(p.fixture.away, 380);
+  const titleY = header + 74;
+  const teamsY = titleY + titleLines.length * 54 + 26;
+  const teamsH = Math.max(homeLines.length, awayLines.length) * 40;
+  const dateY = teamsY + teamsH + 16;
+  const playersY = dateY + 64;
+  const rowsH = rowHeights.reduce((sum, size) => sum + size, 0);
+  const totalY = playersY + rowsH + 28;
+  const height = totalY + 190;
   canvas.width = width;
   canvas.height = height;
-  ctx.fillStyle = "#eef4ed";
-  ctx.fillRect(0, 0, width, height);
   ctx.textBaseline = "top";
+  // Paper ticket.
+  ctx.fillStyle = colors.card;
+  ctx.fillRect(0, 0, width, height);
   function write(
     value: string,
     x: number,
     y: number,
     size: number,
-    color = "#173b2d",
+    color = colors.ink,
     weight = 500,
+    face: Face = "text",
+    align: CanvasTextAlign = "left",
   ) {
-    font(size, weight);
+    font(size, weight, face);
     ctx!.fillStyle = color;
+    ctx!.textAlign = align;
     ctx!.fillText(value, x, y);
   }
-  function box(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    color: string,
-    radius = 16,
-  ) {
-    ctx!.beginPath();
-    ctx!.roundRect(x, y, w, h, radius);
+  function caption(value: string, x: number, y: number, color = colors.muted, align: CanvasTextAlign = "left") {
+    font(15, 750, "display", "expanded");
+    if ("letterSpacing" in ctx!)
+      (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "1.5px";
     ctx!.fillStyle = color;
-    ctx!.fill();
+    ctx!.textAlign = align;
+    ctx!.fillText(value.toUpperCase(), x, y);
+    if ("letterSpacing" in ctx!)
+      (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "0px";
   }
-  write("galacticbet / PORRA", 56, 42, 23, "#37694f", 750);
-  write(
-    p.demo ? "DEMO · PARTIDO DE EJEMPLO" : "ENTRE AMIGOS",
-    56,
-    88,
-    16,
-    "#6b7c6d",
-    650,
+  function rule(y: number, x = pad, w = width - pad * 2, color = colors.rule, h = 1) {
+    ctx!.fillStyle = color;
+    ctx!.fillRect(x, y, w, h);
+  }
+  // Ink header with the brand.
+  ctx.fillStyle = colors.ink;
+  ctx.fillRect(0, 0, width, header);
+  ctx.beginPath();
+  ctx.roundRect(pad, 30, 40, 40, 9);
+  ctx.fillStyle = colors.accent;
+  ctx.fill();
+  ctx.strokeStyle = colors.ink;
+  ctx.lineWidth = 3.2;
+  ctx.beginPath();
+  ctx.roundRect(pad + 9.4, 39.4, 21.2, 21.2, 3);
+  ctx.stroke();
+  ctx.lineWidth = 4.2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(pad + 15, 45.6);
+  ctx.lineTo(pad + 25, 54.7);
+  ctx.moveTo(pad + 24.4, 45);
+  ctx.lineTo(pad + 15.6, 55.3);
+  ctx.stroke();
+  write("galactic", pad + 54, 32, 32, colors.mastInk, 800, "display");
+  font(32, 800, "display");
+  const brandWidth = ctx.measureText("galactic").width;
+  write("bet", pad + 54 + brandWidth, 32, 32, colors.accent, 900, "display");
+  caption(
+    p.demo ? "Demo · partido de ejemplo" : "Porra · entre amigos",
+    width - pad,
+    42,
+    colors.mastMuted,
+    "right",
   );
+  // Punched notches where the stub meets the body.
+  ctx.fillStyle = colors.paper;
+  for (const x of [0, width]) {
+    ctx.beginPath();
+    ctx.arc(x, header, 18, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Fixture.
+  caption(competitionName(p.fixture.competition), pad, header + 36);
   titleLines.forEach((line, i) =>
-    write(line, 56, 130 + i * 44, 36, "#173b2d", 750),
-  );
-  const fixtureY = 152 + titleLines.length * 44;
-  const competition = competitionName(p.fixture.competition);
-  write(competition, 56, fixtureY, 19, "#587260", 600);
-  const teamsY = fixtureY + 48;
-  box(56, teamsY, 74, 74, "#dce9d8", 37);
-  box(870, teamsY, 74, 74, "#dce9d8", 37);
-  write(
-    p.fixture.home.slice(0, 2).toUpperCase(),
-    71,
-    teamsY + 23,
-    24,
-    "#315840",
-    750,
-  );
-  write(
-    p.fixture.away.slice(0, 2).toUpperCase(),
-    885,
-    teamsY + 23,
-    24,
-    "#315840",
-    750,
+    write(line, pad, titleY + i * 54, 50, colors.ink, 850, "display"),
   );
   homeLines.forEach((line, i) =>
-    write(line, 56, teamsY + 93 + i * 36, 30, "#173b2d", 650),
+    write(line, pad, teamsY + i * 40, 34, colors.ink, 800, "display"),
   );
-  awayLines.forEach((line, i) => {
-    font(30, 650);
-    write(
-      line,
-      944 - ctx.measureText(line).width,
-      teamsY + 93 + i * 36,
-      30,
-      "#173b2d",
-      650,
-    );
-  });
-  write("vs", 485, teamsY + 25, 23, "#81917e");
-  const dateY =
-    teamsY + 110 + Math.max(homeLines.length, awayLines.length) * 36;
+  awayLines.forEach((line, i) =>
+    write(line, width - pad, teamsY + i * 40, 34, colors.ink, 800, "display", "right"),
+  );
+  caption("vs", width / 2, teamsY + 10, colors.muted, "center");
   write(
     new Intl.DateTimeFormat("es", {
       dateStyle: "long",
       timeStyle: "short",
     }).format(new Date(p.fixture.utcDate)),
-    56,
+    pad,
     dateY,
     20,
-    "#587260",
+    colors.ink2,
+    500,
   );
-  let rowY = headingHeight;
+  rule(playersY - 22, pad, width - pad * 2, colors.ink, 3);
+  // Players: numbered rows like the slip.
+  let rowY = playersY;
   p.players.forEach((player, i) => {
     const col = i % columns,
       row = Math.floor(i / columns),
-      x = 56 + col * (colWidth + 20),
+      x = pad + col * (colWidth + gap),
       rowH = rowHeights[row];
-    box(x, rowY, colWidth, rowH, "#ffffff");
+    write(
+      String(i + 1).padStart(2, "0"),
+      x,
+      rowY + (rowH - 22) / 2,
+      22,
+      colors.muted,
+      800,
+      "display",
+    );
     font(playerFont, 600);
     const nameLines = lines(player.name, nameWidth);
     const nameY = rowY + (rowH - nameLines.length * playerLine) / 2;
     nameLines.forEach((line, j) =>
-      write(line, x + 18, nameY + j * playerLine, playerFont, "#173b2d", 600),
+      write(line, x + 46, nameY + j * playerLine + 3, playerFont, colors.ink, 600),
     );
-    const pillWidth = twoColumns ? 123 : 160;
-    const scoreSize = twoColumns ? 27 : 34;
-    box(
-      x + colWidth - pillWidth - 18,
-      rowY + (rowH - 48) / 2,
-      pillWidth,
-      48,
-      "#dce9d8",
-      10,
-    );
-    const score = `${player.home} – ${player.away}`;
-    font(scoreSize, 750);
+    const scoreSize = twoColumns ? 38 : 48;
     write(
-      score,
-      x + colWidth - 18 - pillWidth / 2 - ctx.measureText(score).width / 2,
-      rowY + (rowH - scoreSize) / 2,
+      `${player.home}–${player.away}`,
+      x + colWidth,
+      rowY + (rowH - scoreSize) / 2 + 2,
       scoreSize,
-      "#244a34",
-      750,
+      colors.ink,
+      900,
+      "display",
+      "right",
     );
-    if (col === columns - 1 || i === p.players.length - 1) rowY += rowH + 10;
+    if (col === columns - 1 || i === p.players.length - 1) {
+      rowY += rowH;
+      if (i < p.players.length - 1) rule(rowY);
+    }
   });
-  box(56, rowY + 14, 888, 112, "#173b2d");
+  // Perforation, then the total in highlighter.
+  ctx.strokeStyle = colors.rule;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([12, 10]);
+  ctx.beginPath();
+  ctx.moveTo(pad, totalY);
+  ctx.lineTo(width - pad, totalY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  caption("Bote total", pad, totalY + 34, colors.ink);
   write(
     `${p.players.length} personas · ${euro(p.contributionCents)} por persona`,
-    78,
-    rowY + 37,
+    pad,
+    totalY + 66,
     21,
-    "#d9e7d3",
+    colors.muted,
     500,
   );
-  write("BOTE TOTAL", 78, rowY + 78, 16, "#c7d8bf", 650);
   const total = euro(porraTotal(p));
-  font(40, 750);
-  write(
-    total,
-    921 - ctx.measureText(total).width,
-    rowY + 64,
-    40,
-    "#f1edc6",
-    750,
-  );
+  font(76, 900, "display");
+  const totalWidth = ctx.measureText(total).width;
+  ctx.fillStyle = colors.accent;
+  ctx.fillRect(width - pad - totalWidth - 8, totalY + 66, totalWidth + 16, 26);
+  write(total, width - pad, totalY + 22, 76, colors.ink, 900, "display", "right");
   write(
     "GalacticBet · Marcador a 90 minutos · Aportaciones anotadas",
-    56,
-    rowY + 151,
+    pad,
+    totalY + 134,
     17,
-    "#667b69",
+    colors.muted,
   );
   return new Promise((resolve, reject) =>
     canvas.toBlob(

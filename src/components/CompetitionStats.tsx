@@ -4,6 +4,7 @@ import type { Match } from "../lib/domain";
 import { PLAYER_METRICS, topFive, type StatRow } from "../lib/leagueStats";
 import { useLeagueStats } from "../lib/useLeagueStats";
 import { Crest } from "./ui";
+import { SkeletonRows } from "./Skeleton";
 
 function RankingCard({
   title,
@@ -12,6 +13,7 @@ function RankingCard({
   loading = false,
   unavailable,
   note,
+  featured = false,
 }: {
   title: string;
   unit: string;
@@ -19,44 +21,60 @@ function RankingCard({
   loading?: boolean;
   unavailable?: string;
   note?: string;
+  /** The first board of each block prints its leader in large type. */
+  featured?: boolean;
 }) {
+  const [leader, ...rest] = rows || [];
+  const position = (i: number) =>
+    rows && i && rows[i - 1].value === rows[i].value
+      ? rows.findIndex((p) => p.value === rows[i].value) + 1
+      : i + 1;
   return (
-    <section className="panel league-ranking-card" aria-busy={loading}>
+    <section
+      className={`league-ranking-card${featured ? " is-featured" : ""}`}
+      aria-busy={loading}
+    >
       <header>
-        <span className="eyebrow">TOP 5</span>
+        <span className="eyebrow">Top 5</span>
         <h3>{title}</h3>
       </header>
       {loading ? (
-        <div
-          className="league-ranking-skeleton"
-          role="status"
-          aria-label={`Cargando ${title}`}
-        >
-          <span />
-          <span />
-          <span />
-        </div>
+        <SkeletonRows rows={3} variant="line" label={`Cargando ${title}`} />
       ) : rows?.length ? (
-        <ol className="league-ranking-list">
-          {rows.map((r, i) => (
-            <li key={r.key}>
-              <span className="league-ranking-position">
-                {i && rows[i - 1].value === r.value
-                  ? rows.findIndex((p) => p.value === r.value) + 1
-                  : i + 1}
-              </span>
-              <Crest src={r.crest} />
+        <>
+          {featured && leader && (
+            <div className="league-ranking-leader">
+              <Crest src={leader.crest} />
               <span className="league-ranking-person">
-                <strong>{r.name}</strong>
-                {r.team && <small>{r.team}</small>}
+                <strong>{leader.name}</strong>
+                {leader.team && <small>{leader.team}</small>}
               </span>
-              <span className="league-ranking-value">
-                <strong>{r.value}</strong>
+              <span className="league-ranking-big">
+                <b className="numeral">{leader.value}</b>
                 <small>{unit}</small>
               </span>
-            </li>
-          ))}
-        </ol>
+            </div>
+          )}
+          <ol className="league-ranking-list" start={featured ? 2 : 1}>
+            {(featured ? rest : rows).map((r) => {
+              const i = rows.indexOf(r);
+              return (
+                <li key={r.key}>
+                  <span className="league-ranking-position">{position(i)}</span>
+                  <Crest src={r.crest} />
+                  <span className="league-ranking-person">
+                    <strong>{r.name}</strong>
+                    {r.team && <small>{r.team}</small>}
+                  </span>
+                  <span className="league-ranking-value">
+                    <strong>{r.value}</strong>
+                    <small>{unit}</small>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </>
       ) : (
         <p className="league-ranking-empty">
           {unavailable ||
@@ -130,9 +148,10 @@ export default function CompetitionStats({
         </p>
       )}
       <div className="league-rankings-grid">
-        {PLAYER_METRICS.map((metric) => (
+        {PLAYER_METRICS.map((metric, index) => (
           <RankingCard
             key={metric.id}
+            featured={index === 0}
             title={metric.label}
             unit={metric.unit}
             rows={stats.data?.rankings[metric.id]}
@@ -169,6 +188,7 @@ export default function CompetitionStats({
       </div>
       <div className="league-rankings-grid">
         <RankingCard
+          featured
           title="Equipos más goleadores"
           unit="goles"
           rows={topFive(teamRows("goalsFor"))}

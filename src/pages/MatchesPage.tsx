@@ -5,27 +5,40 @@ import {
   competitionSeasons,
   leagueTab,
   LEAGUE_TABS,
+  seasonLabel,
   type LeagueTab,
 } from "../lib/leagueHub";
 import "../styles/leagues.css";
-import "../styles/dashboard.css";
-import { isCompetition, type CompetitionCode } from "../lib/competitions";
+import {
+  competitionName,
+  isCompetition,
+  type CompetitionCode,
+} from "../lib/competitions";
 import {
   lazy,
   Suspense,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, CalendarPlus, Share2, Target } from "lucide-react";
 import { useStuck } from "../lib/useStuck";
 import { knockoutContext } from "../lib/matchInsights";
 import CompetitionTabs from "../components/CompetitionTabs";
 import RoundSelector from "../components/RoundSelector";
-import { Empty, MatchRow } from "../components/ui";
-import { preferredRound, type Match } from "../lib/domain";
+import SwipeRow from "../components/SwipeRow";
+import { menuTarget } from "../components/ContextMenu";
+import { SkeletonRows } from "../components/Skeleton";
+import { Empty, MatchRow, PageTitle } from "../components/ui";
+import { canPredict, preferredRound, type Match } from "../lib/domain";
+import { canAddMatchToCalendar } from "../lib/matchPresentation";
+import { downloadMatchCalendar, shareMatch } from "../lib/matchActions";
+import { haptic, prefersReducedMotion, springEasing } from "../lib/motion";
+import { go } from "../lib/navigation";
 import { preferenceStore } from "../lib/preferences";
 import { roundOptions } from "../lib/roundOptions";
 import { usePreferences } from "../lib/useGroupSelection";
@@ -33,6 +46,11 @@ import { usePreferences } from "../lib/useGroupSelection";
 const CompetitionStats = lazy(() => import("../components/CompetitionStats"));
 const weekday = new Intl.DateTimeFormat("es", { weekday: "long" });
 const dayMonth = new Intl.DateTimeFormat("es", {
+  day: "numeric",
+  month: "long",
+});
+const dayTitle = new Intl.DateTimeFormat("es", {
+  weekday: "long",
   day: "numeric",
   month: "long",
 });
@@ -70,11 +88,109 @@ function DayTitle({ date, count }: { date: string; count: number }) {
   );
 }
 
-const dayTitle = new Intl.DateTimeFormat("es", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-});
+/**
+ * One fixture of the list: tap for the match page (the crests morph into it),
+ * swipe left to add it to the calendar, long-press for every shortcut.
+ */
+function FixtureItem({
+  match: m,
+  matches,
+  userId,
+  onNotice,
+}: {
+  match: Match;
+  matches: Match[];
+  userId: string;
+  onNotice: (message: string) => void;
+}) {
+  const tie = knockoutContext(m, matches);
+  const path = `/partido/${encodeURIComponent(m.id)}`;
+  const calendar = canAddMatchToCalendar(m);
+  const addToCalendar = () => {
+    const message = downloadMatchCalendar(m);
+    if (!message) return;
+    haptic("success");
+    onNotice(message);
+  };
+  const link = (
+    <Link
+      ref={menuTarget(() => ({
+        title: `${m.home} – ${m.away}`,
+        items: [
+          {
+            label: "Ver ficha",
+            icon: <ArrowUpRight size={18} aria-hidden="true" />,
+            onSelect: () =>
+              go(path, {
+                sharedFrom: document.querySelector(
+                  `.route-view.is-top .fixture-card-button [data-vt-match="${CSS.escape(m.id)}"]`,
+                ),
+              }),
+          },
+          ...(canPredict(m.utcDate, Date.now(), m.status)
+            ? [
+                {
+                  label: "Hacer mi quiniela",
+                  icon: <Target size={18} aria-hidden="true" />,
+                  onSelect: () => {
+                    preferenceStore.update(userId, {
+                      competition: m.competition,
+                    });
+                    go(`/quiniela?round=${encodeURIComponent(m.roundId)}`);
+                  },
+                },
+              ]
+            : []),
+          ...(canAddMatchToCalendar(m)
+            ? [
+                {
+                  label: "Añadir al calendario",
+                  icon: <CalendarPlus size={18} aria-hidden="true" />,
+                  onSelect: addToCalendar,
+                },
+              ]
+            : []),
+          {
+            label: "Compartir partido",
+            icon: <Share2 size={18} aria-hidden="true" />,
+            onSelect: () =>
+              void shareMatch(m).then((message) => message && onNotice(message)),
+          },
+        ],
+      }))}
+      className="fixture-card-button"
+      aria-label={`Ver ficha de ${m.home} contra ${m.away}`}
+      to={path}
+    >
+      <MatchRow match={m} history={matches} as="span" />
+      {tie?.leg ? (
+        <span className="fixture-leg">
+          {tie.leg === 1 ? "Ida" : "Vuelta"}
+        </span>
+      ) : null}
+    </Link>
+  );
+  return (
+    <li className="fixture-item">
+      {calendar ? (
+        <SwipeRow
+          actions={[
+            {
+              label: "Calendario",
+              icon: <CalendarPlus size={20} aria-hidden="true" />,
+              tone: "accent",
+              onAction: addToCalendar,
+            },
+          ]}
+        >
+          {link}
+        </SwipeRow>
+      ) : (
+        link
+      )}
+    </li>
+  );
+}
 
 export default function MatchesPage({
   matches,
@@ -97,27 +213,33 @@ export default function MatchesPage({
     : preferences.competition;
   const round = params.get("round") || "";
   const tab = leagueTab(params.get("tab"));
+  const ids = useId();
+  const panelId = `${ids}-panel`;
+  const tabPrefix = `${ids}-tab`;
   const panel = useRef<HTMLDivElement>(null);
   const previousTab = useRef(tab);
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 5000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
   useLayoutEffect(() => {
     const previous = previousTab.current;
     previousTab.current = tab;
-    if (
-      previous === tab ||
-      matchMedia("(prefers-reduced-motion: reduce)").matches
-    )
-      return;
+    if (previous === tab || prefersReducedMotion()) return;
     const direction =
       LEAGUE_TABS.findIndex((t) => t.id === tab) >
       LEAGUE_TABS.findIndex((t) => t.id === previous)
         ? 1
         : -1;
+    const { easing, duration } = springEasing({ response: 0.4, damping: 0.92 });
     const animation = panel.current?.animate(
       [
-        { opacity: 0, transform: `translateX(${direction * 22}px)` },
-        { opacity: 1, transform: "translateX(0)" },
+        { opacity: 0, transform: `translate3d(${direction * 28}px,0,0)` },
+        { opacity: 1, transform: "translate3d(0,0,0)" },
       ],
-      { duration: 260, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+      { duration, easing },
     );
     return () => animation?.cancel();
   }, [tab]);
@@ -168,12 +290,18 @@ export default function MatchesPage({
   }, [filtered, selected]);
   return (
     <section className="leagues-page" aria-label="Ligas">
-      <h1 className="sr-only">Ligas</h1>
-      <LeagueNavigation tab={tab} onChange={changeTab}>
+      <PageTitle
+        title="Ligas"
+        navTitle={competitionName(competition, true)}
+        eyebrow={
+          seasonId ? `Temporada ${seasonLabel(seasonId)}` : "Calendario y resultados"
+        }
+      >
         <div className="league-selection">
           <CompetitionTabs
             value={competition}
             onChange={(code) => {
+              if (code !== competition) haptic();
               preferenceStore.update(userId, { competition: code });
               setParams(
                 (previous) => {
@@ -188,15 +316,22 @@ export default function MatchesPage({
             }}
           />
         </div>
-      </LeagueNavigation>
+      </PageTitle>
+      <LeagueNavigation
+        tab={tab}
+        onChange={changeTab}
+        panel={panel}
+        idPrefix={tabPrefix}
+        panelId={panelId}
+      />
       <div
         ref={panel}
-        id="league-panel"
+        id={panelId}
         role="tabpanel"
-        aria-labelledby={`league-tab-${tab}`}
+        aria-labelledby={`${tabPrefix}-${tab}`}
         className="league-content"
         key={`${competition}:${seasonId}:${tab}`}
-        tabIndex={0}
+        tabIndex={-1}
       >
         {tab === "clasificacion" ? (
           <CompetitionTable
@@ -207,12 +342,10 @@ export default function MatchesPage({
           />
         ) : tab === "noticias" ? (
           loading ? (
-            <p className="league-message" role="status">
-              Cargando temporada…
-            </p>
+            <SkeletonRows rows={4} variant="card" label="Cargando temporada" />
           ) : !seasonId ? (
-            <Empty title="Sin temporada disponible">
-              Las noticias aparecerán cuando se publique el calendario de esta
+            <Empty art="paper" title="Sin temporada en portada">
+              Las noticias llegarán cuando se publique el calendario de esta
               competición.
             </Empty>
           ) : (
@@ -224,19 +357,20 @@ export default function MatchesPage({
           )
         ) : tab === "estadisticas" ? (
           loading ? (
-            <p className="league-message" role="status">
-              Cargando estadísticas…
-            </p>
+            <SkeletonRows rows={5} variant="line" label="Cargando estadísticas" />
           ) : !seasonId ? (
-            <Empty title="Sin temporada disponible">
-              Todavía no hay datos para esta competición.
+            <Empty art="podium" title="Sin números todavía">
+              Aún no hay datos para esta competición. Vuelve cuando ruede el
+              balón.
             </Empty>
           ) : (
             <Suspense
               fallback={
-                <p className="league-message" role="status">
-                  Cargando estadísticas…
-                </p>
+                <SkeletonRows
+                  rows={5}
+                  variant="line"
+                  label="Cargando estadísticas"
+                />
               }
             >
               <CompetitionStats
@@ -266,53 +400,72 @@ export default function MatchesPage({
                 }
               />
             )}
+            {notice && (
+              <p className="league-toast" role="status">
+                <CalendarPlus size={16} aria-hidden="true" />
+                {notice}
+              </p>
+            )}
             <div className="match-calendar-list">
               {loading ? (
-                <Empty title="Cargando partidos…">Consultando Firestore.</Empty>
+                <SkeletonRows rows={6} label="Cargando partidos" />
               ) : filtered.length ? (
-                days.map((items) => (
-                  <section
-                    key={items[0].utcDate}
-                    className="match-day"
-                    aria-label={dayTitle.format(new Date(items[0].utcDate))}
-                  >
-                    <DayTitle date={items[0].utcDate} count={items.length} />
-                    {items.map((m) => {
-                      const tie = knockoutContext(m, matches);
-                      return (
-                        <Link
-                          key={m.id}
-                          className="panel fixture-card-button"
-                          aria-label={`Ver ficha de ${m.home} contra ${m.away}`}
-                          to={`/partido/${encodeURIComponent(m.id)}`}
-                        >
-                          <MatchRow match={m} history={matches} as="span" />
-                          <span className="fixture-card-footer">
-                            {tie?.leg
-                              ? `${tie.leg === 1 ? "Ida" : "Vuelta"} · `
-                              : ""}
-                            Ver ficha del partido
-                            <ArrowUpRight size={15} />
-                          </span>
-                        </Link>
-                      );
-                    })}
-                  </section>
-                ))
+                <>
+                  {days.map((items) => (
+                    <section
+                      key={items[0].utcDate}
+                      className="match-day"
+                      aria-label={dayTitle.format(new Date(items[0].utcDate))}
+                    >
+                      <DayTitle date={items[0].utcDate} count={items.length} />
+                      <ul className="fixture-list">
+                        {items.map((m) => (
+                          <FixtureItem
+                            key={m.id}
+                            match={m}
+                            matches={matches}
+                            userId={userId}
+                            onNotice={setNotice}
+                          />
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
+                  <p className="league-hint">
+                    Desliza un partido a la izquierda para llevarlo a tu
+                    calendario, o mantenlo pulsado para ver más opciones.
+                  </p>
+                </>
               ) : (
-                <Empty title="Aún no hay partidos disponibles">
+                <Empty
+                  art="whistle"
+                  title="El árbitro aún no ha pitado"
+                  action={
+                    !demo && (
+                      <button className="button secondary" onClick={onDemo}>
+                        Explorar modo demo
+                      </button>
+                    )
+                  }
+                >
                   {demo
-                    ? "La demo contiene únicamente una jornada de LaLiga."
-                    : "La sincronización cargará los calendarios y resultados reales desde Football-Data.org."}
-                  <br />
-                  {!demo && (
-                    <button className="button secondary" onClick={onDemo}>
-                      Explorar modo demo
-                    </button>
-                  )}
+                    ? "La demo solo trae una jornada de LaLiga. Prueba con esa."
+                    : "La sincronización traerá los calendarios y resultados reales desde Football-Data.org."}
                 </Empty>
               )}
             </div>
+            {!loading && filtered.length > 0 && (
+              <p className="league-more">
+                <Link to={`/quiniela?round=${encodeURIComponent(selected)}`}
+                  onClick={() =>
+                    preferenceStore.update(userId, { competition })
+                  }
+                >
+                  Ir a mi quiniela de esta jornada
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </Link>
+              </p>
+            )}
           </>
         )}
       </div>

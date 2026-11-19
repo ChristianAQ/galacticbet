@@ -1,200 +1,215 @@
+/* Equipos y jugadores: club picker on the masthead, squad sheet by lines. */
 .teams-clubs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
   gap: 8px;
-  margin-bottom: 22px;
+  margin: 18px calc(-1 * var(--pad-r)) 0 calc(-1 * var(--pad-l));
+  padding: 2px var(--pad-r) 2px var(--pad-l);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.teams-clubs::-webkit-scrollbar {
+  display: none;
 }
 .teams-clubs button {
-  background: #ffffff05;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 10px;
-  text-align: left;
-  transition:
-    background 0.18s,
-    border-color 0.18s;
-  min-width: 0;
-  color: inherit;
-}
-.teams-clubs button[aria-pressed="true"],
-.teams-tabs button[aria-pressed="true"] {
-  background: #c5f66a0d;
-  border-color: #c5f66a55;
-  color: #e4f4cb;
-}
-.teams-clubs .team {
-  font-size: 12px;
-  white-space: normal;
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 14px 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--masthead-ink) 9%, transparent);
+  color: var(--masthead-ink-2);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease,
+    transform 160ms var(--press);
 }
-.teams-clubs img {
-  width: 26px;
-  height: 26px;
+.teams-clubs button[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.teams-clubs button:active {
+  transform: scale(0.95);
+}
+.teams-club-crest {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 12px;
+  font-weight: 900;
+}
+.teams-club-crest img {
+  width: 22px;
+  height: 22px;
   object-fit: contain;
 }
+
 .teams-tabs {
-  display: flex;
-  gap: 8px;
-  margin: 18px 0;
+  margin-top: 16px;
 }
-.teams-tabs button {
-  padding: 10px 20px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: #ffffff05;
-  color: inherit;
+.teams-fixture {
+  margin-top: 18px;
 }
-.teams-squad,
-.teams-lineup,
-.teams-coverage,
-.teams-note {
-  padding: 20px;
+
+/* Squad sheet. */
+.teams-squad-heading {
+  display: grid;
+  gap: 4px;
+  margin-top: 24px;
+  padding-top: 10px;
+  border-top: 3px solid var(--rule-strong);
 }
-.teams-squad header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.teams-squad-heading h2 {
+  font-size: var(--display-sm);
 }
-.teams-squad h2 {
-  font-size: 20px;
-  margin: 0 0 6px;
-}
-.teams-squad small,
-.teams-lineup > p,
-.teams-lineup > small,
-.teams-coverage p {
-  color: var(--muted);
-  line-height: 1.6;
+.teams-squad-heading small {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 .teams-search {
+  position: relative;
+  display: block;
+  margin: 14px 0 6px;
+}
+.teams-search > svg {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  color: var(--ink-3);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.teams-search input[type="search"] {
+  padding-left: 42px;
+}
+.teams-line {
+  margin-top: 20px;
+}
+.teams-line-title {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0 12px;
-  margin: 20px 0 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--rule-strong);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
 }
-.teams-search input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  padding: 12px 0;
-  outline-offset: 2px;
-}
-.teams-players {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.teams-line-title small {
+  font-size: 11px;
+  color: var(--ink-3);
 }
 .teams-players li {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border);
-}
-.teams-players li > div {
-  min-width: 0;
-  flex: 1;
-}
-.teams-players strong {
-  font-size: 14px;
-  overflow-wrap: anywhere;
-}
-.teams-players small {
-  display: block;
-  font-size: 11px;
+  min-height: 60px;
+  border-bottom: 1px solid var(--rule);
 }
 .teams-player-icon {
   display: grid;
   place-items: center;
-  flex: 0 0 36px;
+  width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #ffffff08;
-  color: #c5f66a;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 16px;
+  font-weight: 900;
+}
+.teams-players li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.teams-players strong {
+  font-size: var(--text-md);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.teams-players li > div small {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 .teams-age {
-  text-align: right;
-  font-size: 17px;
+  display: grid;
+  justify-items: end;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-tight);
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 0.9;
   font-variant-numeric: tabular-nums;
 }
-.teams-updated {
-  font-size: 11px;
-  color: var(--muted);
-  margin: 18px 0 0;
+.teams-age small {
+  font-family: var(--font-text);
+  font-stretch: normal;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
 }
-.teams-coverage {
-  margin-top: 18px;
-  font-size: 12px;
+.teams-squad .match-extra-note {
+  margin-top: 14px;
 }
-.teams-coverage summary {
-  cursor: pointer;
-  color: var(--muted);
-}
-.teams-fixture {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
-  font-size: 12px;
-}
-.teams-fixture select {
-  width: 100%;
-  min-width: 0;
-  padding: 12px;
-  background: #141920;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: inherit;
-}
-.teams-lineup h3 {
-  font-size: 16px;
+.teams-lineup {
+  margin-top: 4px;
 }
 .teams-lineup .lineup-map {
-  margin: 20px 0;
-}
-@media (max-width: 640px) {
-  .teams-clubs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .teams-squad,
-  .teams-lineup {
-    padding: 16px;
-  }
-  .teams-clubs button {
-    padding: 12px 8px;
-  }
+  margin-top: 14px;
 }
 
-.teams-selector {
-  padding: 16px;
+/* What the data covers. */
+.teams-coverage {
+  margin-top: 32px;
+  border-top: 3px solid var(--rule-strong);
 }
-.teams-selector summary {
+.teams-coverage summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  cursor: pointer;
-  list-style: none;
+  min-height: 52px;
+  font-size: var(--text-md);
+  font-weight: 680;
 }
-.teams-selector summary::-webkit-details-marker {
-  display: none;
+.teams-coverage summary::after {
+  content: "+";
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--ink-3);
+  transition: transform var(--spring-snappy-ms) var(--spring-snappy);
 }
-.teams-selector summary > span:last-child {
-  font-size: 11px;
-  color: var(--muted);
+.teams-coverage[open] summary::after {
+  transform: rotate(45deg);
 }
-.teams-selector .teams-clubs {
-  margin: 16px 0 0;
+.teams-coverage p {
+  margin-bottom: 10px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--ink-2);
 }
-.teams-page .teams-search {
-  display: flex;
-  flex-direction: row;
-}
-.teams-page .teams-search input {
-  margin: 0;
-  font-size: 14px;
+.teams-coverage p strong {
+  color: var(--ink);
 }

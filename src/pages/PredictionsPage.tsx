@@ -7,10 +7,10 @@ import {
   ChevronDown,
   ChevronRight,
   Coins,
-  Save,
+  Stamp,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
 import PageFilters from "../components/PageFilters";
 import ConfirmQuiniela from "../components/ConfirmQuiniela";
@@ -19,6 +19,7 @@ import GroupPredictions from "../components/GroupPredictions";
 import PredictionCard from "../components/PredictionCard";
 import RoundSelector from "../components/RoundSelector";
 import { Empty, PageTitle, readableError } from "../components/ui";
+import { SkeletonRows } from "../components/Skeleton";
 import {
   loadGameSeasons,
   loadParticipants,
@@ -44,6 +45,12 @@ import { useStuck } from "../lib/useStuck";
 import { PotAmount } from "../components/PotCard";
 import { euroShort, groupPotCents } from "../lib/pot";
 import { euro } from "../lib/porra";
+import { go } from "../lib/navigation";
+import { haptic } from "../lib/motion";
+import "../styles/quiniela.css";
+
+const sameValue = (a?: PredictionValue, b?: PredictionValue) =>
+  JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /** Demo groups show a 5 € pot so the feature can be explored without an account. */
 const DEMO_POT_CENTS = 500;
@@ -79,7 +86,10 @@ export default function PredictionsPage({
     {},
   );
   const [valuesKey, setValuesKey] = useState("");
-  const [busy, setBusy] = useState("");
+  // Optimistic picks: each match tracks its own pending save.
+  const [saving, setSaving] = useState<Record<string, number>>({});
+  const savingCount = Object.keys(saving).length;
+  const [seasonsLoading, setSeasonsLoading] = useState(false);
   const [error, setError] = useState("");
   const [round, setRound] = useState("");
   const [clock, setClock] = useState(Date.now());
@@ -94,6 +104,11 @@ export default function PredictionsPage({
   const [confirm, setConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const focusAfterSubmit = useRef(false);
+  /*
+   * The page lives in an <Activity>: when it is shown again React re-runs every
+   * effect. State only resets when its key really changed; listeners resubscribe.
+   */
+  const lastKeys = useRef({ seasons: "", loaded: "", picks: "", seal: "", people: "" });
   const [submitError, setSubmitError] = useState("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [peopleError, setPeopleError] = useState("");
@@ -116,7 +131,6 @@ export default function PredictionsPage({
   const rounds = useMemo(() => roundOptions(filtered), [filtered, minute]);
   const current = useMemo(() => preferredRound(filtered), [filtered, minute]);
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   // The progress panel pins under the app bar and slims down while scrolling.
   const { sentinel: saveSentinel, stuck: saveStuck } = useStuck();
   const requestedRound = searchParams.get("round") || "";
@@ -175,7 +189,7 @@ export default function PredictionsPage({
     completed > 0 &&
     missingOpen === 0 &&
     !pending &&
-    !busy &&
+    savingCount === 0 &&
     !submitting &&
     !isSealed;
   useEffect(() => {
@@ -183,14 +197,24 @@ export default function PredictionsPage({
     return () => clearInterval(id);
   }, []);
   useEffect(() => {
-    setSeasons([]);
-    setSeason("");
-    setRound("");
+    const key = `${group}|${demo}`;
+    const changed = lastKeys.current.seasons !== key;
+    lastKeys.current.seasons = key;
+    if (changed) {
+      setSeasons([]);
+      setSeason("");
+      setRound("");
+      setSeasonsLoading(false);
+    }
     if (!db || !group || demo) return;
+    // Season configs are fixed for the season: a revealed page keeps them.
+    if (!changed && lastKeys.current.loaded === key) return;
     let active = true;
+    setSeasonsLoading(true);
     loadGameSeasons(group)
       .then((configs) => {
         if (!active) return;
+        lastKeys.current.loaded = key;
         const next = [...configs];
         next.sort(
           (a, b) =>
@@ -206,20 +230,29 @@ export default function PredictionsPage({
       })
       .catch((e) => {
         if (active) setError(readableError(e));
+      })
+      .finally(() => {
+        if (active) setSeasonsLoading(false);
       });
     return () => {
       active = false;
     };
   }, [group, demo]);
   useEffect(() => {
-    setValues({});
-    setValuesKey(predictionKey);
-    setError("");
+    const key = `${predictionKey}|${demo}`;
+    const changed = lastKeys.current.picks !== key;
+    lastKeys.current.picks = key;
+    if (changed) {
+      setValues({});
+      setValuesKey(predictionKey);
+      setSaving({});
+      setError("");
+    }
     if (!db || !group || !season || !selected || !user || demo) {
       setLoadingPredictions(false);
       return;
     }
-    setLoadingPredictions(true);
+    if (changed) setLoadingPredictions(true);
     return onSnapshot(
       query(
         collection(db, "groups", group, "gameSeasons", season, "predictions"),
@@ -242,14 +275,19 @@ export default function PredictionsPage({
     );
   }, [group, season, selected, uid, demo]);
   useEffect(() => {
-    setSealed({ key: sealKey, value: false, sharing: false });
-    setConfirm(false);
-    setSubmitError("");
+    const key = `${sealKey}|${demo}`;
+    const changed = lastKeys.current.seal !== key;
+    lastKeys.current.seal = key;
+    if (changed) {
+      setSealed({ key: sealKey, value: false, sharing: false });
+      setConfirm(false);
+      setSubmitError("");
+    }
     if (!db || !group || !season || !selected || !user || demo) {
       setLoadingSeal(false);
       return;
     }
-    setLoadingSeal(true);
+    if (changed) setLoadingSeal(true);
     return onSnapshot(
       doc(
         db,
@@ -281,8 +319,14 @@ export default function PredictionsPage({
     );
   }, [group, season, selected, uid, demo]);
   useEffect(() => {
-    setParticipants([]);
-    setPeopleError("");
+    const key = demo
+      ? "demo"
+      : `${selectedGroup?.id}|${selectedGroup?.memberIds.join()}`;
+    if (lastKeys.current.people !== key) {
+      setParticipants([]);
+      setPeopleError("");
+    }
+    lastKeys.current.people = key;
     if (demo) return;
     if (!selectedGroup) return;
     let active = true;
@@ -297,21 +341,42 @@ export default function PredictionsPage({
       active = false;
     };
   }, [selectedGroup, demo]);
+  /**
+   * Optimistic pick: the slip shows it at once and the other matches stay
+   * playable. A failed save puts back the previous pick of that match only,
+   * unless you already changed it again.
+   */
   async function choose(match: Match, value: PredictionValue) {
-    if (isSealed || busy || pending || submitting || deadlineClosed) return;
-    setBusy(match.id);
+    if (isSealed || pending || submitting || deadlineClosed) return;
+    const previous = values[match.id];
+    if (sameValue(previous, value)) return;
     setError("");
+    setValues((v) => ({ ...v, [match.id]: value }));
+    if (demo) return;
+    setSaving((s) => ({ ...s, [match.id]: (s[match.id] || 0) + 1 }));
     try {
-      if (!demo) {
-        if (!user || !group || !season)
-          throw new Error("Selecciona un grupo y una competición.");
-        await savePrediction(uid, group, season, match, value);
-      }
-      setValues((v) => ({ ...v, [match.id]: value }));
+      if (!user || !group || !season)
+        throw new Error("Selecciona un grupo y una competición.");
+      await savePrediction(uid, group, season, match, value);
     } catch (e) {
-      setError(readableError(e));
+      haptic("warning");
+      setValues((v) => {
+        if (!sameValue(v[match.id], value)) return v;
+        const next = { ...v };
+        if (previous === undefined) delete next[match.id];
+        else next[match.id] = previous;
+        return next;
+      });
+      setError(
+        `No se anotó ${match.home} – ${match.away}: ${readableError(e)}`,
+      );
     } finally {
-      setBusy("");
+      setSaving((s) => {
+        const next = { ...s };
+        if ((next[match.id] || 0) > 1) next[match.id]--;
+        else delete next[match.id];
+        return next;
+      });
     }
   }
   async function finalize() {
@@ -341,9 +406,11 @@ export default function PredictionsPage({
         );
         setSealed({ key: sealKey, value: true, sharing: true });
       }
+      haptic("success");
       focusAfterSubmit.current = true;
       setConfirm(false);
     } catch (e) {
+      haptic("warning");
       setSubmitError(readableError(e));
     } finally {
       setSubmitting(false);
@@ -353,7 +420,7 @@ export default function PredictionsPage({
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const onDetails = useCallback(
-    (id: string) => {
+    (id: string, from: Element | null) => {
       setSearchParams(
         (previous) => {
           const next = new URLSearchParams(previous);
@@ -362,9 +429,9 @@ export default function PredictionsPage({
         },
         { replace: true },
       );
-      navigate(`/partido/${encodeURIComponent(id)}`);
+      go(`/partido/${encodeURIComponent(id)}`, { sharedFrom: from });
     },
-    [navigate, setSearchParams],
+    [setSearchParams],
   );
   const chooseRef = useRef(choose);
   chooseRef.current = choose;
@@ -383,26 +450,27 @@ export default function PredictionsPage({
         ?.focus({ preventScroll: true });
     }
   }, [isSealed, submitting]);
-  const disabled = Boolean(busy) || pending || submitting;
-  const selectorsDisabled = Boolean(busy) || submitting;
+  const disabled = pending || submitting;
+  const selectorsDisabled = savingCount > 0 || submitting;
+  const total = delivery.requiredIds.length;
+  const progress = total ? completed / total : 0;
+  const status = !list.length
+    ? "Elige grupo y competición y aparecerá tu boleto."
+    : pending
+      ? "Comprobando tu boleto…"
+      : isSealed
+        ? "Boleto sellado. Ahora, a sufrir con el grupo."
+        : deadlineClosed
+          ? "Plazo cerrado: esta jornada se te escapó."
+          : completed > 0
+            ? "A medio rellenar. Séllalo antes del primer pitido."
+            : "Jornada abierta. Marca tus signos antes del primer partido.";
   return (
     <>
       <PageTitle
-        eyebrow={`QUINIELA${list[0] ? ` · ${competitionName(list[0].competition).toUpperCase()}` : ""}`}
+        eyebrow={`Quiniela${list[0] ? ` · ${competitionName(list[0].competition, true)}` : ""}`}
         title="Mi quiniela"
-        description={
-          !list.length
-            ? "Selecciona tu grupo y la competición para ver tu quiniela."
-            : pending
-              ? "Comprobando tu pronóstico…"
-              : isSealed
-                ? "Pronóstico guardado · Tu apuesta está confirmada."
-                : deadlineClosed
-                  ? "Plazo cerrado · No has guardado tu pronóstico."
-                  : completed > 0
-                    ? "Pronóstico en curso · Completa y guarda tu quiniela."
-                    : "Jornada abierta · Haz tu pronóstico antes del primer partido."
-        }
+        description={status}
       />
       <PageFilters
         groups={demo ? [] : groups}
@@ -489,8 +557,7 @@ export default function PredictionsPage({
         !delivery.checking &&
         !delivery.error && (
           <p className="setup-notice">
-            Esta jornada aún no está preparada para recibir entregas. Inténtalo
-            más tarde.
+            Esta jornada todavía no admite boletos. Vuelve en un rato.
           </p>
         )}
       {list.length ? (
@@ -505,7 +572,9 @@ export default function PredictionsPage({
               }
               aria-label={`Bote de la jornada: ${euro(potCents * potPlayers)}, ${potPlayers} ${potPlayers === 1 ? "jugador" : "jugadores"}. Ver detalle`}
             >
-              <Coins size={18} aria-hidden="true" />
+              <span className="pot-chip-icon" aria-hidden="true">
+                <Coins size={18} />
+              </span>
               <span className="pot-chip-text" aria-hidden="true">
                 <strong>Bote de la jornada</strong>
                 <small>
@@ -513,8 +582,8 @@ export default function PredictionsPage({
                   {delivery.completedIds.includes(uid)
                     ? "Ya estás dentro"
                     : deadlineClosed
-                      ? "No entraste esta jornada"
-                      : "Entras al guardar tu quiniela"}
+                      ? "Esta vez te quedaste fuera"
+                      : "Entras al sellar tu boleto"}
                 </small>
               </span>
               <PotAmount cents={potCents * potPlayers} />
@@ -538,52 +607,52 @@ export default function PredictionsPage({
           {!isSealed && <div ref={saveSentinel} className="sticky-sentinel" />}
           {!isSealed && (
             <section
-              className={`round-save-panel panel${saveStuck ? " is-stuck" : ""}`}
-              aria-label="Estado de la quiniela"
-              aria-busy={pending || submitting}
+              className={`round-save-panel${saveStuck ? " is-stuck" : ""}${canSubmit ? " is-ready" : ""}`}
+              aria-label="Estado de tu boleto"
+              aria-busy={pending || submitting || savingCount > 0}
             >
               <div className="round-save-progress">
+                <strong className="round-save-count" aria-hidden="true">
+                  {completed}
+                  <small>/{total}</small>
+                </strong>
                 <div className="round-progress-row">
-                  <strong>
-                    {completed}/{delivery.requiredIds.length}
-                  </strong>
                   <span>
                     {deadlineClosed
                       ? "Plazo cerrado"
                       : pending
                         ? "Comprobando…"
-                        : missingOpen > 0
-                          ? `${missingOpen} pendientes`
-                          : completed > 0
-                            ? "Lista para guardar"
-                            : "Sin pronósticos"}
+                        : savingCount > 0
+                          ? "Anotando…"
+                          : missingOpen > 0
+                            ? `${missingOpen} ${missingOpen === 1 ? "signo pendiente" : "signos pendientes"}`
+                            : completed > 0
+                              ? "Listo para sellar"
+                              : "Boleto en blanco"}
                   </span>
-                </div>
-                <div
-                  className="round-progress-track"
-                  role="progressbar"
-                  aria-label="Pronósticos completados"
-                  aria-valuemin={0}
-                  aria-valuemax={delivery.requiredIds.length}
-                  aria-valuenow={completed}
-                >
-                  <span
-                    style={{
-                      width: `${delivery.requiredIds.length ? (completed / delivery.requiredIds.length) * 100 : 0}%`,
-                    }}
-                  />
+                  <div
+                    className="round-progress-track"
+                    role="progressbar"
+                    aria-label="Pronósticos completados"
+                    aria-valuemin={0}
+                    aria-valuemax={total}
+                    aria-valuenow={completed}
+                  >
+                    <span style={{ transform: `scaleX(${progress})` }} />
+                  </div>
                 </div>
               </div>
               <button
                 className="button primary"
                 disabled={!canSubmit}
                 onClick={() => {
+                  haptic();
                   setSubmitError("");
                   setConfirm(true);
                 }}
               >
-                <Save size={16} />
-                Guardar<span className="round-save-long"> quiniela</span>
+                <Stamp size={17} aria-hidden="true" />
+                Sellar<span className="round-save-long"> boleto</span>
               </button>
             </section>
           )}
@@ -593,11 +662,12 @@ export default function PredictionsPage({
               role="region"
               aria-label="Mi quiniela"
               aria-busy={pending}
-              className="prediction-list"
+              className="prediction-list slip"
             >
-              {list.map((m) => (
+              {list.map((m, index) => (
                 <PredictionCard
                   key={m.id}
+                  number={index + 1}
                   match={m}
                   history={matches}
                   value={values[m.id]}
@@ -612,7 +682,7 @@ export default function PredictionsPage({
                           : null
                   }
                   disabled={disabled}
-                  saving={busy === m.id}
+                  saving={Boolean(saving[m.id])}
                   demo={demo}
                   onChoose={onChoose}
                   onDetails={onDetails}
@@ -653,33 +723,28 @@ export default function PredictionsPage({
             </div>
           )}
         </>
+      ) : !demo && user && groups.length > 0 && seasonsLoading ? (
+        <SkeletonRows rows={5} label="Preparando tu boleto" />
       ) : (
-        <div
-          className={
-            !demo && user && !groups.length
-              ? "panel group-empty-state"
-              : undefined
+        <Empty
+          art={!demo && user && !groups.length ? "bench" : "slip"}
+          title={
+            demo || active
+              ? "Boleto sin partidos"
+              : groups.length
+                ? "Elige tu competición"
+                : "Banquillo vacío"
           }
+          action={!demo && user && !groups.length ? <GroupActions /> : undefined}
         >
-          <Empty
-            title={
-              demo || active
-                ? "Aún no hay partidos disponibles"
-                : groups.length
-                  ? "Elige tu competición"
-                  : "Primero, reúne a tu equipo"
-            }
-          >
-            {demo
-              ? "La demo contiene únicamente una jornada de LaLiga."
-              : active
-                ? "Los partidos aparecerán cuando se sincronice el calendario de esta competición."
-                : groups.length
-                  ? "Selecciona tu grupo y una competición para ver tu quiniela."
-                  : "Crea un grupo o únete con un código de invitación."}
-          </Empty>
-          {!demo && user && !groups.length && <GroupActions />}
-        </div>
+          {demo
+            ? "La demo solo trae una jornada de LaLiga."
+            : active
+              ? "Los partidos aparecerán en cuanto se sincronice el calendario de esta competición."
+              : groups.length
+                ? "Toca el escudo de una competición y aparecerá tu boleto."
+                : "Para rellenar boletos hace falta un grupo. Crea el tuyo o únete con el código de un amigo."}
+        </Empty>
       )}
       {confirm && (
         <ConfirmQuiniela

@@ -8,27 +8,53 @@ import {
 } from "./shareSummary";
 
 /*
- * Local PNGs drawn with Canvas: no remote crests or fonts, so the canvas is never
- * tainted and the image works offline and in every share target.
+ * Local PNGs drawn with Canvas in the «Boleto» style: paper, ink masthead and
+ * one yellow highlighter. No remote crests; the fonts are the app's own
+ * (same origin), so the canvas is never tainted and works offline.
  */
 const WIDTH = 1080;
-const PAD = 48;
+const PAD = 56;
+const MAST = 196;
 const colors = {
-  background: "#111317",
-  panel: "#191c21",
-  row: "#1f2329",
-  border: "#2e333b",
-  text: "#eeeff2",
-  muted: "#9ca3ad",
-  accent: "#c5f66a",
-  hit: "#8cdb63",
-  miss: "#ef7772",
-  gold: "#f0d58c",
+  paper: "#f2efe6",
+  card: "#fbfaf5",
+  row: "#e8e4d8",
+  rule: "#d5d0c1",
+  ink: "#15140f",
+  ink2: "#48453d",
+  muted: "#645f56",
+  mastInk: "#f2efe6",
+  mastMuted: "#a8a396",
+  accent: "#ffd100",
+  hit: "#1d7a45",
+  hitSoft: "#d5e6d9",
+  miss: "#c0352a",
+  missSoft: "#f2d9d4",
+  live: "#d4231a",
 };
 type Ctx = CanvasRenderingContext2D;
+type Face = "display" | "text";
 
-function setFont(ctx: Ctx, size: number, weight = 500) {
-  ctx.font = `${weight} ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+const DISPLAY = '"Anybody Variable", "Arial Narrow", sans-serif';
+const TEXT = '"Instrument Sans Variable", "Helvetica Neue", Arial, sans-serif';
+
+/** Waits for the app fonts; falls back silently to system fonts. */
+export async function loadShareFonts() {
+  try {
+    await Promise.all([
+      document.fonts.load(`800 48px ${DISPLAY}`),
+      document.fonts.load(`600 20px ${TEXT}`),
+    ]);
+  } catch {
+    /* System fonts are fine. */
+  }
+}
+
+function setFont(ctx: Ctx, size: number, weight = 500, face: Face = "text") {
+  ctx.font = `${weight} ${size}px ${face === "display" ? DISPLAY : TEXT}`;
+  // Anybody is width-variable: condensed for titles and numbers where supported.
+  if ("fontStretch" in ctx)
+    ctx.fontStretch = face === "display" ? "condensed" : "normal";
 }
 function fit(ctx: Ctx, value: string, maxWidth: number) {
   if (ctx.measureText(value).width <= maxWidth) return value;
@@ -43,15 +69,36 @@ function write(
   x: number,
   y: number,
   size: number,
-  color = colors.text,
+  color = colors.ink,
   weight = 500,
   align: CanvasTextAlign = "left",
   maxWidth = Infinity,
+  face: Face = "text",
 ) {
-  setFont(ctx, size, weight);
+  setFont(ctx, size, weight, face);
   ctx.fillStyle = color;
   ctx.textAlign = align;
   ctx.fillText(fit(ctx, value, maxWidth), x, y);
+}
+/** Wide uppercase label, like the slip's printed captions. */
+function label(
+  ctx: Ctx,
+  value: string,
+  x: number,
+  y: number,
+  color = colors.muted,
+  align: CanvasTextAlign = "left",
+  maxWidth = Infinity,
+) {
+  setFont(ctx, 15, 750, "display");
+  if ("fontStretch" in ctx) ctx.fontStretch = "expanded";
+  if ("letterSpacing" in ctx)
+    (ctx as Ctx & { letterSpacing: string }).letterSpacing = "1.5px";
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.fillText(fit(ctx, value.toUpperCase(), maxWidth), x, y);
+  if ("letterSpacing" in ctx)
+    (ctx as Ctx & { letterSpacing: string }).letterSpacing = "0px";
 }
 function box(
   ctx: Ctx,
@@ -60,12 +107,21 @@ function box(
   w: number,
   h: number,
   color: string,
-  radius = 14,
+  radius = 10,
 ) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, radius);
   ctx.fillStyle = color;
   ctx.fill();
+}
+function rule(ctx: Ctx, y: number, color = colors.rule, height = 1) {
+  ctx.fillStyle = color;
+  ctx.fillRect(PAD, y, WIDTH - PAD * 2, height);
+}
+/** Yellow marker stroke behind a number. */
+function highlight(ctx: Ctx, x: number, y: number, w: number, h = 14) {
+  ctx.fillStyle = colors.accent;
+  ctx.fillRect(x, y, w, h);
 }
 function canvasFor(height: number) {
   const canvas = document.createElement("canvas");
@@ -73,40 +129,75 @@ function canvasFor(height: number) {
   if (!ctx) throw new Error("Tu navegador no ha podido preparar la imagen.");
   canvas.width = WIDTH;
   canvas.height = height;
-  ctx.fillStyle = colors.background;
+  ctx.fillStyle = colors.paper;
   ctx.fillRect(0, 0, WIDTH, height);
   ctx.textBaseline = "middle";
   return { canvas, ctx };
 }
+/** The brand: a yellow tile with a marked box. */
+function brandMark(ctx: Ctx, x: number, y: number, size: number) {
+  box(ctx, x, y, size, size, colors.accent, size * 0.23);
+  const s = size / 64;
+  ctx.strokeStyle = colors.ink;
+  ctx.lineWidth = 5 * s;
+  ctx.beginPath();
+  ctx.roundRect(x + 15 * s, y + 15 * s, 34 * s, 34 * s, 5 * s);
+  ctx.stroke();
+  ctx.lineWidth = 6.6 * s;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x + 24 * s, y + 25 * s);
+  ctx.lineTo(x + 40 * s, y + 39.5 * s);
+  ctx.moveTo(x + 39 * s, y + 24 * s);
+  ctx.lineTo(x + 25 * s, y + 40.5 * s);
+  ctx.stroke();
+}
 function header(ctx: Ctx, kicker: string, title: string, subtitle: string) {
-  write(ctx, kicker, PAD, 58, 20, colors.accent, 750);
-  write(ctx, title, PAD, 108, 44, colors.text, 800, "left", WIDTH - PAD * 2);
+  ctx.fillStyle = colors.ink;
+  ctx.fillRect(0, 0, WIDTH, MAST + 24);
+  brandMark(ctx, PAD, 34, 40);
+  label(ctx, kicker, PAD + 54, 55, colors.accent, "left", WIDTH - PAD * 2 - 54);
+  write(
+    ctx,
+    title,
+    PAD,
+    112,
+    58,
+    colors.mastInk,
+    850,
+    "left",
+    WIDTH - PAD * 2,
+    "display",
+  );
   write(
     ctx,
     subtitle,
     PAD,
-    158,
+    160,
     22,
-    colors.muted,
+    colors.mastMuted,
     550,
     "left",
     WIDTH - PAD * 2,
   );
+  // The sheet of paper laid over the ink.
+  box(ctx, 0, MAST, WIDTH, 48, colors.paper, 26);
 }
 function footer(ctx: Ctx, y: number, note: string) {
-  write(ctx, note, PAD, y, 17, colors.muted, 500, "left", WIDTH - PAD * 2);
+  rule(ctx, y - 18, colors.ink, 3);
+  write(ctx, note, PAD, y + 8, 17, colors.muted, 500, "left", WIDTH - PAD * 2);
   const date = new Intl.DateTimeFormat("es", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date());
   write(
     ctx,
-    `GalacticBet · ${date}`,
+    `galacticbet · ${date}`,
     WIDTH - PAD,
-    y + 30,
+    y + 40,
     17,
-    colors.muted,
-    600,
+    colors.ink2,
+    650,
     "right",
   );
 }
@@ -120,14 +211,15 @@ function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
   );
 }
 const pickColors: Record<Exclude<PickState, null>, [string, string]> = {
-  hit: ["#24361f", colors.hit],
-  "live-hit": ["#1f2a1f", colors.hit],
-  miss: ["#3a2224", colors.miss],
+  hit: [colors.hitSoft, colors.hit],
+  "live-hit": [colors.hitSoft, colors.hit],
+  miss: [colors.missSoft, colors.miss],
   "live-miss": [colors.row, colors.muted],
 };
 
 /** All shared picks of the round, one column per player, plus round points. */
 export async function quinielaImage(q: QuinielaShare): Promise<Blob> {
+  await loadShareFonts();
   const perBlock = 6;
   const blocks = Math.max(1, Math.ceil(q.players.length / perBlock));
   const rowH = 76;
@@ -136,280 +228,213 @@ export async function quinielaImage(q: QuinielaShare): Promise<Blob> {
   const board = roundBoard(q.matches, q.mode, q.players);
   const scored = board.some((r) => r.points || r.livePoints);
   const boardH = scored ? 70 + board.length * 46 : 0;
-  const height = 210 + blocks * (blockH + 28) + boardH + 110;
+  const height = 230 + blocks * (blockH + 28) + boardH + 120;
   const { canvas, ctx } = canvasFor(height);
   const competition = q.matches[0]
     ? competitionName(q.matches[0].competition)
     : "";
   header(
     ctx,
-    `GALACTICBET · QUINIELA${q.demo ? " · DEMO" : ""}`,
+    `Quiniela${q.demo ? " · demo" : ""}`,
     q.groupName,
     `${q.title}${competition && !q.title.includes(competition) ? ` · ${competition}` : ""} · ${q.mode === "classic" ? "1X2" : "Marcador exacto"}`,
   );
-  const matchW = 400;
-  let y = 210;
+  const matchW = 420;
+  let y = 236;
   for (let b = 0; b < blocks; b++) {
     const people = q.players.slice(b * perBlock, (b + 1) * perBlock);
-    const colW = (WIDTH - PAD * 2 - matchW - 16) / Math.max(people.length, 1);
-    box(ctx, PAD - 12, y, WIDTH - PAD * 2 + 24, blockH, colors.panel, 20);
-    write(ctx, "Partido", PAD + 8, y + headH / 2 + 4, 17, colors.muted, 650);
+    const colW = (WIDTH - PAD * 2 - matchW - 8) / Math.max(people.length, 1);
+    rule(ctx, y, colors.ink, 3);
+    label(ctx, "Partido", PAD, y + headH / 2 + 2);
     people.forEach((p, i) =>
       write(
         ctx,
         p.name,
-        PAD + matchW + 16 + colW * i + colW / 2,
-        y + headH / 2 + 4,
-        18,
-        colors.text,
+        PAD + matchW + 8 + colW * i + colW / 2,
+        y + headH / 2 + 2,
+        19,
+        colors.ink,
         700,
         "center",
         colW - 10,
       ),
     );
     let rowY = y + headH;
-    for (const m of q.matches) {
-      ctx.fillStyle = colors.border;
-      ctx.fillRect(PAD, rowY, WIDTH - PAD * 2, 1);
+    q.matches.forEach((m, index) => {
+      rule(ctx, rowY);
       const scoreText = matchScoreLabel(m).replace(" (en juego)", "");
       const live = ["IN_PLAY", "PAUSED"].includes(m.status);
       write(
         ctx,
-        m.home,
-        PAD + 8,
-        rowY + 24,
-        20,
-        colors.text,
-        650,
+        String(index + 1).padStart(2, "0"),
+        PAD,
+        rowY + rowH / 2,
+        22,
+        colors.muted,
+        800,
         "left",
-        matchW - 96,
+        Infinity,
+        "display",
       );
-      write(
-        ctx,
-        m.away,
-        PAD + 8,
-        rowY + 52,
-        20,
-        colors.text,
-        650,
-        "left",
-        matchW - 96,
-      );
+      write(ctx, m.home, PAD + 44, rowY + 24, 20, colors.ink, 650, "left", matchW - 140);
+      write(ctx, m.away, PAD + 44, rowY + 52, 20, colors.ink, 650, "left", matchW - 140);
       write(
         ctx,
         scoreText,
-        PAD + matchW - 12,
-        rowY + 30,
-        scoreText === "vs" ? 18 : 24,
-        live ? colors.hit : scoreText === "vs" ? colors.muted : colors.text,
-        800,
+        PAD + matchW - 14,
+        rowY + 32,
+        scoreText === "vs" ? 18 : 30,
+        live ? colors.live : scoreText === "vs" ? colors.muted : colors.ink,
+        900,
         "right",
+        Infinity,
+        "display",
       );
-      if (live)
-        write(
-          ctx,
-          "EN JUEGO",
-          PAD + matchW - 12,
-          rowY + 56,
-          12,
-          colors.hit,
-          750,
-          "right",
-        );
+      if (live) label(ctx, "En juego", PAD + matchW - 14, rowY + 58, colors.live, "right");
       people.forEach((p, i) => {
         const value = p.picks[m.id];
         const state = pickState(q.mode, value, m);
-        const [fill, ink] = state
-          ? pickColors[state]
-          : [colors.row, colors.text];
-        const cx = PAD + matchW + 16 + colW * i;
-        box(ctx, cx + 6, rowY + 12, colW - 12, rowH - 24, fill, 10);
+        const [fill, ink] = state ? pickColors[state] : [colors.row, colors.ink];
+        const cx = PAD + matchW + 8 + colW * i;
+        box(ctx, cx + 6, rowY + 12, colW - 12, rowH - 24, fill, 8);
         write(
           ctx,
           value ? predictionSummary(value).replace(" – ", "-") : "—",
           cx + colW / 2,
-          rowY + rowH / 2,
-          value ? 24 : 20,
+          rowY + rowH / 2 + 1,
+          value ? 28 : 20,
           value ? ink : colors.muted,
-          800,
+          900,
           "center",
           colW - 18,
+          "display",
         );
       });
       rowY += rowH;
-    }
-    ctx.fillStyle = colors.border;
-    ctx.fillRect(PAD, rowY, WIDTH - PAD * 2, 1);
-    write(ctx, "Puntos jornada", PAD + 8, rowY + 34, 18, colors.muted, 700);
+    });
+    rule(ctx, rowY, colors.ink, 2);
+    label(ctx, "Puntos jornada", PAD, rowY + 34);
     people.forEach((p, i) => {
       const row = board.find((r) => r.id === p.id);
-      write(
-        ctx,
-        row
-          ? `${row.points}${row.livePoints ? ` (+${row.livePoints})` : ""}`
-          : "0",
-        PAD + matchW + 16 + colW * i + colW / 2,
-        rowY + 34,
-        22,
-        colors.accent,
-        800,
-        "center",
-        colW - 10,
-      );
+      const text = row
+        ? `${row.points}${row.livePoints ? ` (+${row.livePoints})` : ""}`
+        : "0";
+      const cx = PAD + matchW + 8 + colW * i + colW / 2;
+      setFont(ctx, 28, 900, "display");
+      const w = Math.min(colW - 16, ctx.measureText(text).width + 12);
+      highlight(ctx, cx - w / 2, rowY + 38, w, 12);
+      write(ctx, text, cx, rowY + 34, 28, colors.ink, 900, "center", colW - 10, "display");
     });
     y += blockH + 28;
   }
   if (scored) {
-    write(
-      ctx,
-      "Clasificación de la jornada",
-      PAD,
-      y + 22,
-      24,
-      colors.text,
-      800,
-    );
+    write(ctx, "Así va la jornada", PAD, y + 22, 34, colors.ink, 850, "left", Infinity, "display");
     y += 62;
     for (const r of board) {
-      box(ctx, PAD - 12, y, WIDTH - PAD * 2 + 24, 40, colors.panel, 10);
+      rule(ctx, y);
+      if (r.position === 1) box(ctx, PAD, y + 7, 34, 32, colors.accent, 6);
       write(
         ctx,
         String(r.position),
-        PAD + 14,
-        y + 20,
-        19,
-        r.position === 1 ? colors.gold : colors.muted,
-        800,
+        PAD + 17,
+        y + 23,
+        24,
+        r.position === 1 ? colors.ink : colors.muted,
+        900,
         "center",
+        Infinity,
+        "display",
       );
-      write(ctx, r.name, PAD + 44, y + 20, 19, colors.text, 650, "left", 600);
+      write(ctx, r.name, PAD + 52, y + 23, 20, colors.ink, 650, "left", 600);
       write(
         ctx,
         `${r.points} pts${r.livePoints ? ` · +${r.livePoints} en juego` : ""}`,
         WIDTH - PAD,
-        y + 20,
-        19,
-        colors.accent,
-        800,
+        y + 23,
+        24,
+        colors.ink,
+        900,
         "right",
+        Infinity,
+        "display",
       );
       y += 46;
     }
+    rule(ctx, y);
     y += 8;
   }
   footer(
     ctx,
-    y + 26,
+    y + 44,
     "Verde: acierto · Rojo: fallo · Resultados a 90 min. Puntos provisionales hasta cerrar la jornada.",
   );
   return toPng(canvas);
 }
 
 export async function standingsImage(s: StandingsShare): Promise<Blob> {
+  await loadShareFonts();
   const rowH = 64;
-  const height = 210 + 50 + s.rows.length * (rowH + 8) + 110;
+  const height = 236 + 50 + s.rows.length * (rowH + 8) + 120;
   const { canvas, ctx } = canvasFor(height);
-  header(
-    ctx,
-    `GALACTICBET · CLASIFICACIÓN${s.demo ? " · DEMO" : ""}`,
-    s.groupName,
-    s.title,
-  );
-  let y = 214;
-  write(ctx, "Pos.", PAD + 22, y + 14, 16, colors.muted, 650, "center");
-  write(ctx, "Jugador", PAD + 70, y + 14, 16, colors.muted, 650);
-  if (s.showHits)
-    write(
-      ctx,
-      "Aciertos",
-      WIDTH - PAD - 150,
-      y + 14,
-      16,
-      colors.muted,
-      650,
-      "right",
-    );
-  write(
-    ctx,
-    "Puntos",
-    WIDTH - PAD - 16,
-    y + 14,
-    16,
-    colors.muted,
-    650,
-    "right",
-  );
-  y += 40;
+  header(ctx, `Clasificación${s.demo ? " · demo" : ""}`, s.groupName, s.title);
+  let y = 240;
+  rule(ctx, y, colors.ink, 3);
+  label(ctx, "Pos.", PAD + 22, y + 22, colors.muted, "center");
+  label(ctx, "Jugador", PAD + 70, y + 22);
+  if (s.showHits) label(ctx, "Aciertos", WIDTH - PAD - 150, y + 22, colors.muted, "right");
+  label(ctx, "Puntos", WIDTH - PAD, y + 22, colors.muted, "right");
+  y += 46;
   const leader = s.rows[0]?.points || 0;
-  const medals = [colors.gold, "#cfd6df", "#d9a066"];
   for (const r of s.rows) {
-    box(ctx, PAD - 12, y, WIDTH - PAD * 2 + 24, rowH, colors.panel, 14);
-    if (leader > 0) {
-      box(
-        ctx,
-        PAD - 12,
-        y + rowH - 5,
-        ((WIDTH - PAD * 2 + 24) * r.points) / leader,
-        5,
-        "#c5f66a33",
-        3,
-      );
-    }
-    const medal =
-      r.points > 0 && r.position <= 3 ? medals[r.position - 1] : null;
-    if (medal) {
-      ctx.beginPath();
-      ctx.arc(PAD + 22, y + rowH / 2, 19, 0, Math.PI * 2);
-      ctx.fillStyle = medal;
-      ctx.fill();
-    }
+    rule(ctx, y);
+    if (leader > 0)
+      highlight(ctx, PAD, y + rowH + 2, ((WIDTH - PAD * 2) * r.points) / leader, 4);
+    const podium = r.points > 0 && r.position <= 3;
+    if (podium)
+      box(ctx, PAD + 3, y + rowH / 2 - 19, 38, 38, r.position === 1 ? colors.accent : colors.ink, 8);
     write(
       ctx,
       String(r.position),
       PAD + 22,
-      y + rowH / 2,
-      20,
-      medal ? "#16181c" : colors.muted,
-      800,
+      y + rowH / 2 + 1,
+      26,
+      podium ? (r.position === 1 ? colors.ink : colors.paper) : colors.muted,
+      900,
       "center",
+      Infinity,
+      "display",
     );
     write(
       ctx,
       r.name,
       PAD + 70,
       y + rowH / 2,
-      23,
-      colors.text,
+      24,
+      colors.ink,
       700,
       "left",
-      s.showHits ? 640 : 760,
+      s.showHits ? 620 : 740,
     );
     if (s.showHits)
-      write(
-        ctx,
-        String(r.hits),
-        WIDTH - PAD - 150,
-        y + rowH / 2,
-        22,
-        colors.muted,
-        650,
-        "right",
-      );
+      write(ctx, String(r.hits), WIDTH - PAD - 150, y + rowH / 2, 24, colors.ink2, 800, "right", Infinity, "display");
     write(
       ctx,
       String(r.points),
-      WIDTH - PAD - 16,
-      y + rowH / 2,
-      28,
-      colors.accent,
-      800,
+      WIDTH - PAD,
+      y + rowH / 2 + 1,
+      38,
+      colors.ink,
+      900,
       "right",
+      Infinity,
+      "display",
     );
     y += rowH + 8;
   }
+  rule(ctx, y);
   footer(
     ctx,
-    y + 30,
+    y + 48,
     "Puntos calculados por el servidor con resultados a 90 minutos.",
   );
   return toPng(canvas);

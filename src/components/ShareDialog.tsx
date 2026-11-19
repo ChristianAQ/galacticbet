@@ -1,7 +1,9 @@
 import { Download, LoaderCircle, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Modal from "./Modal";
-import "../styles/live.css";
+import { haptic } from "../lib/motion";
+import { Skeleton } from "./Skeleton";
+import "../styles/share.css";
 
 /**
  * Previews a locally generated PNG with native sharing and download. Nothing is uploaded.
@@ -52,7 +54,8 @@ export default function ShareDialog({
     link.href = url;
     link.download = filename;
     link.click();
-    setMessage("Imagen descargada.");
+    haptic("success");
+    setMessage("Imagen descargada. Ya la tienes en tus archivos.");
   }
   async function share() {
     setSharing(true);
@@ -73,41 +76,58 @@ export default function ShareDialog({
     }
   }
   return (
-    <Modal title={title} onClose={onClose} className="share-dialog">
-      <div className="share-preview" aria-busy={!url && !error}>
+    <Modal
+      title={title}
+      onClose={onClose}
+      className="share-dialog"
+      detents={["medium", "large"]}
+      footer={
+        <div className="share-actions">
+          <button
+            type="button"
+            className="button primary"
+            onClick={() => void share()}
+            disabled={sharing || (!url && !error)}
+          >
+            {sharing ? (
+              <LoaderCircle size={17} className="spin" aria-hidden="true" />
+            ) : (
+              <Share2 size={17} aria-hidden="true" />
+            )}
+            Compartir
+          </button>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={download}
+            disabled={!url}
+          >
+            <Download size={17} aria-hidden="true" /> Descargar
+          </button>
+        </div>
+      }
+    >
+      <figure className="share-preview" aria-busy={!url && !error}>
         {url ? (
           <img src={url} alt={`Vista previa: ${title}`} />
+        ) : error ? (
+          <p className="share-preview-error" role="status">
+            {error}
+          </p>
         ) : (
-          <div className="share-preview-loading" role="status">
-            {error || "Preparando la imagen…"}
+          <div className="share-preview-loading" role="status" aria-label="Preparando la imagen">
+            <Skeleton width="45%" height={12} />
+            <Skeleton width="80%" height={30} radius={6} />
+            <Skeleton width="100%" height={14} />
+            <Skeleton width="100%" height={14} />
+            <Skeleton width="92%" height={14} />
+            <Skeleton width="70%" height={14} />
           </div>
         )}
-      </div>
-      <div className="share-actions">
-        <button
-          type="button"
-          className="button primary"
-          onClick={() => void share()}
-          disabled={sharing}
-        >
-          {sharing ? (
-            <LoaderCircle size={16} className="spin" />
-          ) : (
-            <Share2 size={16} />
-          )}
-          Compartir
-        </button>
-        <button
-          type="button"
-          className="button secondary"
-          onClick={download}
-          disabled={!url}
-        >
-          <Download size={16} /> Descargar
-        </button>
-      </div>
+        <figcaption>Se genera en tu móvil · No se sube a ningún sitio</figcaption>
+      </figure>
       {message && (
-        <p className="share-message" role="status">
+        <p className="form-message share-message" role="status">
           {message}
         </p>
       )}

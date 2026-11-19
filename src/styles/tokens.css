@@ -1,0 +1,134 @@
+/*
+ * «Boleto» — design tokens.
+ * Paper and ink like the quiniela slip and the sports press; one accent,
+ * yellow-card yellow, used as a highlighter for whatever matters right now.
+ * Light («papel») by default, «edición de noche» when the system is dark.
+ */
+@import "@fontsource-variable/anybody/standard.css";
+@import "@fontsource-variable/instrument-sans/wght.css";
+
+:root {
+  color-scheme: light dark;
+
+  /* Type */
+  --font-display: "Anybody Variable", "Arial Narrow", sans-serif;
+  --font-text: "Instrument Sans Variable", "Helvetica Neue", Arial, sans-serif;
+  /* Anybody is a width-variable family: condensed for headlines, wide for labels. */
+  --stretch-tight: 58%;
+  --stretch-condensed: 68%;
+  --stretch-normal: 100%;
+  --stretch-wide: 128%;
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 21px;
+  --display-sm: 24px;
+  --display-md: 30px;
+  --display-lg: 40px;
+  --display-xl: 56px;
+
+  /* Paper (light) */
+  --paper: #f2efe6;
+  --paper-2: #e8e4d8;
+  --paper-3: #ddd8ca;
+  --card: #fbfaf5;
+  --ink: #15140f;
+  --ink-2: #48453d;
+  --ink-3: #645f56;
+  --rule: #d5d0c1;
+  --rule-strong: #15140f;
+  --masthead: #15140f;
+  --masthead-ink: #f2efe6;
+  --masthead-ink-2: #a8a396;
+  --masthead-rule: #2d2b25;
+
+  --accent: #ffd100;
+  --accent-ink: #15140f;
+  --accent-soft: #ffd10033;
+  /* Accent as text/line on paper needs more weight than the fill. */
+  --accent-line: #8a6e00;
+
+  --win: #1d7a45;
+  --win-soft: #1d7a4520;
+  --loss: #c0352a;
+  --loss-soft: #c0352a1c;
+  --live: #d4231a;
+  --draw: #645f56;
+
+  --scrim: #15140f66;
+  --scrim-strong: #15140fa6;
+  --shadow-lift: 0 1px 0 #15140f0d, 0 12px 32px -12px #15140f40;
+  --shadow-sheet: 0 -10px 40px #15140f33;
+  --skeleton: #e1dccf;
+  --skeleton-shine: #f2efe6;
+  --focus: #15140f;
+
+  /* Shape */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --hairline: 1px solid var(--rule);
+
+  /* Layout */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --gutter: 16px;
+  --nav-height: 48px;
+  /* Where sticky page controls pin: right under the fixed navigation bar. */
+  --sticky-top: calc(var(--safe-top) + var(--nav-height));
+  --tabbar-height: 62px;
+  --tabbar-space: calc(var(--tabbar-height) + 18px + max(var(--safe-bottom), 10px));
+  --content-max: 760px;
+
+  /* Motion: real spring curves (response / damping) sampled into linear(). */
+  --spring-snappy: linear(0, 0.007 1.5%, 0.027 3%, 0.094 6%, 0.184 9%, 0.513 19%, 0.613 22.5%, 0.687 25.5%, 0.752 28.5%, 0.815 32%, 0.865 35.5%, 0.904 39%, 0.938 43%, 0.965 47.5%, 0.984 52.5%, 0.996 58%, 1.005 71.5%, 1);
+  --spring-snappy-ms: 420ms;
+  --spring-smooth: linear(0, 0.004 1%, 0.021 2.5%, 0.085 5.5%, 0.157 8%, 0.455 17.5%, 0.551 21%, 0.634 24.5%, 0.696 27.5%, 0.756 31%, 0.806 34.5%, 0.852 38.5%, 0.891 43%, 0.923 48%, 0.948 53.5%, 0.967 59.5%, 0.989 74.5%, 1);
+  --spring-smooth-ms: 580ms;
+  --spring-bouncy: linear(0, 0.005 1%, 0.028 2.5%, 0.067 4%, 0.119 5.5%, 0.222 8%, 0.504 14%, 0.615 16.5%, 0.715 19%, 0.802 21.5%, 0.875 24%, 0.945 27%, 0.988 29.5%, 1.025 32.5%, 1.055 37%, 1.063 42%, 1.055 47.5%, 1.015 62%, 1.002 70%, 0.996 82%, 1);
+  --spring-bouncy-ms: 760ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --press: cubic-bezier(0.3, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #12110e;
+    --paper-2: #1b1a16;
+    --paper-3: #26241f;
+    --card: #1e1d19;
+    --ink: #f1ede2;
+    --ink-2: #c3beb0;
+    --ink-3: #959083;
+    --rule: #302e27;
+    --rule-strong: #f1ede2;
+    --masthead: #0a0907;
+    --masthead-ink: #f1ede2;
+    --masthead-ink-2: #8f8a7d;
+    --masthead-rule: #26241f;
+
+    --accent-soft: #ffd1002b;
+    --accent-line: #ffd100;
+
+    --win: #4cc489;
+    --win-soft: #4cc48924;
+    --loss: #ff6f61;
+    --loss-soft: #ff6f6124;
+    --live: #ff4436;
+    --draw: #959083;
+
+    --scrim: #00000080;
+    --scrim-strong: #000000b8;
+    --shadow-lift: 0 1px 0 #ffffff0a, 0 14px 36px -10px #000000c0;
+    --shadow-sheet: 0 -10px 40px #00000099;
+    --skeleton: #232119;
+    --skeleton-shine: #2e2c24;
+    --focus: #ffd100;
+  }
+}

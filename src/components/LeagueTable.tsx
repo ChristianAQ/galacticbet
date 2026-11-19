@@ -4,7 +4,7 @@ import type { LeagueRow } from "../lib/leagueTable";
 import { useStuck } from "../lib/useStuck";
 import { formNames } from "./TeamForm";
 import { Crest } from "./ui";
-import "../styles/dashboard.css";
+import "../styles/leagues.css";
 
 interface Zone {
   kind: "top" | "mid" | "down";

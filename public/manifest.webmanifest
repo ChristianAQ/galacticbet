@@ -1,1 +1,25 @@
-{"name": "GalacticBet", "short_name": "GalacticBet", "start_url": "./", "scope": "./", "display": "standalone", "background_color": "#10141c", "theme_color": "#10141c", "lang": "es", "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"}, {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]}
+{
+  "name": "GalacticBet",
+  "short_name": "GalacticBet",
+  "description": "Tu quiniela de LaLiga, Champions y Premier, entre amigos.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#15140f",
+  "theme_color": "#15140f",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": ["sports", "entertainment"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Mi quiniela", "url": "./#/quiniela", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Clasificación", "url": "./#/clasificacion", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+  ]
+}

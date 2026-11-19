@@ -1,21 +1,24 @@
 import { competitionName } from "../lib/competitions";
 import { COMPETITION_CODES } from "../lib/competitions";
 import {
-  Download,
   Camera,
+  Download,
+  Eye,
   FilePenLine,
   Plus,
   Share2,
   Trash2,
-  Wallet,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import Modal from "../components/Modal";
 import PorraTicket from "../components/PorraTicket";
-import { PageTitle } from "../components/ui";
+import SwipeRow from "../components/SwipeRow";
+import { menuTarget } from "../components/ContextMenu";
+import { Empty, PageTitle } from "../components/ui";
 import { canPredict, type Match } from "../lib/domain";
 import { kickoffLabel } from "../lib/matchInsights";
+import { haptic } from "../lib/motion";
 import {
   euro,
   fixtureSnapshot,
@@ -138,21 +141,31 @@ export default function PorraPage({
         value.fixture ? value : { ...value, fixture: fixtureSnapshot(first) },
       );
   }, [firstId, matches]);
+  // This page lives in a hidden <Activity> while you browse deeper; effects run
+  // again when it reappears, so the image is only drawn once per porra version.
+  const drawn = useRef<Porra | null | undefined>(undefined);
   useEffect(() => {
+    if (drawn.current === preview) return;
     let active = true;
     setImage(null);
     setImageError("");
-    if (preview)
-      void porraImage(preview)
-        .then((blob) => {
-          if (active) setImage(blob);
-        })
-        .catch(() => {
-          if (active)
-            setImageError(
-              "No se ha podido preparar la imagen. Puedes hacer una captura de la tarjeta.",
-            );
-        });
+    if (!preview) {
+      drawn.current = preview;
+      return;
+    }
+    void porraImage(preview)
+      .then((blob) => {
+        if (!active) return;
+        drawn.current = preview;
+        setImage(blob);
+      })
+      .catch(() => {
+        if (!active) return;
+        drawn.current = preview;
+        setImageError(
+          "No se ha podido preparar la imagen. Puedes hacer una captura de la tarjeta.",
+        );
+      });
     return () => {
       active = false;
     };
@@ -166,10 +179,16 @@ export default function PorraPage({
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [image]);
+  // Focus the heading when the porra on screen changes, not on every return.
+  const focused = useRef<string | null>(null);
   useEffect(() => {
+    const key = `${preview?.id}|${preview?.updatedAt}`;
+    if (focused.current === key) return;
+    const first = focused.current === null;
+    focused.current = key;
     const frame = requestAnimationFrame(() => {
       heading.current?.focus({ preventScroll: true });
-      if (preview)
+      if (preview && !first)
         heading.current
           ?.closest(".porra-tool")
           ?.scrollIntoView({ block: "start" });
@@ -190,6 +209,10 @@ export default function PorraPage({
     setStored(true);
     setError("");
     setMessage("");
+  }
+  function edit(p: Porra) {
+    show(p);
+    setPreview(null);
   }
   function updatePlayer(
     id: string,
@@ -248,6 +271,7 @@ export default function PorraPage({
       !validPorra(p) ||
       draft.players.some((row) => row.home === "" || row.away === "")
     ) {
+      haptic("warning");
       setError(
         "Completa todos los nombres y marcadores con goles enteros entre 0 y 99.",
       );
@@ -256,6 +280,7 @@ export default function PorraPage({
     try {
       setItems(savePorra(localStorage, storageKey, p));
       setStored(true);
+      haptic("success");
     } catch (e) {
       setStored(false);
       setError(
@@ -277,23 +302,26 @@ export default function PorraPage({
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  async function share() {
-    if (!preview) return;
+  /** Image of the porra on screen when ready; text for any other porra. */
+  async function share(target: Porra | null = preview) {
+    if (!target) return;
     setSharing(true);
     setMessage("");
     try {
-      const file = image
-        ? new File([image], `porra-${preview.id}.png`, { type: "image/png" })
-        : null;
+      const file =
+        image && target === preview
+          ? new File([image], `porra-${target.id}.png`, { type: "image/png" })
+          : null;
       if (file && navigator.share && navigator.canShare?.({ files: [file] }))
-        await navigator.share({ title: preview.title, files: [file] });
+        await navigator.share({ title: target.title, files: [file] });
       else if (navigator.share)
         await navigator.share({
-          title: preview.title,
-          text: porraText(preview),
+          title: target.title,
+          text: porraText(target),
         });
       else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(porraText(preview));
+        await navigator.clipboard.writeText(porraText(target));
+        haptic("success");
         setMessage("Porra copiada. Ya puedes pegarla en el chat que quieras.");
       } else
         setMessage(
@@ -306,94 +334,120 @@ export default function PorraPage({
       setSharing(false);
     }
   }
+  function remove(target: Porra) {
+    try {
+      const next = removePorra(localStorage, storageKey, target.id);
+      setItems(next);
+      haptic("success");
+      if (preview?.id === target.id || editing?.id === target.id) start();
+      setDeleting(null);
+    } catch {
+      setError("No se ha podido eliminar la porra. Inténtalo de nuevo.");
+    }
+  }
   const selectedUpcoming = upcoming.some((m) => m.id === draft.fixture?.id);
   const amount = parseContribution(draft.contribution);
+  const savedPreview = Boolean(preview && items.some((p) => p.id === preview.id));
   return (
     <>
       <PageTitle
-        eyebrow="HERRAMIENTAS · ENTRE AMIGOS"
+        eyebrow="Herramientas · entre amigos"
         title="Porra rápida"
-        description="Un partido, vuestros marcadores y una tarjeta lista para compartir."
+        description="Un partido, vuestros marcadores y una tarjeta lista para el chat."
       />
       <section className="porra-tool" aria-label="Herramienta de porras">
-        <div className="porra-tool-heading">
+        <header className="porra-tool-heading">
           <div>
-            <span className="porra-kicker">
-              VUESTRO PARTIDO. VUESTRA PORRA.
-            </span>
+            <span className="eyebrow">Vuestro partido. Vuestra porra.</span>
             <h2 ref={heading} tabIndex={-1}>
               {preview
-                ? "Lista para compartir"
+                ? "Lista para el chat"
                 : editing
-                  ? "Editar la porra"
-                  : "Prepara vuestra porra"}
+                  ? "Retoca la porra"
+                  : "Monta vuestra porra"}
             </h2>
           </div>
           {preview && (
-            <button className="porra-button secondary" onClick={start}>
-              <Plus size={16} /> Nueva porra
+            <button type="button" className="button secondary porra-new" onClick={start}>
+              <Plus size={16} aria-hidden="true" /> Nueva
             </button>
           )}
-        </div>
+        </header>
         <p className="porra-local-note">
-          Tus porras se guardan en este dispositivo · Siempre editables
+          Se guardan en este dispositivo · Siempre editables
         </p>
         {error && (
-          <p className="porra-message error-note" role="alert">
+          <p className="error" role="alert">
             {error}
           </p>
         )}
         {preview ? (
           <>
+            <PorraTicket porra={preview} />
+            <p className="porra-preview-status" role="status">
+              {stored
+                ? "Porra guardada. Compártela tal cual o haz una captura."
+                : "Vista sin guardar en este dispositivo. Puedes descargarla o volver a editarla."}
+            </p>
+            {message && (
+              <p className="form-message" role="status">
+                {message}
+              </p>
+            )}
+            {imageError && (
+              <p className="setup-notice" role="status">
+                {imageError}
+              </p>
+            )}
             <div className="porra-preview-actions">
               <button
-                className="porra-button secondary"
+                type="button"
+                className="button primary porra-share"
+                disabled={sharing || (!image && !imageError)}
+                onClick={() => void share()}
+              >
+                <Share2 size={17} aria-hidden="true" />
+                {sharing ? "Compartiendo…" : "Compartir porra"}
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={!image}
+                onClick={download}
+              >
+                <Download size={16} aria-hidden="true" /> Descargar
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={!imageUrl}
+                onClick={() => setCapture(true)}
+              >
+                <Camera size={16} aria-hidden="true" /> Para captura
+              </button>
+              <button
+                type="button"
+                className="button secondary"
                 onClick={() => {
                   setPreview(null);
                   setMessage("");
                 }}
               >
-                <FilePenLine size={16} /> Editar porra
+                <FilePenLine size={16} aria-hidden="true" /> Editar
               </button>
-              <button
-                className="porra-button secondary"
-                disabled={!imageUrl}
-                onClick={() => setCapture(true)}
-              >
-                <Camera size={16} /> Vista para captura
-              </button>
-              <button
-                className="porra-button secondary"
-                disabled={!image}
-                onClick={download}
-              >
-                <Download size={16} /> Descargar imagen
-              </button>
-              <button
-                className="porra-button"
-                disabled={sharing || (!image && !imageError)}
-                onClick={() => void share()}
-              >
-                <Share2 size={16} />
-                {sharing ? "Compartiendo…" : "Compartir porra"}
-              </button>
+              {savedPreview && (
+                <button
+                  type="button"
+                  className="button secondary porra-delete"
+                  onClick={() => {
+                    setError("");
+                    setDeleting(preview);
+                  }}
+                >
+                  <Trash2 size={16} aria-hidden="true" /> Eliminar
+                </button>
+              )}
             </div>
-            <p className="porra-preview-status" role="status">
-              {stored
-                ? "Porra guardada. Puedes compartir la imagen o hacer una captura."
-                : "Vista sin guardar en este dispositivo. Puedes descargarla o volver a editarla."}
-            </p>
-            {message && (
-              <p className="porra-message" role="status">
-                {message}
-              </p>
-            )}
-            {imageError && (
-              <p className="porra-message" role="status">
-                {imageError}
-              </p>
-            )}
-            <PorraTicket porra={preview} />
           </>
         ) : (
           <form className="porra-editor" onSubmit={save}>
@@ -440,8 +494,8 @@ export default function PorraPage({
               </select>
             </label>
             {!upcoming.length && !editing && !loading && (
-              <p className="porra-message">
-                No hay próximos partidos disponibles en el calendario.{" "}
+              <p className="setup-notice">
+                No hay próximos partidos en el calendario.{" "}
                 <Link to="/ligas">Consultar partidos</Link>
               </p>
             )}
@@ -453,6 +507,9 @@ export default function PorraPage({
                   value={draft.title}
                   required
                   maxLength={60}
+                  autoComplete="off"
+                  autoCapitalize="sentences"
+                  enterKeyHint="next"
                   onChange={(e) =>
                     setDraft((value) => ({ ...value, title: e.target.value }))
                   }
@@ -460,11 +517,13 @@ export default function PorraPage({
               </label>
               <label>
                 Aportación por persona
-                <div className="porra-money-input">
+                <span className="porra-money-input">
                   <input
                     aria-label="Aportación por persona"
                     type="text"
                     inputMode="decimal"
+                    autoComplete="off"
+                    enterKeyHint="next"
                     placeholder="2,00"
                     value={draft.contribution}
                     required
@@ -476,8 +535,8 @@ export default function PorraPage({
                       }))
                     }
                   />
-                  <span>€</span>
-                </div>
+                  <span aria-hidden="true">€</span>
+                </span>
               </label>
             </div>
             <div className="porra-editor-heading">
@@ -487,20 +546,28 @@ export default function PorraPage({
               </span>
             </div>
             <div className="porra-player-labels" aria-hidden="true">
+              <span />
               <span>Nombre</span>
               <span>Local</span>
-              <span>Visitante</span>
+              <span />
+              <span>Visit.</span>
               <span />
             </div>
-            <div className="porra-player-fields">
+            <ol className="porra-player-fields">
               {draft.players.map((row, index) => (
-                <div className="porra-player-field" key={row.id}>
+                <li className="porra-player-field" key={row.id}>
+                  <span className="porra-player-number" aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
                   <input
                     aria-label={`Nombre de participante ${index + 1}`}
                     value={row.name}
                     placeholder={index === 0 ? "Juan" : "Nombre"}
                     required
                     maxLength={40}
+                    autoComplete="off"
+                    autoCapitalize="words"
+                    enterKeyHint="next"
                     onChange={(e) =>
                       updatePlayer(row.id, "name", e.target.value)
                     }
@@ -509,25 +576,30 @@ export default function PorraPage({
                     aria-label={`Goles local de participante ${index + 1}`}
                     type="number"
                     inputMode="numeric"
+                    enterKeyHint="next"
                     min={0}
                     max={99}
                     step={1}
                     required
-                    placeholder="—"
+                    placeholder="–"
                     value={row.home}
                     onChange={(e) =>
                       updatePlayer(row.id, "home", e.target.value)
                     }
                   />
+                  <span className="porra-dash" aria-hidden="true">
+                    –
+                  </span>
                   <input
                     aria-label={`Goles visitante de participante ${index + 1}`}
                     type="number"
                     inputMode="numeric"
+                    enterKeyHint={index === draft.players.length - 1 ? "done" : "next"}
                     min={0}
                     max={99}
                     step={1}
                     required
-                    placeholder="—"
+                    placeholder="–"
                     value={row.away}
                     onChange={(e) =>
                       updatePlayer(row.id, "away", e.target.value)
@@ -535,26 +607,28 @@ export default function PorraPage({
                   />
                   <button
                     type="button"
-                    className="porra-remove"
+                    className="icon-button porra-remove"
                     aria-label={`Eliminar participante ${index + 1}`}
                     disabled={draft.players.length === 1}
-                    onClick={() =>
+                    onClick={() => {
+                      haptic();
                       setDraft((value) => ({
                         ...value,
                         players: value.players.filter((p) => p.id !== row.id),
-                      }))
-                    }
+                      }));
+                    }}
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={17} />
                   </button>
-                </div>
+                </li>
               ))}
-            </div>
+            </ol>
             <button
               type="button"
               className="porra-add"
               disabled={draft.players.length >= MAX_PORRA_PLAYERS}
               onClick={() => {
+                haptic();
                 const id = crypto.randomUUID();
                 setDraft((value) => ({
                   ...value,
@@ -569,88 +643,162 @@ export default function PorraPage({
                 );
               }}
             >
-              <Plus size={16} /> Añadir participante
+              <Plus size={17} aria-hidden="true" /> Añadir participante
             </button>
-            <div className="porra-editor-total">
-              <Wallet size={20} />
-              <div>
-                <span>Bote previsto</span>
-                <strong>
-                  {amount === null ? "—" : euro(draft.players.length * amount)}
-                </strong>
-              </div>
-              <small>{draft.players.length} personas</small>
+            <div className="porra-editor-total" aria-live="polite">
+              <span className="eyebrow">Bote previsto</span>
+              <strong className="numeral">
+                {amount === null ? "—" : euro(draft.players.length * amount)}
+              </strong>
+              <small>
+                {draft.players.length}{" "}
+                {draft.players.length === 1 ? "persona" : "personas"}
+                {amount ? ` × ${euro(amount)}` : ""}
+              </small>
             </div>
             <div className="porra-editor-actions">
               {editing && (
                 <button
                   type="button"
-                  className="porra-button secondary"
+                  className="button secondary"
                   onClick={() => setPreview(editing)}
                 >
                   Volver a la tarjeta
                 </button>
               )}
-              <button className="porra-button" disabled={!draft.fixture}>
+              <button className="button primary" disabled={!draft.fixture}>
                 Guardar y ver porra
               </button>
             </div>
           </form>
         )}
-        <details className="porra-saved">
-          <summary>
-            <span>Mis porras</span>
-            <span>{items.length} guardadas</span>
-          </summary>
-          {items.length ? (
-            <ul>
+      </section>
+
+      <section className="porra-saved" aria-labelledby="porra-saved-title">
+        <div className="section-heading">
+          <h2 id="porra-saved-title">Mis porras</h2>
+          <span className="porra-saved-count">
+            {items.length} {items.length === 1 ? "guardada" : "guardadas"}
+          </span>
+        </div>
+        {items.length ? (
+          <>
+            <p className="porra-saved-hint">
+              Desliza para editar o borrar; mantén pulsado para compartir.
+            </p>
+            <ul className="porra-saved-list">
               {items.map((p) => (
                 <li key={p.id}>
-                  <button onClick={() => show(p)}>
-                    <strong>
-                      {p.title}
-                      {p.demo ? " · Demo" : ""}
-                    </strong>
-                    <span>
-                      {p.fixture.home} – {p.fixture.away}
-                    </span>
-                    <small>
-                      {p.players.length} personas · {euro(porraTotal(p))}
-                    </small>
-                  </button>
-                  <button
-                    className="porra-remove"
-                    aria-label={`Eliminar porra ${p.title}`}
-                    onClick={() => {
-                      setError("");
-                      setDeleting(p);
-                    }}
+                  <SwipeRow
+                    actions={[
+                      {
+                        label: "Eliminar",
+                        tone: "destructive",
+                        icon: <Trash2 size={20} aria-hidden="true" />,
+                        onAction: () => {
+                          setError("");
+                          setDeleting(p);
+                        },
+                      },
+                      {
+                        label: "Editar",
+                        icon: <FilePenLine size={20} aria-hidden="true" />,
+                        onAction: () => edit(p),
+                      },
+                    ]}
                   >
-                    <Trash2 size={16} />
-                  </button>
+                    <button
+                      type="button"
+                      className={`porra-saved-row${preview?.id === p.id ? " is-current" : ""}`}
+                      aria-current={preview?.id === p.id || undefined}
+                      ref={menuTarget(() => ({
+                        title: p.title,
+                        items: [
+                          {
+                            label: "Ver tarjeta",
+                            icon: <Eye size={18} aria-hidden="true" />,
+                            onSelect: () => show(p),
+                          },
+                          {
+                            label: "Editar",
+                            icon: <FilePenLine size={18} aria-hidden="true" />,
+                            onSelect: () => edit(p),
+                          },
+                          {
+                            label: "Compartir",
+                            icon: <Share2 size={18} aria-hidden="true" />,
+                            onSelect: () => void share(p),
+                          },
+                          {
+                            label: "Eliminar",
+                            icon: <Trash2 size={18} aria-hidden="true" />,
+                            destructive: true,
+                            onSelect: () => {
+                              setError("");
+                              setDeleting(p);
+                            },
+                          },
+                        ],
+                      }))}
+                      onClick={() => show(p)}
+                    >
+                      <span className="porra-saved-main">
+                        <strong>
+                          {p.title}
+                          {p.demo && <small className="badge">Demo</small>}
+                        </strong>
+                        <span>
+                          {p.fixture.home} – {p.fixture.away}
+                        </span>
+                      </span>
+                      <span className="porra-saved-total">
+                        <b className="numeral">{euro(porraTotal(p))}</b>
+                        <small>
+                          {p.players.length}{" "}
+                          {p.players.length === 1 ? "persona" : "personas"}
+                        </small>
+                      </span>
+                    </button>
+                  </SwipeRow>
                 </li>
               ))}
             </ul>
-          ) : (
-            <p>Aquí aparecerán las porras que guardes en este dispositivo.</p>
-          )}
-        </details>
+          </>
+        ) : (
+          <Empty art="slip" title="Ninguna porra en el cajón">
+            Aquí aparecerán las porras que guardes en este dispositivo.
+          </Empty>
+        )}
       </section>
+
       {capture && imageUrl && preview && (
         <Modal
           title="Vista para captura"
           className="porra-capture-modal"
+          detents={["large"]}
           onClose={() => setCapture(false)}
         >
           <img
             src={imageUrl}
             alt={`Porra ${preview.title}, con todos sus marcadores y el bote total`}
           />
+          <p className="muted">
+            Haz una captura de pantalla o mantén pulsada la imagen para
+            guardarla.
+          </p>
         </Modal>
       )}
       {deleting && (
-        <Modal title="Eliminar porra" onClose={() => setDeleting(null)}>
-          <p>Se eliminará «{deleting.title}» de este dispositivo.</p>
+        <Modal
+          title="¿Borramos la porra?"
+          role="alertdialog"
+          onClose={() => setDeleting(null)}
+          initialFocus="[data-cancel]"
+        >
+          <p>
+            Se eliminará «{deleting.title}» de este dispositivo. No hay
+            papelera: no se puede deshacer.
+          </p>
           {error && (
             <p className="error" role="alert">
               {error}
@@ -658,35 +806,19 @@ export default function PorraPage({
           )}
           <div className="confirm-buttons">
             <button
+              type="button"
               className="button secondary"
+              data-cancel
               onClick={() => setDeleting(null)}
             >
               Cancelar
             </button>
             <button
-              className="button primary"
-              onClick={() => {
-                try {
-                  const next = removePorra(
-                    localStorage,
-                    storageKey,
-                    deleting.id,
-                  );
-                  setItems(next);
-                  if (
-                    preview?.id === deleting.id ||
-                    editing?.id === deleting.id
-                  )
-                    start();
-                  setDeleting(null);
-                } catch {
-                  setError(
-                    "No se ha podido eliminar la porra. Inténtalo de nuevo.",
-                  );
-                }
-              }}
+              type="button"
+              className="button danger"
+              onClick={() => remove(deleting)}
             >
-              Eliminar porra
+              Eliminar
             </button>
           </div>
         </Modal>

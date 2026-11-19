@@ -14,7 +14,12 @@ export function useLeagueStats(seasonId: string, demo: boolean) {
   useEffect(() => {
     let active = true;
     if (demo || !/^(PD|CL|PL)-\d{4}$/.test(seasonId)) return;
-    setState({ id: seasonId });
+    // Re-shown pages (Activity) re-run this effect: keep what is on screen.
+    setState((previous) =>
+      previous.id === seasonId && previous.data !== undefined
+        ? previous
+        : { id: seasonId },
+    );
     void cache
       .read(
         seasonId,

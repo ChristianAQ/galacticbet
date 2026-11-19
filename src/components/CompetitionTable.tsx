@@ -6,6 +6,7 @@ import type { Match } from "../lib/domain";
 import { seasonLeagueTable } from "../lib/leagueTable";
 import { seasonLabel } from "../lib/leagueHub";
 import { Empty } from "./ui";
+import { SkeletonRows } from "./Skeleton";
 
 export default function CompetitionTable({
   matches,
@@ -23,24 +24,20 @@ export default function CompetitionTable({
     [matches, competition, seasonId],
   );
   return (
-    <section className="panel competition-table-panel" aria-busy={loading}>
-      <div className="standings-heading">
-        <div>
-          <h2>Clasificación</h2>
-          <p>
-            {competitionName(competition, true)} · {seasonLabel(seasonId)} ·
-            Fase liga
-          </p>
-        </div>
-      </div>
-      {loading ? (
-        <p className="league-message" role="status">
-          Cargando clasificación…
+    <section className="competition-table-panel" aria-busy={loading}>
+      <header className="standings-heading">
+        <h2>Clasificación</h2>
+        <p>
+          {competitionName(competition, true)} · {seasonLabel(seasonId)} · Fase
+          liga
         </p>
+      </header>
+      {loading ? (
+        <SkeletonRows rows={8} variant="line" label="Cargando clasificación" />
       ) : !rows.length ? (
-        <Empty title="Clasificación no disponible">
-          No hay equipos de una fase de liga publicados para esta temporada. Las
-          eliminatorias se consultan en Partidos.
+        <Empty art="podium" title="Aquí no hay tabla que valga">
+          Esta temporada no tiene fase de liga publicada. Las eliminatorias se
+          siguen en Partidos.
         </Empty>
       ) : (
         <>

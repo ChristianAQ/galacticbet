@@ -7,7 +7,7 @@ import {
 } from "firebase/firestore";
 import { ChevronRight, Users } from "lucide-react";
 import { Link } from "react-router-dom";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   hasMatchStarted,
   matchStatusLabel,
@@ -86,11 +86,18 @@ export default function GroupPredictions({
     .map((p) => p.id)
     .sort();
   const membersQueryKey = JSON.stringify(membersKey);
+  // Inside an <Activity>: a revealed page keeps what it showed while resubscribing.
+  const lastKey = useRef("");
   useEffect(() => {
-    setEntries({});
-    setReady(false);
-    setError("");
-    setPending(false);
+    const key = JSON.stringify([canShare, membersQueryKey, groupId, seasonId, roundId, demo, userId, attempt]);
+    const changed = lastKey.current !== key;
+    lastKey.current = key;
+    if (changed) {
+      setEntries({});
+      setReady(false);
+      setError("");
+      setPending(false);
+    }
     if (!canShare) return;
     if (membersQueryKey === "[]") {
       setReady(true);
@@ -116,7 +123,7 @@ export default function GroupPredictions({
       return;
     }
     if (!db) return;
-    setPending(true);
+    if (changed) setPending(true);
     // One round listener shares each immutable entry across all fixture cards.
     return onSnapshot(
       query(
@@ -195,13 +202,16 @@ export default function GroupPredictions({
   return (
     <section className="group-predictions" aria-label="Pronósticos del grupo">
       <div className="group-view-heading">
-        <h2 tabIndex={-1}>El grupo</h2>
+        <div className="group-view-title">
+          <span className="eyebrow">Tu boleto y el de los demás</span>
+          <h2 tabIndex={-1}>El grupo</h2>
+        </div>
+        {sealed && (
+          <span className="sealed-stamp" role="status">
+            Sellada
+          </span>
+        )}
         <span className="group-view-actions">
-          {sealed && (
-            <span className="round-state saved" role="status">
-              Guardada
-            </span>
-          )}
           {canShare && (
             <ShareTrigger
               label="Compartir quiniela"
@@ -269,7 +279,16 @@ function RoundBoardPanel({
     <section className="panel round-board" aria-label="Puntos de la jornada">
       <header className="round-board-heading">
         <h3>Puntos de la jornada</h3>
-        <small>{live ? "Provisional · en directo" : "Provisional"}</small>
+        <small>
+          {live ? (
+            <>
+              <i className="live-dot" aria-hidden="true" /> Provisional · en
+              directo
+            </>
+          ) : (
+            "Provisional"
+          )}
+        </small>
       </header>
       <ol>
         {rows.map((r) => (
@@ -283,7 +302,7 @@ function RoundBoardPanel({
               {r.hits} {r.hits === 1 ? "acierto" : "aciertos"}
             </span>
             <span className="rb-points">
-              {r.points} pts
+              <b>{r.points}</b> pts
               {r.livePoints > 0 && (
                 <span className="rb-live" title="Si terminaran así">
                   +{r.livePoints}
@@ -340,7 +359,7 @@ function RivalsCard({
     ["FINISHED", "IN_PLAY", "PAUSED"].includes(match.status);
   const scheduled = ["TIMED", "SCHEDULED"].includes(match.status);
   return (
-    <article className="panel group-match-card">
+    <article className="group-match-card" data-vt-match={match.id}>
       <header className="saved-match-heading">
         <time dateTime={match.utcDate}>{kickoffLabel(match.utcDate)}</time>
         <span
@@ -348,9 +367,9 @@ function RivalsCard({
         >
           {scheduled ? (
             started ? (
-              "Pendiente de actualización"
+              "Esperando el resultado"
             ) : (
-              "A la espera del inicio"
+              "Aún no ha rodado el balón"
             )
           ) : ["IN_PLAY", "PAUSED"].includes(match.status) ? (
             <LiveMinute match={match} />
@@ -361,7 +380,7 @@ function RivalsCard({
       </header>
       <div className="saved-fixture">
         <div className="saved-team">
-          <Team name={match.home} crest={match.homeCrest} />
+          <Team name={match.home} crest={match.homeCrest} part="home-crest" />
           <TeamForm match={match} side="home" matches={history} />
         </div>
         <div
@@ -370,10 +389,10 @@ function RivalsCard({
           aria-label="Tu pronóstico"
           aria-busy={loadingOwn}
         >
-          <span>Tu pronóstico</span>
+          <span>Tu signo</span>
           {loadingOwn ? (
             <span className="saved-pick-loading" role="status">
-              Cargando…
+              <span className="sr-only">Cargando tu pronóstico</span>
             </span>
           ) : (
             <PickValue
@@ -385,7 +404,7 @@ function RivalsCard({
           )}
         </div>
         <div className="saved-team">
-          <Team name={match.away} crest={match.awayCrest} />
+          <Team name={match.away} crest={match.awayCrest} part="away-crest" />
           <TeamForm match={match} side="away" matches={history} />
         </div>
       </div>
@@ -420,7 +439,7 @@ function RivalsCard({
         >
           <header className="shared-predictions-heading">
             <h3>
-              <Users size={13} aria-hidden="true" /> Pronósticos compartidos
+              <Users size={13} aria-hidden="true" /> Lo que han puesto
             </h3>
             <span
               className="shared-predictions-count"
@@ -432,7 +451,10 @@ function RivalsCard({
           <div className="rivals-content" aria-busy={pending || !ready}>
             {pending || !ready ? (
               <p className="rivals-loading" role="status">
-                Cargando pronósticos…
+                <span className="sr-only">Cargando pronósticos</span>
+                <span className="skeleton" aria-hidden="true" />
+                <span className="skeleton" aria-hidden="true" />
+                <span className="skeleton" aria-hidden="true" />
               </p>
             ) : error ? (
               <div className="rivals-error">
@@ -445,7 +467,7 @@ function RivalsCard({
               <>
                 {visible.length === 0 && (
                   <p className="rivals-empty">
-                    Aquí aparecerán cuando guarden su quiniela.
+                    Nadie más ha sellado todavía. Sus signos saldrán aquí.
                   </p>
                 )}
                 <ul
