@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowUpRight, Copy, Share2 } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
+import { fromServer } from "../lib/firestoreOnline";
 import { db } from "../lib/firebase";
 import { currentArticles, type FootballNews } from "../lib/footballNews";
 import { createNewsLoader } from "../lib/newsCache";
@@ -16,7 +17,8 @@ import "../styles/home.css";
 const load = createNewsLoader(
   import.meta.env.VITE_FIREBASE_PROJECT_ID || "unconfigured",
   () => localStorage,
-  async () => (db ? (await getDoc(doc(db, "news", "football"))).data() : null),
+  async () =>
+    db ? fromServer(await getDoc(doc(db, "news", "football"))).data() : null,
 );
 const articleDate = new Intl.DateTimeFormat("es", {
   day: "numeric",

@@ -1,4 +1,4 @@
-import type { User } from "firebase/auth";
+import type { AppUser as User } from "../lib/session";
 import {
   ArrowRight,
   ChevronRight,

@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   expireGroupRankings,
   getCachedGroupRankings,
+  getStoredGroupRankings,
   loadGroupRankings,
+  SEASONS_CHANGED,
   type Group,
 } from "./data";
 import { readableError } from "../components/ui";
@@ -19,7 +21,13 @@ export function useGroupRankings(userId: string, group?: Group) {
     data?: Awaited<ReturnType<typeof loadGroupRankings>>;
     error?: string;
   }>({ key: "" });
-  const cached = key && group ? getCachedGroupRankings(group) : undefined;
+  // Last totals seen on this device: painted at once, replaced when fresh ones land.
+  const stored = useMemo(
+    () => (key && group ? getStoredGroupRankings(group) : undefined),
+    [key],
+  );
+  const cached =
+    key && group ? (getCachedGroupRankings(group) ?? stored) : undefined;
   useEffect(() => {
     if (!key || !group) return;
     let active = true;
@@ -27,7 +35,7 @@ export function useGroupRankings(userId: string, group?: Group) {
     setResult((previous) =>
       previous.key === key && previous.data
         ? previous
-        : { key, data: getCachedGroupRankings(group) },
+        : { key, data: getCachedGroupRankings(group) ?? stored },
     );
     void loadGroupRankings(group).then(
       (data) => {
@@ -56,22 +64,31 @@ export function useGroupRankings(userId: string, group?: Group) {
       expireGroupRankings();
       refresh();
     };
+    // New competitions in this group: totals per season changed shape.
+    const seasons = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === group?.id) refresh();
+    };
     window.addEventListener("focus", refresh);
     window.addEventListener(STANDINGS_UPDATED, scored);
+    window.addEventListener(SEASONS_CHANGED, seasons);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener(STANDINGS_UPDATED, scored);
+      window.removeEventListener(SEASONS_CHANGED, seasons);
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [key]);
+  const data = key
+    ? result.key === key
+      ? result.data || cached
+      : cached
+    : undefined;
   return {
-    data: key
-      ? result.key === key
-        ? result.data || cached
-        : cached
-      : undefined,
-    error: key && result.key === key ? result.error : undefined,
+    data,
+    // Stored totals stay on screen when a refresh fails (offline, flaky
+    // signal); the error only replaces an empty table.
+    error: key && result.key === key && !data ? result.error : undefined,
     retry: () => {
       privateCache.clear();
       setAttempt((n) => n + 1);

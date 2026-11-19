@@ -1,6 +1,6 @@
 import { competitionName } from "../lib/competitions";
 import { COMPETITION_CODES } from "../lib/competitions";
-import type { User } from "firebase/auth";
+import type { AppUser as User } from "../lib/session";
 import {
   ArrowRight,
   Coins,

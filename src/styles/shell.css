@@ -479,6 +479,23 @@ body {
   border-radius: 50%;
   color: var(--ink-2);
 }
+/* A new version is stored: one tap reloads into it. */
+.toast.is-update {
+  align-items: center;
+  padding-block: 8px;
+  box-shadow: var(--shadow-lift), inset 4px 0 0 var(--accent);
+}
+.toast.is-update p {
+  padding-top: 0;
+}
+.toast .toast-action {
+  width: auto;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 650;
+}
 @keyframes drop-in {
   from {
     opacity: 0;

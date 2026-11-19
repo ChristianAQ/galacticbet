@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
+import { fromServer } from "./firestoreOnline";
 import { db } from "./firebase";
 import type { Match } from "./domain";
 import type { MatchInsight } from "./matchInsightsData";
@@ -10,7 +11,7 @@ const load = createMatchInsightLoader(
   () => localStorage,
   async (id) => {
     if (!db) return null;
-    const snapshot = await getDoc(doc(db, "matchInsights", id));
+    const snapshot = fromServer(await getDoc(doc(db, "matchInsights", id)));
     return snapshot.data()?.insight ?? null;
   },
 );

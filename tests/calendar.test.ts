@@ -5,7 +5,11 @@ import {
   decodeCalendar,
   encodeCalendar,
 } from "../src/lib/calendar";
-import { CALENDAR_TTL, createCalendarLoader } from "../src/lib/calendarCache";
+import {
+  CALENDAR_STALE_LIMIT,
+  CALENDAR_TTL,
+  createCalendarLoader,
+} from "../src/lib/calendarCache";
 import type { Match } from "../src/lib/domain";
 
 const match: Match = {
@@ -172,4 +176,31 @@ it("admite calendarios antiguos y rechaza estadísticas nuevas mal formadas", ()
   expect(
     read({ winner: "2", halfTimeHomeScore: 0, halfTimeAwayScore: 1 })[0],
   ).toMatchObject({ winner: "2", halfTimeHomeScore: 0, halfTimeAwayScore: 1 });
+});
+
+it("pinta al instante una copia de hace días y la descarga fresca la sustituye", async () => {
+  vi.useFakeTimers();
+  const local = storage();
+  const fetch = vi.fn(async () => [match]);
+  await createCalendarLoader("project", () => local, fetch)();
+  vi.advanceTimersByTime(2 * 24 * 3_600_000);
+  fetch.mockResolvedValueOnce([
+    { ...match, status: "FINISHED", homeScore: 2, awayScore: 1 },
+  ]);
+  const load = createCalendarLoader("project", () => local, fetch);
+  // Two days old: shown at launch without a network read...
+  expect(load.peek()?.[0].status).toBe("TIMED");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  // ...but due a refresh, so load() goes to the server.
+  expect((await load())[0].homeScore).toBe(2);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(load.peek()?.[0].homeScore).toBe(2);
+});
+it("no pinta copias de más de una semana ni datos sin calendario", async () => {
+  vi.useFakeTimers();
+  const local = storage();
+  expect(createCalendarLoader("project", () => local, vi.fn()).peek()).toBeUndefined();
+  await createCalendarLoader("project", () => local, async () => [match])();
+  vi.advanceTimersByTime(CALENDAR_STALE_LIMIT);
+  expect(createCalendarLoader("project", () => local, vi.fn()).peek()).toBeUndefined();
 });

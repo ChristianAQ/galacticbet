@@ -1,6 +1,6 @@
 import { competitionCode, competitionName } from "../lib/competitions";
 import { COMPETITION_CODES } from "../lib/competitions";
-import type { User } from "firebase/auth";
+import type { AppUser as User } from "../lib/session";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import {
   CalendarDays,
@@ -23,6 +23,7 @@ import { SkeletonRows } from "../components/Skeleton";
 import {
   loadGameSeasons,
   loadParticipants,
+  SEASONS_CHANGED,
   savePrediction,
   submitRound,
   type Group,
@@ -196,6 +197,17 @@ export default function PredictionsPage({
     const id = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+  // The group gained a competition (new season) after its list was shown.
+  const [seasonsVersion, setSeasonsVersion] = useState(0);
+  useEffect(() => {
+    const reload = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== group) return;
+      lastKeys.current.loaded = "";
+      setSeasonsVersion((n) => n + 1);
+    };
+    window.addEventListener(SEASONS_CHANGED, reload);
+    return () => window.removeEventListener(SEASONS_CHANGED, reload);
+  }, [group]);
   useEffect(() => {
     const key = `${group}|${demo}`;
     const changed = lastKeys.current.seasons !== key;
@@ -237,7 +249,7 @@ export default function PredictionsPage({
     return () => {
       active = false;
     };
-  }, [group, demo]);
+  }, [group, demo, seasonsVersion]);
   useEffect(() => {
     const key = `${predictionKey}|${demo}`;
     const changed = lastKeys.current.picks !== key;

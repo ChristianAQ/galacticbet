@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import type { User } from "firebase/auth";
+import type { AppUser as User } from "../lib/session";
 import { competitionName, type CompetitionCode } from "../lib/competitions";
 import { matchStatusLabel, type Match } from "../lib/domain";
 import type { Group } from "../lib/data";

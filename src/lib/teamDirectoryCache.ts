@@ -1,4 +1,5 @@
 import { doc, getDoc } from "firebase/firestore";
+import { fromServer } from "./firestoreOnline";
 import { db } from "./firebase";
 import { createMemoryCache } from "./memoryCache";
 import { validDirectory, type TeamDirectory } from "./teamExplorer";
@@ -23,7 +24,9 @@ export function loadTeamDirectory() {
         /* Storage is optional. */
       }
       if (!db) return null;
-      const data = (await getDoc(doc(db, "teamDirectory", "featured"))).data();
+      const data = fromServer(
+        await getDoc(doc(db, "teamDirectory", "featured")),
+      ).data();
       if (!validDirectory(data)) return null;
       try {
         localStorage.setItem(key, JSON.stringify({ at: Date.now(), data }));

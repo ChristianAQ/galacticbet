@@ -46,6 +46,7 @@ export const readableError = (e: unknown) => {
     "permission-denied":
       "No tienes permiso para esta operación o el partido ya está cerrado.",
     unavailable: "No hay conexión con Firestore. Tu cambio no se ha guardado.",
+    offline: "Sin conexión. Los datos llegarán en cuanto vuelva la red.",
   };
   return (
     messages[code] ||

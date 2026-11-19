@@ -3,6 +3,8 @@ import { calendarMatch, validCalendarMatch } from "./calendar";
 import type { Match } from "./domain";
 
 export const CALENDAR_TTL = 5 * 60_000;
+/** An older copy is still painted at launch while the fresh one downloads. */
+export const CALENDAR_STALE_LIMIT = 7 * 24 * 3_600_000;
 const MAX_CACHE_CHARS = 1_500_000;
 type StorageAccess = () => Pick<Storage, "getItem" | "setItem">;
 
@@ -26,7 +28,7 @@ export function createCalendarLoader(
       if (
         Number.isFinite(data.savedAt) &&
         data.savedAt <= Date.now() &&
-        Date.now() - data.savedAt < CALENDAR_TTL &&
+        Date.now() - data.savedAt < CALENDAR_STALE_LIMIT &&
         Array.isArray(data.matches) &&
         data.matches.length > 0 &&
         data.matches.every(validCalendarMatch)
@@ -42,7 +44,7 @@ export function createCalendarLoader(
     }
   }
   /** `maxAge` lets pull-to-refresh ask for fresher data than the usual TTL. */
-  return function load({ maxAge = CALENDAR_TTL }: { maxAge?: number } = {}) {
+  function load({ maxAge = CALENDAR_TTL }: { maxAge?: number } = {}) {
     restore();
     if (
       cached &&
@@ -75,5 +77,18 @@ export function createCalendarLoader(
         pending = undefined;
       });
     return pending;
-  };
+  }
+  /**
+   * Whatever copy is at hand, even if it is due a refresh: the first paint uses
+   * it (stale-while-revalidate) and `load()` swaps in the fresh one.
+   */
+  function peek(): Match[] | undefined {
+    restore();
+    return cached &&
+      Date.now() >= cached.savedAt &&
+      Date.now() - cached.savedAt < CALENDAR_STALE_LIMIT
+      ? cached.matches
+      : undefined;
+  }
+  return Object.assign(load, { peek });
 }

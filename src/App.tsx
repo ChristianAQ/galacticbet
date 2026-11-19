@@ -1,5 +1,5 @@
 import BottomNavigation from "./components/BottomNavigation";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { CalendarDays, Home, Target, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,8 +15,11 @@ import {
   loadGroups,
   loadMatches,
   ensureGroupCompetitions,
+  storedGroups,
   type Group,
 } from "./lib/data";
+import { readSession, rememberSession, type AppUser } from "./lib/session";
+import { useUpdateReady } from "./lib/appUpdate";
 import { demoMatches } from "./lib/demo";
 import { type Match } from "./lib/domain";
 import { auth, configured, db } from "./lib/firebase";
@@ -45,6 +48,8 @@ const nav = [
   { to: "/quiniela", label: "Mi quiniela", short: "Quiniela", icon: Target },
   { to: "/clasificacion", label: "Clasificación", icon: Trophy },
 ];
+const storedCalendar = () => (configured ? loadMatches.peek() ?? [] : []);
+
 function LegacyMatchesRoute() {
   const { search, hash } = useLocation();
   return <Navigate to={{ pathname: "/ligas", search, hash }} replace />;
@@ -53,33 +58,55 @@ function LegacyMatchesRoute() {
 export default function App() {
   const { pathname } = useLocation();
   const [, setProfileVersion] = useState(0);
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(!auth);
+  // The account of the last launch paints at once; Firebase confirms it (or
+  // signs out) after its own network round trips.
+  const [user, setUser] = useState<AppUser | null>(() =>
+    auth ? readSession() : null,
+  );
+  const [authReady, setAuthReady] = useState(() => !auth || Boolean(user));
   const [demo, setDemo] = useState(false);
-  const [calendar, setMatches] = useState<Match[]>([]);
+  // Last calendar on this device, even if a few days old: the first paint has
+  // fixtures and the network only swaps in fresher scores.
+  const [calendar, setMatches] = useState<Match[]>(storedCalendar);
   const live = useLiveBoard(calendar, configured && !demo);
   // Faster live scores over the cached calendar; official results always win.
   const matches = useMemo(
     () => applyLiveBoard(calendar, live.board),
     [calendar, live.board],
   );
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [groupsUid, setGroupsUid] = useState("");
+  const [groups, setGroups] = useState<Group[]>(
+    () => (user && storedGroups(user.uid)) || [],
+  );
+  const [groupsUid, setGroupsUid] = useState(() =>
+    user && storedGroups(user.uid) ? user.uid : "",
+  );
   const activeGroups = user && groupsUid === user.uid ? groups : [];
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(
+    () => configured && calendar.length === 0,
+  );
   const [error, setError] = useState("");
   const [login, setLogin] = useState(false);
+  const updateReady = useUpdateReady();
+  const [updateDismissed, setUpdateDismissed] = useState(false);
   useEffect(() => interceptLinks(), []);
   useEffect(() => preloadTabsWhenIdle(), []);
   useEffect(
     () =>
       auth
         ? onAuthStateChanged(auth, (u) => {
-            privateCache.clear();
+            const previous = readSession();
+            // Same account as the remembered one: keep what already loaded.
+            if (previous?.uid !== u?.uid) privateCache.clear();
+            rememberSession(u);
             setUser(u);
             if (u) setLogin(false);
             setAuthReady(true);
-            if (u && db)
+            const known =
+              previous?.uid === u?.uid &&
+              previous?.displayName === u?.displayName &&
+              previous?.photoURL === u?.photoURL;
+            // The public profile only needs writing when it changed.
+            if (u && db && !known)
               void setDoc(
                 doc(db, "users", u.uid),
                 {
@@ -98,54 +125,63 @@ export default function App() {
         : undefined,
     [],
   );
-  async function refreshGroups() {
+  /** `quiet`: stored groups are on screen, so being offline is not news. */
+  async function refreshGroups(quiet = false) {
+    const report = (e: unknown, prefix = "") => {
+      if (auth?.currentUser?.uid !== user?.uid) return;
+      const code = (e as { code?: string })?.code;
+      if (quiet && (!navigator.onLine || code === "unavailable" || code === "offline"))
+        return;
+      setError(prefix + readableError(e));
+    };
     if (user) {
       try {
         const next = await loadGroups(user.uid);
+        // Show the groups first; preparing a new season is the owner's
+        // background chore (and usually there is nothing to prepare).
+        if (auth?.currentUser?.uid === user.uid) {
+          setGroups(next);
+          setGroupsUid(user.uid);
+        }
         const setup = await Promise.allSettled(
           next
             .filter((g) => g.ownerId === user.uid)
             .map((g) => ensureGroupCompetitions(user.uid, g.id)),
         );
         const failed = setup.find((r) => r.status === "rejected");
-        if (
-          failed?.status === "rejected" &&
-          auth?.currentUser?.uid === user.uid
-        )
-          setError(
-            "No se pudieron preparar las tres competiciones: " +
-              readableError(failed.reason),
-          );
-        if (auth?.currentUser?.uid === user.uid) {
-          setGroups(next);
-          setGroupsUid(user.uid);
-        }
+        if (failed?.status === "rejected")
+          report(failed.reason, "No se pudieron preparar las tres competiciones: ");
       } catch (e) {
-        setError(readableError(e));
+        // (A remembered session that Firebase did not confirm is not an error.)
+        report(e);
       }
     }
   }
   useEffect(() => {
-    setMatches(demo ? demoMatches : []);
+    const stored = storedCalendar();
+    setMatches(demo ? demoMatches : stored);
     if (demo || !configured) {
       setLoading(false);
       return;
     }
     let active = true;
+    let shown = stored.length > 0;
     const refresh = () => {
       if (document.visibilityState === "hidden") return;
       loadMatches()
         .then((next) => {
+          shown = true;
           if (active) setMatches(next);
         })
         .catch((e) => {
-          if (active) setError(readableError(e));
+          // With a stored calendar on screen a failed refresh is not news.
+          if (active && !shown) setError(readableError(e));
         })
         .finally(() => {
           if (active) setLoading(false);
         });
     };
-    setLoading(true);
+    setLoading(!shown);
     refresh();
     // The shared loader deduplicates requests and checks at most once every five minutes.
     const interval = window.setInterval(refresh, 5 * 60_000);
@@ -158,10 +194,11 @@ export default function App() {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [demo]);
+  // Keyed by account, not by object: confirming the remembered session must
+  // not blank the groups already on screen.
   useEffect(() => {
-    setGroups([]);
-    void refreshGroups();
-  }, [user]);
+    void refreshGroups(groupsUid === user?.uid);
+  }, [user?.uid]);
   /**
    * Pull to refresh: calendar at most a minute old, groups and rankings again.
    * Quotas stay safe because the loader still deduplicates and caches.
@@ -248,7 +285,7 @@ export default function App() {
           <GroupsPage
             user={user}
             groups={activeGroups}
-            refresh={refreshGroups}
+            refresh={() => refreshGroups()}
             onLogin={() => setLogin(true)}
           />
         }
@@ -272,7 +309,10 @@ export default function App() {
             user={user}
             groups={activeGroups}
             onLogin={() => setLogin(true)}
-            onUpdated={() => setProfileVersion((v) => v + 1)}
+            onUpdated={() => {
+              if (auth?.currentUser) rememberSession(auth.currentUser);
+              setProfileVersion((v) => v + 1);
+            }}
           />
         }
       />
@@ -346,13 +386,34 @@ export default function App() {
               </button>
             </div>
           )}
-          {error && (
+          {error ? (
             <div className="toast is-error" role="alert">
               <p>{error}</p>
               <button onClick={() => setError("")} aria-label="Cerrar aviso">
                 <X size={16} />
               </button>
             </div>
+          ) : (
+            updateReady &&
+            !updateDismissed && (
+              <div className="toast is-update" role="status">
+                <p>Hay una versión nueva de GalacticBet.</p>
+                <button
+                  type="button"
+                  className="toast-action"
+                  onClick={() => window.location.reload()}
+                >
+                  Actualizar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUpdateDismissed(true)}
+                  aria-label="Más tarde"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )
           )}
           <ContextMenuHost />
           {login && <LoginModal close={() => setLogin(false)} />}

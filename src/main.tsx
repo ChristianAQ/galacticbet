@@ -4,11 +4,14 @@ import { HashRouter } from "react-router-dom";
 import App from "./App";
 import { configureMobileViewport } from "./lib/mobileViewport";
 import { applyTheme, readTheme } from "./lib/theme";
+import { watchForUpdates } from "./lib/appUpdate";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/shell.css";
 import "./styles/components.css";
 applyTheme(readTheme());
+// Before React: the worker may announce a new version within the first frames.
+if (import.meta.env.PROD) watchForUpdates();
 const resetMobileViewport = configureMobileViewport();
 if (import.meta.hot) import.meta.hot.dispose(resetMobileViewport);
 ReactDOM.createRoot(document.getElementById("root")!).render(

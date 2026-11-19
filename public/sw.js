@@ -1,9 +1,13 @@
 // GalacticBet service worker.
-// Private data (Firestore) always goes to the network. Only public, content-hashed
-// static files are cached, so launches from the home screen are instant.
+// Private data (Firestore) always goes to the network. Only public files are
+// cached: content-hashed assets (cache first) and the app shell, index.html,
+// which opens from the cache at once and is refreshed in the background, so a
+// launch from the home screen never waits for the network.
 const STATIC = "galacticbet-static-v2";
-const MAX_ENTRIES = 90;
-const scopePath = new URL(self.registration.scope).pathname;
+const SHELL = "galacticbet-shell-v1";
+const MAX_ENTRIES = 120;
+const scope = self.registration.scope;
+const scopePath = new URL(scope).pathname;
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) =>
@@ -11,7 +15,11 @@ self.addEventListener("activate", (event) =>
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((key) => key !== STATIC).map((key) => caches.delete(key))),
+        Promise.all(
+          keys
+            .filter((key) => key !== STATIC && key !== SHELL)
+            .map((key) => caches.delete(key)),
+        ),
       )
       .then(() => self.clients.claim()),
   ),
@@ -52,18 +60,48 @@ button{justify-self:center;min-height:48px;padding:0 22px;border:0;border-radius
 <p>Conéctate para consultar tus quinielas de GalacticBet.</p>
 <button onclick="location.reload()">Reintentar</button></main></body></html>`;
 
+const offline = () =>
+  new Response(offlinePage, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+
+const isShell = (url) =>
+  url.origin === self.location.origin &&
+  (url.pathname === scopePath || url.pathname === `${scopePath}index.html`);
+
+/** Downloads index.html; tells open windows when a new version was stored. */
+async function refreshShell(previous) {
+  const response = await fetch(scope, { cache: "no-cache", credentials: "same-origin" });
+  if (!response.ok || response.redirected || response.type !== "basic") return response;
+  const body = await response.clone().text();
+  const cache = await caches.open(SHELL);
+  await cache.put(scope, response.clone());
+  if (previous !== undefined && previous !== body) {
+    const windows = await self.clients.matchAll({ type: "window" });
+    for (const client of windows) client.postMessage({ type: "galacticbet:update" });
+  }
+  return response;
+}
+
+async function openShell(event) {
+  const cache = await caches.open(SHELL);
+  const cached = await cache.match(scope);
+  if (!cached) {
+    // First launch with this worker: the network as usual, and keep a copy.
+    event.waitUntil(refreshShell().catch(() => {}));
+    return fetch(event.request).catch(offline);
+  }
+  const previous = await cached.clone().text();
+  event.waitUntil(refreshShell(previous).catch(() => {}));
+  return cached;
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(
-        () =>
-          new Response(offlinePage, {
-            headers: { "Content-Type": "text/html; charset=utf-8" },
-          }),
-      ),
-    );
+    const url = new URL(request.url);
+    event.respondWith(isShell(url) ? openShell(event) : fetch(request).catch(offline));
     return;
   }
   const url = new URL(request.url);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { User } from "firebase/auth";
+import type { AppUser as User } from "../lib/session";
 import UpcomingSchedule from "../components/UpcomingSchedule";
 import NewsSection from "../components/NewsSection";
 import {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
+import { fromServer } from "./firestoreOnline";
 import { db } from "./firebase";
 import { createMemoryCache } from "./memoryCache";
 import { validLeagueStats, type LeagueStats } from "./leagueStats";
@@ -25,7 +26,7 @@ export function useLeagueStats(seasonId: string, demo: boolean) {
         seasonId,
         async () => {
           if (!db) throw new Error("Firebase no configurado");
-          const data = (await getDoc(doc(db, "leagueStats", seasonId))).data();
+          const data = fromServer(await getDoc(doc(db, "leagueStats", seasonId))).data();
           if (data === undefined) return null;
           if (
             !validLeagueStats(data) ||

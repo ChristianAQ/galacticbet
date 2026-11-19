@@ -38,13 +38,21 @@ export function preloadPage(path: string): Promise<unknown> {
   }
   return pending;
 }
-/** Tab roots are warmed when the browser is idle so the first switch is instant. */
+/**
+ * Pages are warmed when the browser is idle: tab roots and the match page
+ * first, then the rest. Every screen of this version ends up in the service
+ * worker's cache, so opening one never waits for (or fails on) the network.
+ */
 export function preloadTabsWhenIdle() {
   const idle =
     window.requestIdleCallback ||
     ((callback: () => void) => window.setTimeout(callback, 1200));
   idle(() => {
-    for (const path of ["/", "/ligas", "/quiniela", "/clasificacion", "/partido"])
-      void preloadPage(path);
+    const first = ["/", "/ligas", "/quiniela", "/clasificacion", "/partido"];
+    void Promise.allSettled(first.map(preloadPage)).then(() =>
+      idle(() => {
+        for (const path of Object.keys(pageLoaders)) void preloadPage(path);
+      }),
+    );
   });
 }

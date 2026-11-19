@@ -1,5 +1,5 @@
 import { competitionName } from "../lib/competitions";
-import type { User } from "firebase/auth";
+import type { AppUser as User } from "../lib/session";
 import { ChevronDown, ChevronUp, Crown } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";

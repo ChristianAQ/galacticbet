@@ -1,4 +1,5 @@
 import { doc, getDoc } from "firebase/firestore";
+import { fromServer } from "./firestoreOnline";
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
 import { decodeOddsBoard, type MatchOdds, type OddsBoard } from "./odds";
@@ -14,7 +15,7 @@ function loadOdds() {
   if (!pending)
     pending = (
       db
-        ? getDoc(doc(db, "odds", "football")).then((s) =>
+        ? getDoc(doc(db, "odds", "football")).then(fromServer).then((s) =>
             decodeOddsBoard(s.data()),
           )
         : Promise.resolve(null)
