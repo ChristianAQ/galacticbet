@@ -95,7 +95,7 @@
   font-family: var(--font-display);
   font-stretch: var(--stretch-wide);
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1.3;
   text-transform: uppercase;
@@ -176,7 +176,7 @@
   flex-shrink: 0;
   font-family: var(--font-display);
   font-stretch: var(--stretch-condensed);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--accent);
 }
 .match-hero-date {
@@ -236,7 +236,7 @@
   padding: 0 12px;
   color: var(--ink-3);
   font-size: var(--text-md);
-  font-weight: 650;
+  font-weight: 500;
   white-space: nowrap;
   transition:
     color 160ms ease,
@@ -248,8 +248,8 @@
   z-index: -1;
   left: 8px;
   right: 8px;
-  bottom: 13px;
-  height: 9px;
+  bottom: 15px;
+  height: 8px;
   border-radius: 2px;
   background: var(--accent);
   transform: scaleX(0);
@@ -258,7 +258,7 @@
 }
 .match-tabs button[aria-selected="true"] {
   color: var(--ink);
-  font-weight: 750;
+  font-weight: 650;
 }
 .match-tabs button[aria-selected="true"]::after {
   transform: scaleX(1);
@@ -306,7 +306,7 @@
   min-height: 54px;
   border-bottom: 1px solid var(--rule);
   font-size: var(--text-md);
-  font-weight: 620;
+  font-weight: 500;
   transition:
     background-color 160ms ease,
     transform 180ms var(--press);
@@ -362,5 +362,14 @@
   .match-page-panel,
   .match-hero .live-minute i {
     animation: none;
+  }
+}
+
+/* Night edition: the highlighter becomes an underline so light text stays legible. */
+@media (prefers-color-scheme: dark) {
+  .match-tabs button::after {
+    bottom: 6px;
+    height: 3px;
+    border-radius: 3px;
   }
 }

@@ -27,7 +27,7 @@
   font-family: var(--font-display);
   font-stretch: var(--stretch-wide);
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -60,7 +60,7 @@
 .my-rank-of {
   margin-top: 6px;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink-3);
 }
 .my-rank-stats {
@@ -82,7 +82,7 @@
 }
 .my-rank-stats small {
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 500;
   color: var(--ink-3);
 }
 .my-rank-status {
@@ -93,7 +93,7 @@
   padding: 10px 0 0;
   border-top: 1px solid var(--rule);
   font-size: var(--text-sm);
-  font-weight: 620;
+  font-weight: 500;
   color: var(--ink-2);
 }
 .my-rank-status svg {
@@ -150,7 +150,7 @@
 }
 .podium-name small {
   color: var(--ink-3);
-  font-weight: 600;
+  font-weight: 500;
 }
 .podium-step.is-me .podium-name {
   text-decoration: underline;
@@ -168,7 +168,7 @@
 .podium-points small {
   font-family: var(--font-text);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink-3);
 }
 .podium-block {
@@ -219,7 +219,7 @@
   font-family: var(--font-display);
   font-stretch: var(--stretch-wide);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-align: right;
@@ -247,7 +247,7 @@
   vertical-align: middle;
   text-align: right;
   font-size: var(--text-md);
-  font-weight: 600;
+  font-weight: 500;
 }
 .standings-table tbody th {
   text-align: left;
@@ -304,7 +304,7 @@
 }
 .standings-name small {
   color: var(--ink-3);
-  font-weight: 600;
+  font-weight: 500;
 }
 .standings-bar {
   display: block;
@@ -351,5 +351,13 @@
   }
   .my-rank-stats strong {
     font-size: 32px;
+  }
+}
+
+/* Night edition: light ink over yellow is unreadable, the number turns yellow instead. */
+@media (prefers-color-scheme: dark) {
+  .my-rank-position strong {
+    background: none;
+    color: var(--accent);
   }
 }

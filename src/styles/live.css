@@ -48,7 +48,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: 500;
 }
 .live-event-icon {
   display: inline-block;

@@ -5,6 +5,7 @@ import Segmented from "./Segmented";
 /** Short labels so four segments fit a phone; the panel titles stay complete. */
 const shortLabels: Partial<Record<LeagueTab, string>> = {
   clasificacion: "Tabla",
+  estadisticas: "Datos",
 };
 
 /**

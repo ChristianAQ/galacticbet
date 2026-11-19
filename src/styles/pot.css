@@ -33,7 +33,7 @@
   font-family: var(--font-display);
   font-stretch: var(--stretch-wide);
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent);
@@ -48,7 +48,7 @@
   background: color-mix(in srgb, var(--masthead-ink) 12%, transparent);
   color: var(--masthead-ink);
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
 }
 .pot-state i {
   width: 7px;
@@ -87,7 +87,7 @@
 }
 .pot-formula {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--masthead-ink-2);
 }
 /* Perforation: a dashed fold with two punched notches. */
@@ -156,7 +156,7 @@
   font-family: var(--font-display);
   font-stretch: var(--stretch-wide);
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -203,7 +203,7 @@
 }
 .pot-winner-name small {
   color: var(--ink-3);
-  font-weight: 600;
+  font-weight: 500;
 }
 .pot-winner-points {
   font-size: var(--text-xs);
@@ -270,7 +270,7 @@
   background: var(--paper-2);
   color: var(--ink);
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   transition:
     background-color 160ms ease,
     transform 160ms var(--press);

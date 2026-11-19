@@ -41,7 +41,7 @@
   white-space: nowrap;
   color: var(--masthead-ink-2);
   font-size: var(--text-xs);
-  font-weight: 550;
+  font-weight: 500;
 }
 .pot-chip .pot-amount {
   font-size: 26px;
@@ -122,7 +122,7 @@
   border-radius: 999px;
   background: var(--paper-2);
   font-size: var(--text-sm);
-  font-weight: 620;
+  font-weight: 550;
 }
 .delivery-alert-people li > span {
   display: grid;
@@ -193,7 +193,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 500;
   color: var(--ink-2);
 }
 .round-progress-track {
@@ -288,7 +288,7 @@
   gap: 6px;
   min-width: 0;
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 500;
   color: var(--ink-3);
 }
 .prediction-picked .prediction-state {
@@ -335,11 +335,12 @@
   line-height: 0.9;
 }
 .slip-cell small {
+  max-width: 100%;
   font-family: var(--font-display);
-  font-stretch: var(--stretch-wide);
+  font-stretch: var(--stretch-normal);
   font-size: 8.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -468,7 +469,7 @@
 .confirmation-teams {
   display: grid;
   min-width: 0;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
 }
 .confirmation-teams small {
@@ -589,7 +590,7 @@
   gap: 6px;
   color: var(--masthead-ink-2);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 500;
 }
 .round-board li {
   display: grid;
@@ -610,11 +611,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 650;
+  font-weight: 600;
 }
 .round-board .rb-name small {
   color: var(--masthead-ink-2);
-  font-weight: 550;
+  font-weight: 500;
 }
 .round-board .rb-hits {
   color: var(--masthead-ink-2);
@@ -662,14 +663,14 @@
   font-family: var(--font-display);
   font-stretch: var(--stretch-wide);
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
 .saved-match-status {
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 500;
   color: var(--ink-3);
 }
 .saved-match-status.is-live {
@@ -704,7 +705,7 @@
   font-family: var(--font-display);
   font-stretch: var(--stretch-wide);
   font-size: 9px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -744,7 +745,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink-3);
 }
 .rival-selection.compact strong {
@@ -787,7 +788,7 @@
 }
 .saved-match-result span {
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 500;
   color: var(--ink-2);
 }
 .saved-match-result strong {
@@ -854,7 +855,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--text-sm);
-  font-weight: 620;
+  font-weight: 600;
 }
 .rival-selection.condensed > span {
   display: none;
@@ -907,7 +908,7 @@
   font-family: var(--font-display);
   font-stretch: var(--stretch-wide);
   font-size: 9.5px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -926,7 +927,7 @@
   background: var(--ink);
   color: var(--paper);
   font-size: 11px;
-  font-weight: 750;
+  font-weight: 600;
 }
 .finished-winner {
   display: flex;
@@ -961,7 +962,7 @@
   min-height: 40px;
   justify-self: start;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   text-decoration: underline;
   text-decoration-color: var(--accent);
