@@ -366,10 +366,8 @@
 }
 
 /* Night edition: the highlighter becomes an underline so light text stays legible. */
-@media (prefers-color-scheme: dark) {
-  .match-tabs button::after {
-    bottom: 6px;
-    height: 3px;
-    border-radius: 3px;
-  }
+:root[data-theme="dark"] .match-tabs button::after {
+  bottom: 6px;
+  height: 3px;
+  border-radius: 3px;
 }

@@ -43,7 +43,8 @@ function StatisticsContent({
     </>
   );
 }
-function LoadedStatistics({ match }: { match: Match }) {
+/** Statistics of a finished match, fetched on demand (the group card's disclosure). */
+export function MatchResultStatistics({ match }: { match: Match }) {
   const state = useMatchInsight(match);
   return state.error ? (
     <p role="alert" className="match-data-note">
@@ -131,7 +132,7 @@ export default function MatchResult({
         >
           {open &&
             (insight === undefined ? (
-              <LoadedStatistics match={match} />
+              <MatchResultStatistics match={match} />
             ) : (
               <StatisticsContent
                 match={match}

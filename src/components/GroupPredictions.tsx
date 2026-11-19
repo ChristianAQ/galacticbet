@@ -5,9 +5,17 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { ChevronRight, Users } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Trophy, X } from "lucide-react";
 import { Link } from "react-router-dom";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   hasMatchStarted,
   matchStatusLabel,
@@ -22,15 +30,16 @@ import { db } from "../lib/firebase";
 import { kickoffLabel } from "../lib/matchInsights";
 import { Team, readableError } from "./ui";
 import TeamForm from "./TeamForm";
-import MatchResult from "./MatchResult";
+import { MatchResultStatistics } from "./MatchResult";
+import { finishedMatchResult } from "../lib/matchResult";
 import { decodeDelivery } from "../lib/roundDelivery";
 import { LiveEvents, LiveMinute } from "./LiveStatus";
 import ShareTrigger from "./ShareTrigger";
 import {
+  pickPoints,
   pickState,
   roundBoard,
   roundHasStarted,
-  type PickState,
   type RoundPlayer,
 } from "../lib/roundBoard";
 import { shareFileName } from "../lib/shareSummary";
@@ -350,57 +359,63 @@ function RivalsCard({
   mode: Mode;
   onRetry: () => void;
 }) {
+  const [statsOpen, setStatsOpen] = useState(false);
+  const statsId = useId();
   const visible = participants.filter(
     (p) => p.id !== userId && completedIds.includes(p.id),
   );
-  const hasScore =
-    match.homeScore !== null &&
-    match.awayScore !== null &&
-    ["FINISHED", "IN_PLAY", "PAUSED"].includes(match.status);
+  const live = ["IN_PLAY", "PAUSED"].includes(match.status);
+  const finished = match.status === "FINISHED";
   const scheduled = ["TIMED", "SCHEDULED"].includes(match.status);
+  const result = finishedMatchResult(match);
+  const score =
+    match.homeScore !== null && match.awayScore !== null && (live || finished)
+      ? { home: match.homeScore, away: match.awayScore }
+      : null;
+  const sign = score ? outcome(score.home, score.away) : null;
+  const showStatistics = finished && !demo;
   return (
     <article className="group-match-card" data-vt-match={match.id}>
       <header className="saved-match-heading">
         <time dateTime={match.utcDate}>{kickoffLabel(match.utcDate)}</time>
-        <span
-          className={`saved-match-status ${["IN_PLAY", "PAUSED"].includes(match.status) ? "is-live" : ""}`}
-        >
+        <span className={`saved-match-status${live ? " is-live" : ""}`}>
           {scheduled ? (
             started ? (
               "Esperando el resultado"
             ) : (
               "Aún no ha rodado el balón"
             )
-          ) : ["IN_PLAY", "PAUSED"].includes(match.status) ? (
+          ) : live ? (
             <LiveMinute match={match} />
           ) : (
             matchStatusLabel[match.status] || match.status
           )}
         </span>
       </header>
-      <div className="saved-fixture">
+
+      {/* The real match first: teams and the score that decides the signs. */}
+      <div className="gm-fixture">
         <div className="saved-team">
           <Team name={match.home} crest={match.homeCrest} part="home-crest" />
           <TeamForm match={match} side="home" matches={history} />
         </div>
         <div
-          className="match-own-pick"
-          role="group"
-          aria-label="Tu pronóstico"
-          aria-busy={loadingOwn}
+          className={`gm-score${live ? " is-live" : ""}${score ? "" : " is-pending"}`}
+          data-vt-part="score"
         >
-          <span>Tu signo</span>
-          {loadingOwn ? (
-            <span className="saved-pick-loading" role="status">
-              <span className="sr-only">Cargando tu pronóstico</span>
-            </span>
-          ) : (
-            <PickValue
-              match={match}
-              value={ownValue}
-              state={pickState(mode, ownValue, match)}
-              compact
-            />
+          <strong
+            aria-label={
+              score
+                ? `${live ? "Marcador en juego" : "Resultado a 90 minutos"}: ${score.home} a ${score.away}`
+                : "Sin resultado todavía"
+            }
+          >
+            {score ? `${score.home} – ${score.away}` : "vs"}
+          </strong>
+          {sign && (
+            <small>
+              {live ? "Ahora" : "Signo"} <b>{sign}</b>
+            </small>
           )}
         </div>
         <div className="saved-team">
@@ -408,148 +423,165 @@ function RivalsCard({
           <TeamForm match={match} side="away" matches={history} />
         </div>
       </div>
-      <LiveEvents match={match} />
-      <Link
-        className="prediction-details-link"
-        to={`/partido/${encodeURIComponent(match.id)}`}
-      >
-        {["TIMED", "SCHEDULED"].includes(match.status)
-          ? "Previa y cuotas"
-          : "Ficha del partido"}
-        <ChevronRight size={15} aria-hidden="true" />
-      </Link>
-      {match.status === "FINISHED" && <MatchResult match={match} demo={demo} />}
-      {hasScore && match.status !== "FINISHED" && (
-        <div className="saved-match-footer">
-          <div
-            className="saved-match-result"
-            aria-label="Resultado real a 90 minutos"
-          >
-            <span>Marcador · 90 min</span>
-            <strong>
-              {match.homeScore} – {match.awayScore}
-            </strong>
-          </div>
-        </div>
+      {result?.extended && result.winnerName && (
+        <p className="gm-decision">
+          <Trophy size={13} aria-hidden="true" />
+          Pasa {result.winnerName} {result.decision.toLowerCase()}. La
+          quiniela cuenta el resultado a 90 minutos.
+        </p>
       )}
-      {canShare && (
-        <section
-          className="shared-predictions"
-          aria-label="Pronósticos compartidos"
-        >
-          <header className="shared-predictions-heading">
-            <h3>
-              <Users size={13} aria-hidden="true" /> Lo que han puesto
-            </h3>
-            <span
-              className="shared-predictions-count"
-              aria-label={`${visible.length} compañeros`}
-            >
-              {visible.length}
-            </span>
-          </header>
-          <div className="rivals-content" aria-busy={pending || !ready}>
-            {pending || !ready ? (
-              <p className="rivals-loading" role="status">
-                <span className="sr-only">Cargando pronósticos</span>
-                <span className="skeleton" aria-hidden="true" />
-                <span className="skeleton" aria-hidden="true" />
-                <span className="skeleton" aria-hidden="true" />
+      <LiveEvents match={match} />
+
+      {/* Then every pick of the group against that score. */}
+      <section className="gm-picks" aria-label="Pronósticos del grupo">
+        <ul className="gm-pick-list">
+          <PickRow
+            name="Tú"
+            me
+            match={match}
+            mode={mode}
+            value={ownValue}
+            loading={loadingOwn}
+          />
+          {canShare &&
+            ready &&
+            !pending &&
+            !error &&
+            visible.map((person) => (
+              <PickRow
+                key={person.id}
+                name={person.name}
+                match={match}
+                mode={mode}
+                value={entries[person.id]?.[match.id]}
+              />
+            ))}
+        </ul>
+        {canShare &&
+          (pending || !ready ? (
+            <p className="gm-picks-loading" role="status">
+              <span className="sr-only">Cargando pronósticos</span>
+              <span className="skeleton" aria-hidden="true" />
+            </p>
+          ) : error ? (
+            <div className="rivals-error">
+              <p role="alert">{error}</p>
+              <button className="button secondary" onClick={onRetry}>
+                Volver a intentar
+              </button>
+            </div>
+          ) : (
+            !visible.length && (
+              <p className="gm-picks-note">
+                Nadie más ha sellado todavía. Sus signos saldrán aquí.
               </p>
-            ) : error ? (
-              <div className="rivals-error">
-                <p role="alert">{error}</p>
-                <button className="button secondary" onClick={onRetry}>
-                  Volver a intentar
-                </button>
-              </div>
-            ) : (
-              <>
-                {visible.length === 0 && (
-                  <p className="rivals-empty">
-                    Nadie más ha sellado todavía. Sus signos saldrán aquí.
-                  </p>
-                )}
-                <ul
-                  className="rivals-grid"
-                  aria-label="Pronósticos de tus compañeros"
-                >
-                  {visible.map((person) => (
-                    <li className="rival-player" key={person.id}>
-                      <span className="rival-name" title={person.name}>
-                        {person.name}
-                      </span>
-                      <PickValue
-                        match={match}
-                        value={entries[person.id]?.[match.id]}
-                        state={pickState(
-                          mode,
-                          entries[person.id]?.[match.id],
-                          match,
-                        )}
-                        condensed
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-        </section>
+            )
+          ))}
+      </section>
+
+      <footer className="gm-links">
+        <Link to={`/partido/${encodeURIComponent(match.id)}`}>
+          {scheduled ? "Previa y cuotas" : "Ficha del partido"}
+          <ChevronRight size={15} aria-hidden="true" />
+        </Link>
+        {showStatistics && (
+          <button
+            type="button"
+            aria-expanded={statsOpen}
+            aria-controls={statsId}
+            onClick={() => setStatsOpen((v) => !v)}
+          >
+            Estadísticas
+            <ChevronDown size={15} aria-hidden="true" />
+          </button>
+        )}
+      </footer>
+      {showStatistics && (
+        <div
+          id={statsId}
+          hidden={!statsOpen}
+          className="match-extra-panel match-statistics-panel gm-statistics"
+        >
+          {statsOpen && <MatchResultStatistics match={match} />}
+        </div>
       )}
     </article>
   );
 }
 
-function PickValue({
+/** One person's pick: the sign, what it means and how it went. */
+function PickRow({
+  name,
+  me = false,
   match,
+  mode,
   value,
-  state = null,
-  compact = false,
-  condensed = false,
+  loading = false,
 }: {
+  name: string;
+  me?: boolean;
   match: Match;
+  mode: Mode;
   value?: PredictionValue;
-  state?: PickState;
-  compact?: boolean;
-  condensed?: boolean;
+  loading?: boolean;
 }) {
   const sign = value
     ? typeof value === "string"
       ? value
       : outcome(value.home, value.away)
     : null;
-  const label =
+  const meaning =
     sign === "1"
-      ? match.home
+      ? `Gana ${match.home}`
       : sign === "2"
-        ? match.away
+        ? `Gana ${match.away}`
         : sign === "X"
           ? "Empate"
           : "Sin pronóstico";
-  const result =
-    state === "hit" || state === "live-hit"
-      ? " pick-hit"
+  const state = pickState(mode, value, match);
+  const points = pickPoints(mode, value, match);
+  const verdict =
+    state === "hit"
+      ? `+${points} ${points === 1 ? "pto" : "ptos"}`
       : state === "miss"
-        ? " pick-miss"
-        : "";
+        ? "Fallo"
+        : state === "live-hit"
+          ? "Acertando"
+          : state === "live-miss"
+            ? "Fallando"
+            : "";
   return (
-    <div
-      role="group"
-      aria-label={`Pronóstico: ${value ? predictionSummary(value) : "sin pronóstico"}, ${label}${state === "hit" ? ", acierto" : state === "miss" ? ", fallo" : ""}`}
-      title={condensed ? label : undefined}
-      className={`rival-selection ${condensed ? "condensed" : ""} ${compact ? "compact" : ""} ${sign === "1" ? "pick-home" : sign === "X" ? "pick-draw" : sign === "2" ? "pick-away" : "pick-missing"}${result}`}
+    <li
+      className={`gm-pick${me ? " is-me" : ""}${state ? ` is-${state}` : ""}${value ? "" : " is-missing"}`}
+      aria-busy={loading}
     >
-      <strong>{value ? predictionSummary(value) : "—"}</strong>
-      <span>
-        {compact && value
-          ? sign === "1"
-            ? "Local"
-            : sign === "2"
-              ? "Visitante"
-              : "Empate"
-          : label}
+      <span className="gm-pick-name" title={name}>
+        {name}
       </span>
-    </div>
+      {loading ? (
+        <span className="gm-pick-what">
+          <span className="skeleton gm-pick-skeleton" aria-hidden="true" />
+          <span className="sr-only">Cargando tu pronóstico</span>
+        </span>
+      ) : (
+        <span className="gm-pick-what">
+          <b className="gm-pick-sign">
+            {value ? predictionSummary(value) : "—"}
+          </b>
+          <span className="gm-pick-meaning" title={meaning}>
+            {meaning}
+          </span>
+        </span>
+      )}
+      <span className="gm-pick-verdict">
+        {(state === "hit" || state === "live-hit") && (
+          <Check size={13} strokeWidth={3} aria-hidden="true" />
+        )}
+        {(state === "miss" || state === "live-miss") && (
+          <X size={13} strokeWidth={3} aria-hidden="true" />
+        )}
+        {verdict}
+      </span>
+    </li>
   );
 }

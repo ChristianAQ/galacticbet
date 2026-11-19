@@ -8,6 +8,7 @@ import {
   NotebookPen,
   Plus,
   Shirt,
+  SunMoon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -21,6 +22,7 @@ import { COMPETITION_CODES, competitionName } from "../lib/competitions";
 import type { Group } from "../lib/data";
 import { logout, saveDisplayName } from "../lib/firebase";
 import { haptic, prefersReducedMotion } from "../lib/motion";
+import { setTheme, useTheme, type Theme } from "../lib/theme";
 import "../styles/profile.css";
 
 type Tab = "profile" | "groups" | "play";
@@ -246,6 +248,12 @@ export default function ProfilePage({
             detail="Plantillas y alineaciones"
           />
         </ul>
+        <p className="more-caption">Apariencia</p>
+        <ul className="more-list">
+          <li>
+            <ThemeRow />
+          </li>
+        </ul>
         <p className="more-caption">Competiciones</p>
         <ul className="more-list">
           {COMPETITION_CODES.map((code) => (
@@ -314,6 +322,32 @@ export default function ProfilePage({
         )}
       </section>
     </>
+  );
+}
+
+const themes: { value: Theme; label: string }[] = [
+  { value: "light", label: "Claro" },
+  { value: "dark", label: "Oscuro" },
+];
+function ThemeRow() {
+  const theme = useTheme();
+  return (
+    <div className="more-row theme-row">
+      <span className="more-icon">
+        <SunMoon size={20} aria-hidden="true" />
+      </span>
+      <span className="more-label" id="theme-label">
+        Tema
+      </span>
+      <Segmented
+        label="Tema de la app"
+        size="sm"
+        className="theme-switch"
+        value={theme}
+        options={themes}
+        onChange={setTheme}
+      />
+    </div>
   );
 }
 

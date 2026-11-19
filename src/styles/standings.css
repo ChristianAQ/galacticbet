@@ -355,9 +355,7 @@
 }
 
 /* Night edition: light ink over yellow is unreadable, the number turns yellow instead. */
-@media (prefers-color-scheme: dark) {
-  .my-rank-position strong {
-    background: none;
-    color: var(--accent);
-  }
+:root[data-theme="dark"] .my-rank-position strong {
+  background: none;
+  color: var(--accent);
 }

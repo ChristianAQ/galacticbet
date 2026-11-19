@@ -104,6 +104,15 @@
 .more-row:disabled {
   opacity: 0.5;
 }
+.theme-row {
+  min-height: 60px;
+}
+.more-row.theme-row:active:not(:disabled) {
+  background: none;
+}
+.theme-switch {
+  width: 168px;
+}
 .more-icon {
   display: grid;
   place-items: center;
@@ -580,9 +589,7 @@
 }
 
 /* Night edition: light ink over yellow is unreadable, the number turns yellow instead. */
-@media (prefers-color-scheme: dark) {
-  .step-number {
-    box-shadow: none;
-    color: var(--accent);
-  }
+:root[data-theme="dark"] .step-number {
+  box-shadow: none;
+  color: var(--accent);
 }

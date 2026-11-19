@@ -2,13 +2,14 @@
  * «Boleto» — design tokens.
  * Paper and ink like the quiniela slip and the sports press; one accent,
  * yellow-card yellow, used as a highlighter for whatever matters right now.
- * Light («papel») by default, «edición de noche» when the system is dark.
+ * Light («papel») by default, «edición de noche» when chosen in Perfil
+ * (data-theme="dark" on <html>, see src/lib/theme.ts).
  */
 @import "@fontsource-variable/anybody/standard.css";
 @import "@fontsource-variable/instrument-sans/wght.css";
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Type */
   --font-display: "Anybody Variable", "Arial Narrow", sans-serif;
@@ -97,38 +98,37 @@
   --press: cubic-bezier(0.3, 0, 0.2, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #12110e;
-    --paper-2: #1b1a16;
-    --paper-3: #26241f;
-    --card: #1e1d19;
-    --ink: #f1ede2;
-    --ink-2: #c3beb0;
-    --ink-3: #959083;
-    --rule: #302e27;
-    --rule-strong: #f1ede2;
-    --masthead: #0a0907;
-    --masthead-ink: #f1ede2;
-    --masthead-ink-2: #8f8a7d;
-    --masthead-rule: #26241f;
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #12110e;
+  --paper-2: #1b1a16;
+  --paper-3: #26241f;
+  --card: #1e1d19;
+  --ink: #f1ede2;
+  --ink-2: #c3beb0;
+  --ink-3: #959083;
+  --rule: #302e27;
+  --rule-strong: #f1ede2;
+  --masthead: #0a0907;
+  --masthead-ink: #f1ede2;
+  --masthead-ink-2: #8f8a7d;
+  --masthead-rule: #26241f;
 
-    --accent-soft: #ffd1002b;
-    --accent-line: #ffd100;
+  --accent-soft: #ffd1002b;
+  --accent-line: #ffd100;
 
-    --win: #4cc489;
-    --win-soft: #4cc48924;
-    --loss: #ff6f61;
-    --loss-soft: #ff6f6124;
-    --live: #ff4436;
-    --draw: #959083;
+  --win: #4cc489;
+  --win-soft: #4cc48924;
+  --loss: #ff6f61;
+  --loss-soft: #ff6f6124;
+  --live: #ff4436;
+  --draw: #959083;
 
-    --scrim: #00000080;
-    --scrim-strong: #000000b8;
-    --shadow-lift: 0 1px 0 #ffffff0a, 0 14px 36px -10px #000000c0;
-    --shadow-sheet: 0 -10px 40px #00000099;
-    --skeleton: #232119;
-    --skeleton-shine: #2e2c24;
-    --focus: #ffd100;
-  }
+  --scrim: #00000080;
+  --scrim-strong: #000000b8;
+  --shadow-lift: 0 1px 0 #ffffff0a, 0 14px 36px -10px #000000c0;
+  --shadow-sheet: 0 -10px 40px #00000099;
+  --skeleton: #232119;
+  --skeleton-shine: #2e2c24;
+  --focus: #ffd100;
 }

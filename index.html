@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#15140f" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <meta
       name="description"
       content="Tu fútbol. Tus amigos. Tu quiniela. LaLiga, Champions y Premier en una sola liga privada."
@@ -32,6 +32,16 @@
     <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%BASE_URL%splash/splash-750x1334.png" />
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
     <title>GalacticBet · El fútbol se juega entre amigos</title>
+    <script>
+      // Theme before the first paint (see src/lib/theme.ts): light unless the player chose dark.
+      try {
+        if (localStorage.getItem("galacticbet:theme") === "dark") {
+          document.documentElement.dataset.theme = "dark";
+          document.documentElement.style.colorScheme = "dark";
+          document.querySelector('meta[name="theme-color"]').content = "#0a0907";
+        }
+      } catch (e) {}
+    </script>
     <style>
       /* Ink until the app paints: no white flash between the launch screen and the app. */
       :where(html, body) {

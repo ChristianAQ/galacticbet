@@ -44,62 +44,59 @@
   margin-top: 8px;
 }
 .match-day + .match-day {
-  margin-top: 10px;
+  margin-top: 6px;
 }
+/* A quiet dateline: the fixtures matter, the day only orders them. */
 .match-day-title {
   position: sticky;
   top: calc(var(--sticky-top) + var(--league-navigation-height, 0px));
   z-index: 4;
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   margin: 0 calc(-1 * var(--pad-r)) 0 calc(-1 * var(--pad-l));
-  padding: 14px var(--pad-r) 8px var(--pad-l);
+  padding: 12px var(--pad-r) 6px var(--pad-l);
   background: var(--paper);
   font-family: var(--font-text);
-  font-size: var(--text-sm);
+  font-stretch: var(--stretch-normal);
+  font-size: var(--text-xs);
   font-weight: 500;
-  line-height: 1.1;
+  line-height: 1.2;
   letter-spacing: 0;
+  color: var(--ink-3);
   transition: box-shadow 200ms ease;
 }
 .match-day-title.is-stuck {
   box-shadow: 0 1px 0 var(--rule);
 }
 .match-day-name {
-  font-family: var(--font-display);
-  font-stretch: var(--stretch-condensed);
-  font-size: var(--display-sm);
-  font-weight: 850;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-2);
   text-transform: capitalize;
 }
 .match-day-title.is-near .match-day-name {
-  padding: 0 6px;
+  padding: 1px 6px;
   border-radius: 4px;
   background: var(--accent);
   color: var(--accent-ink);
 }
 .match-day-date {
-  color: var(--ink-2);
+  color: var(--ink-3);
 }
 .match-day-rule {
   flex: 1;
-  align-self: center;
   height: 1px;
   background: var(--rule);
 }
 .match-day-count {
   flex-shrink: 0;
-  font-family: var(--font-display);
-  font-stretch: var(--stretch-wide);
-  font-size: 10px;
-  font-weight: 550;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: var(--text-xs);
+  font-weight: 500;
   color: var(--ink-3);
 }
 .fixture-list {
-  border-top: 2px solid var(--rule-strong);
+  border-top: 1px solid var(--rule);
 }
 /* Rows run edge to edge so the swipe tray reaches the screen border. */
 .fixture-item {
@@ -481,11 +478,9 @@
   font-size: var(--text-xs);
   font-weight: 500;
 }
-@media (prefers-color-scheme: dark) {
-  .league-ranking-big b {
-    color: var(--accent);
-    background: none;
-  }
+:root[data-theme="dark"] .league-ranking-big b {
+  color: var(--accent);
+  background: none;
 }
 .league-ranking-list li {
   display: flex;

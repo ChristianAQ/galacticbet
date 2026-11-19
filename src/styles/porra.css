@@ -499,10 +499,8 @@
 }
 
 /* Night edition: light ink over yellow is unreadable, the total turns yellow instead. */
-@media (prefers-color-scheme: dark) {
-  .porra-editor-total .numeral:not(.is-empty),
-  .porra-ticket-total > b {
-    box-shadow: none;
-    color: var(--accent);
-  }
+:root[data-theme="dark"] .porra-editor-total .numeral:not(.is-empty),
+:root[data-theme="dark"] .porra-ticket-total > b {
+  box-shadow: none;
+  color: var(--accent);
 }
