@@ -21,6 +21,8 @@ import {
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import { useStuck } from "../lib/useStuck";
+import { COMPETITION_CODES } from "../lib/competitions";
+import { switchTab, tabDirection } from "../lib/viewTransition";
 import { knockoutContext } from "../lib/matchInsights";
 import CompetitionTabs from "../components/CompetitionTabs";
 import RoundSelector from "../components/RoundSelector";
@@ -102,8 +104,10 @@ export default function MatchesPage({
   useLayoutEffect(() => {
     const previous = previousTab.current;
     previousTab.current = tab;
+    // The View Transition already slides the panel.
     if (
       previous === tab ||
+      document.documentElement.dataset.vt ||
       matchMedia("(prefers-reduced-motion: reduce)").matches
     )
       return;
@@ -134,12 +138,21 @@ export default function MatchesPage({
     : linkedSeason && seasons.includes(linkedSeason)
       ? linkedSeason
       : seasons[0] || "";
-  function changeTab(value: LeagueTab) {
-    setParams((previous) => {
-      const next = new URLSearchParams(previous);
-      next.set("tab", value);
-      return next;
-    });
+  function changeTab(value: LeagueTab, beforeUpdate?: () => void) {
+    switchTab(
+      tabDirection(
+        LEAGUE_TABS.findIndex((t) => t.id === tab),
+        LEAGUE_TABS.findIndex((t) => t.id === value),
+      ),
+      () => {
+        beforeUpdate?.();
+        setParams((previous) => {
+          const next = new URLSearchParams(previous);
+          next.set("tab", value);
+          return next;
+        });
+      },
+    );
   }
   // A competition opened from a link becomes the shared choice for quiniela and standings.
   useEffect(() => {
@@ -173,19 +186,27 @@ export default function MatchesPage({
         <div className="league-selection">
           <CompetitionTabs
             value={competition}
-            onChange={(code) => {
-              preferenceStore.update(userId, { competition: code });
-              setParams(
-                (previous) => {
-                  const next = new URLSearchParams(previous);
-                  next.set("competition", code);
-                  next.delete("season");
-                  next.delete("round");
-                  return next;
+            onChange={(code) =>
+              switchTab(
+                tabDirection(
+                  (COMPETITION_CODES as readonly string[]).indexOf(competition),
+                  (COMPETITION_CODES as readonly string[]).indexOf(code),
+                ),
+                () => {
+                  preferenceStore.update(userId, { competition: code });
+                  setParams(
+                    (previous) => {
+                      const next = new URLSearchParams(previous);
+                      next.set("competition", code);
+                      next.delete("season");
+                      next.delete("round");
+                      return next;
+                    },
+                    { replace: true },
+                  );
                 },
-                { replace: true },
-              );
-            }}
+              )
+            }
           />
         </div>
       </LeagueNavigation>

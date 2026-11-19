@@ -25,8 +25,8 @@
   position: absolute;
   inset: 1px 3px;
   border-radius: 15px;
-  background: linear-gradient(180deg, #c5f66a0f, #c5f66a04);
-  border: 1px solid #c5f66a1a;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, transparent), color-mix(in srgb, var(--accent) 2%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 10%, transparent);
 }
 .bottom-nav-indicator::after {
   content: "";
@@ -36,7 +36,7 @@
   width: 22px;
   height: 2px;
   border-radius: 2px;
-  background: var(--brand-accent, #c5f66a);
+  background: var(--brand-accent, var(--accent));
 }
 .bottom-nav-indicator.is-hidden {
   opacity: 0;
@@ -105,7 +105,7 @@
     display: block;
     padding: 8px calc(5px + var(--safe-area-right))
       calc(8px + var(--safe-area-bottom)) calc(5px + var(--safe-area-left));
-    background: #151b27f2;
+    background: #1d211bf2;
     box-shadow: 0 -8px 28px #00000018;
     -webkit-backdrop-filter: blur(18px);
     backdrop-filter: blur(18px);
@@ -144,7 +144,7 @@
 }
 @media (prefers-reduced-transparency: reduce) {
   .bottom-nav {
-    background: #151b27;
+    background: #1d211b;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }

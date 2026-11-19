@@ -65,7 +65,7 @@ button {
   .modal-backdrop {
     align-items: flex-end;
     padding: calc(12px + var(--safe-area-top)) 0 0;
-    background: #04050799;
+    background: #05060599;
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
     animation: sheet-backdrop-in 260ms ease both;
@@ -137,87 +137,7 @@ button {
   }
 }
 
-/* ---------- Tab transitions (View Transitions API) ---------- */
-.topbar {
-  view-transition-name: app-bar;
-}
-.bottom-nav {
-  view-transition-name: tab-bar;
-}
-.route-view {
-  view-transition-name: page;
-}
-/* The View Transition already animates the page; skip the CSS entrance. */
-html[data-nav-direction] .route-view {
-  animation: none;
-}
-::view-transition-group(root),
-::view-transition-old(root),
-::view-transition-new(root),
-::view-transition-group(app-bar),
-::view-transition-group(tab-bar),
-::view-transition-old(app-bar),
-::view-transition-new(app-bar),
-::view-transition-old(tab-bar),
-::view-transition-new(tab-bar) {
-  animation: none;
-}
-::view-transition-group(page) {
-  animation-duration: 340ms;
-  animation-timing-function: var(--ios-spring);
-}
-html[data-nav-direction="forward"]::view-transition-old(page) {
-  animation: page-out-left 300ms var(--ios-spring) both;
-}
-html[data-nav-direction="forward"]::view-transition-new(page) {
-  animation: page-in-right 340ms var(--ios-spring) both;
-}
-html[data-nav-direction="back"]::view-transition-old(page) {
-  animation: page-out-right 300ms var(--ios-spring) both;
-}
-html[data-nav-direction="back"]::view-transition-new(page) {
-  animation: page-in-left 340ms var(--ios-spring) both;
-}
-html[data-nav-direction="fade"]::view-transition-old(page) {
-  animation: page-fade-out 160ms ease both;
-}
-html[data-nav-direction="fade"]::view-transition-new(page) {
-  animation: page-fade-in 240ms ease both;
-}
-@keyframes page-out-left {
-  to {
-    opacity: 0;
-    transform: translateX(-28px);
-  }
-}
-@keyframes page-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(36px);
-  }
-}
-@keyframes page-out-right {
-  to {
-    opacity: 0;
-    transform: translateX(28px);
-  }
-}
-@keyframes page-in-left {
-  from {
-    opacity: 0;
-    transform: translateX(-36px);
-  }
-}
-@keyframes page-fade-out {
-  to {
-    opacity: 0;
-  }
-}
-@keyframes page-fade-in {
-  from {
-    opacity: 0;
-  }
-}
+/* Tab and screen transitions live in matchday.css. */
 
 /* ---------- Small touches ---------- */
 /* Group detail sections breathe a little more on phones. */
@@ -248,11 +168,6 @@ html[data-nav-direction="fade"]::view-transition-new(page) {
   .modal-backdrop.is-closing > .modal {
     animation: none !important;
   }
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
-  }
   .button,
   .pot-chip,
   .group-summary,
@@ -263,7 +178,7 @@ html[data-nav-direction="fade"]::view-transition-new(page) {
 }
 @media (prefers-reduced-transparency: reduce) {
   .modal-backdrop {
-    background: #040507e6;
+    background: #050605e6;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
