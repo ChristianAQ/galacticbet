@@ -652,7 +652,9 @@ export default function PredictionsPage({
                 }}
               >
                 <Stamp size={17} aria-hidden="true" />
-                Sellar<span className="round-save-long"> boleto</span>
+                <span>
+                  Sellar<span className="round-save-long"> boleto</span>
+                </span>
               </button>
             </section>
           )}

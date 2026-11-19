@@ -172,7 +172,7 @@ label {
   display: grid;
   gap: 6px;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink-2);
 }
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
@@ -297,7 +297,7 @@ fieldset {
   padding: 12px 14px;
   border-radius: var(--r-sm);
   font-size: var(--text-sm);
-  font-weight: 550;
+  font-weight: 500;
   line-height: 1.45;
   color: var(--ink);
 }
@@ -314,6 +314,15 @@ fieldset {
   min-height: 32px;
   border-radius: 50%;
   color: var(--ink-2);
+}
+.inline-link {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 .setup-notice {
   background: var(--paper-2);

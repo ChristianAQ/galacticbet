@@ -64,7 +64,7 @@ body {
   padding: 0 8px 0 0;
   color: var(--accent);
   font-size: var(--text-lg);
-  font-weight: 560;
+  font-weight: 450;
   letter-spacing: -0.01em;
   transition: opacity 120ms ease;
 }
@@ -333,7 +333,7 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 10.5px;
-  font-weight: 650;
+  font-weight: 550;
   letter-spacing: 0.01em;
 }
 .bottom-nav a.active {
@@ -373,7 +373,7 @@ body {
 }
 .ptr-label {
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--masthead-ink-2);
 }
@@ -392,7 +392,7 @@ body {
   background: var(--accent);
   color: var(--accent-ink);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   box-shadow: var(--shadow-lift);
@@ -405,7 +405,7 @@ body {
   border-radius: 999px;
   background: var(--accent-ink);
   color: var(--accent);
-  font-weight: 750;
+  font-weight: 650;
   text-transform: none;
   letter-spacing: 0;
 }
@@ -432,7 +432,7 @@ body {
   color: var(--ink);
   box-shadow: var(--shadow-lift), inset 4px 0 0 var(--loss);
   font-size: var(--text-sm);
-  font-weight: 550;
+  font-weight: 500;
   animation: drop-in var(--spring-bouncy-ms) var(--spring-bouncy) both;
 }
 .toast p {
@@ -529,7 +529,7 @@ body {
     font-family: var(--font-display);
     font-stretch: var(--stretch-wide);
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--masthead-ink-2);
@@ -543,7 +543,7 @@ body {
     border-radius: var(--r-sm);
     color: var(--masthead-ink-2);
     font-size: var(--text-md);
-    font-weight: 560;
+    font-weight: 500;
     transition:
       background-color 160ms ease,
       color 160ms ease;
@@ -555,7 +555,7 @@ body {
   .sidebar-nav a.active {
     background: var(--accent);
     color: var(--accent-ink);
-    font-weight: 700;
+    font-weight: 650;
   }
   .sidebar-group a.active {
     color: var(--accent);

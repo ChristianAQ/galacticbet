@@ -495,8 +495,12 @@ export default function PorraPage({
             </label>
             {!upcoming.length && !editing && !loading && (
               <p className="setup-notice">
-                No hay próximos partidos en el calendario.{" "}
-                <Link to="/ligas">Consultar partidos</Link>
+                <span>
+                  No hay próximos partidos en el calendario.{" "}
+                  <Link className="inline-link" to="/ligas">
+                    Consultar partidos
+                  </Link>
+                </span>
               </p>
             )}
             <div className="porra-fields">
@@ -647,7 +651,7 @@ export default function PorraPage({
             </button>
             <div className="porra-editor-total" aria-live="polite">
               <span className="eyebrow">Bote previsto</span>
-              <strong className="numeral">
+              <strong className={`numeral${amount === null ? " is-empty" : ""}`}>
                 {amount === null ? "—" : euro(draft.players.length * amount)}
               </strong>
               <small>
