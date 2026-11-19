@@ -40,6 +40,8 @@ export const chrome = {
     emit();
   },
   get: (id: string | undefined) => (id ? entries.get(id) : undefined),
+  /** Called on every change; non-React listeners (e.g. scroll effects) use it. */
+  subscribe,
   get stack() {
     return stack;
   },

@@ -269,15 +269,24 @@ body {
 }
 
 /* ---------- Tab bar ---------- */
+/* 0 = full bar, 1 = compact. Written by the scroll handler, so it follows the
+   finger; registered so the settle at the end of a scroll can animate it. */
+@property --nav-shrink {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
 .bottom-nav {
+  --nav-full: min(100% - 28px - var(--safe-left) - var(--safe-right), 460px);
+  --nav-compact: min(var(--nav-full), calc(var(--nav-count) * 54px + 8px));
   position: fixed;
   z-index: 40;
   left: calc(14px + var(--safe-left));
   right: calc(14px + var(--safe-right));
   bottom: max(calc(var(--safe-bottom) - 12px), 12px);
-  max-width: 460px;
+  width: calc(var(--nav-full) - (var(--nav-full) - var(--nav-compact)) * var(--nav-shrink));
   margin: 0 auto;
-  padding: 6px;
+  padding: calc(6px - 2px * var(--nav-shrink));
   border-radius: 999px;
   background: var(--masthead);
   color: var(--masthead-ink-2);
@@ -288,6 +297,12 @@ body {
   transition:
     transform var(--spring-smooth-ms) var(--spring-smooth),
     opacity 200ms ease;
+}
+.bottom-nav.is-settling {
+  transition:
+    transform var(--spring-smooth-ms) var(--spring-smooth),
+    opacity 200ms ease,
+    --nav-shrink var(--spring-smooth-ms) var(--spring-smooth);
 }
 .bottom-nav.keyboard-open,
 .bottom-nav.is-concealed {
@@ -327,23 +342,31 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: calc(3px * (1 - var(--nav-shrink)));
   min-width: 0;
-  height: calc(var(--tabbar-height) - 12px);
+  height: calc(var(--tabbar-height) - 12px - 14px * var(--nav-shrink));
   border-radius: 999px;
   transition: color 200ms ease;
 }
 .bottom-nav a > svg {
+  flex-shrink: 0;
+  scale: calc(1 - 0.06 * var(--nav-shrink));
   transition: transform var(--spring-snappy-ms) var(--spring-snappy);
 }
+/* The label folds away first, so the compact bar is icons only. */
 .bottom-nav a > span {
   max-width: 100%;
+  height: calc(13px * (1 - var(--nav-shrink)));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 10.5px;
   font-weight: 550;
+  line-height: 13px;
   letter-spacing: 0.01em;
+  opacity: calc(1 - 2.2 * var(--nav-shrink));
+  scale: calc(1 - 0.25 * var(--nav-shrink));
+  transform-origin: 50% 0;
 }
 .bottom-nav a.active {
   color: var(--accent-ink);

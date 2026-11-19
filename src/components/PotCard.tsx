@@ -1,4 +1,4 @@
-import { Crown, Info, Settings2 } from "lucide-react";
+import { Crown, Settings2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { euro } from "../lib/porra";
 import { euroShort, potNames, type PotSummary } from "../lib/pot";
@@ -157,11 +157,6 @@ export default function PotCard({
               )}
             </div>
           )}
-        <p className="pot-disclaimer">
-          <Info size={12} aria-hidden="true" />
-          Bote informativo. GalacticBet no toca el dinero ni cobra comisión:
-          los pagos los organizáis vosotros.
-        </p>
       </div>
     </section>
   );
