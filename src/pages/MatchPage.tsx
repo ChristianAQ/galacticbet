@@ -3,6 +3,7 @@ import {
   ArrowUpRight,
   CalendarDays,
   MapPin,
+  NotebookPen,
   Tv,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -227,7 +228,7 @@ function MatchView({
   const requested = params.get("tab") as MatchPageTab | null;
   const tab = requested && tabs.includes(requested) ? requested : tabs[0];
   const tabsAnchor = useRef<HTMLSpanElement>(null);
-  const tabsRef = useRef<HTMLElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
   const scorers = useScorers(match, demo ? null : insight);
   const tie = knockoutContext(match, matches);
   const links = matchExternalLinks(match, insight);
@@ -384,12 +385,12 @@ function MatchView({
       </header>
 
       <span ref={tabsAnchor} className="sticky-sentinel" aria-hidden="true" />
-      <nav
-        ref={tabsRef}
-        className="match-tabs"
-        role="tablist"
-        aria-label="Información del partido"
-      >
+      <div ref={tabsRef} className="match-tabs">
+        <div
+          className="match-tabs-list"
+          role="tablist"
+          aria-label="Información del partido"
+        >
         {tabs.map((t) => (
           <button
             key={t}
@@ -417,7 +418,16 @@ function MatchView({
             {matchPageTabLabels[t]}
           </button>
         ))}
-      </nav>
+        </div>
+        {/* Not a tab: opens Porra rápida with this fixture already chosen. */}
+        <Link
+          className="match-tabs-porra"
+          to={`/porra?partido=${encodeURIComponent(match.id)}`}
+        >
+          <NotebookPen size={15} aria-hidden="true" />
+          Porra rápida
+        </Link>
+      </div>
 
       <section
         className="match-page-panel"

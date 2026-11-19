@@ -201,8 +201,8 @@
 .porra-preview-actions .button {
   padding: 0 10px;
 }
-.porra-share,
-.porra-delete {
+/* Share spans the row; Editar and Eliminar share the last one. */
+.porra-share {
   grid-column: 1 / -1;
 }
 .porra-delete.button.secondary {
@@ -503,4 +503,25 @@
 :root[data-theme="dark"] .porra-ticket-total > b {
   box-shadow: none;
   color: var(--accent);
+}
+
+/* After saving: a quiet way out, back to the match or home. */
+.porra-done {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--rule);
+  text-align: center;
+}
+.porra-done > span {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.porra-done > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 24px;
 }

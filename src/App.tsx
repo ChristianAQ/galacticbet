@@ -330,10 +330,12 @@ export default function App() {
             </footer>
           </div>
           <PullToRefresh enabled={isTabRoot(pathname)} onRefresh={refreshAll} />
-          {/* Perfil (and its Grupos) is a settings screen: no tab bar, like iOS. */}
+          {/* The tab bar lives on the four tab roots only. Pushed screens (match
+              page, Equipos, Porra, Perfil, Grupos) get the whole height and go
+              back with «‹» or the edge swipe. */}
           <BottomNavigation
             items={nav}
-            inactive={pathname === "/perfil" || pathname === "/grupos"}
+            inactive={!isTabRoot(pathname)}
             onPrefetch={preloadPage}
           />
           {demo && (

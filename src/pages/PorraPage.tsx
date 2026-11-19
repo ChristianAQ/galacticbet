@@ -2,15 +2,17 @@ import { competitionName } from "../lib/competitions";
 import { COMPETITION_CODES } from "../lib/competitions";
 import {
   Camera,
+  ChevronLeft,
   Download,
   Eye,
   FilePenLine,
+  Home,
   Plus,
   Share2,
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Modal from "../components/Modal";
 import PorraTicket from "../components/PorraTicket";
 import SwipeRow from "../components/SwipeRow";
@@ -19,6 +21,7 @@ import { Empty, PageTitle } from "../components/ui";
 import { canPredict, type Match } from "../lib/domain";
 import { kickoffLabel } from "../lib/matchInsights";
 import { haptic } from "../lib/motion";
+import { go, goBack } from "../lib/navigation";
 import {
   euro,
   fixtureSnapshot,
@@ -134,6 +137,21 @@ export default function PorraPage({
       window.removeEventListener("focus", refresh);
     };
   }, []);
+  // Opened from a match page (?partido=id): a fresh porra for that fixture.
+  const [params] = useSearchParams();
+  const fromMatch = params.get("partido") || "";
+  const seeded = useRef("");
+  useEffect(() => {
+    if (!fromMatch || seeded.current === fromMatch) return;
+    const m = matches.find((m) => m.id === fromMatch);
+    if (!m) return;
+    seeded.current = fromMatch;
+    setDraft(blank(fixtureSnapshot(m)));
+    setEditing(null);
+    setPreview(null);
+    setError("");
+    setMessage("");
+  }, [fromMatch, matches]);
   useEffect(() => {
     const first = matches.find((m) => m.id === firstId);
     if (first)
@@ -448,6 +466,37 @@ export default function PorraPage({
                 </button>
               )}
             </div>
+            {stored && (
+              <nav className="porra-done" aria-label="Al terminar">
+                <span>¿Lista? Puedes volver cuando quieras.</span>
+                <div>
+                  {fromMatch && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => {
+                        haptic();
+                        goBack();
+                      }}
+                    >
+                      <ChevronLeft size={16} aria-hidden="true" />
+                      Volver al partido
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => {
+                      haptic();
+                      go("/", { reset: true });
+                    }}
+                  >
+                    <Home size={16} aria-hidden="true" />
+                    Volver a inicio
+                  </button>
+                </div>
+              </nav>
+            )}
           </>
         ) : (
           <form className="porra-editor" onSubmit={save}>
