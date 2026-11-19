@@ -18,8 +18,8 @@
 }
 .teams-clubs button[aria-pressed="true"],
 .teams-tabs button[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 33%, transparent);
+  background: #c5f66a0d;
+  border-color: #c5f66a55;
   color: #e4f4cb;
 }
 .teams-clubs .team {
@@ -115,7 +115,7 @@
   height: 36px;
   border-radius: 50%;
   background: #ffffff08;
-  color: var(--accent);
+  color: #c5f66a;
 }
 .teams-age {
   text-align: right;
@@ -145,7 +145,7 @@
   width: 100%;
   min-width: 0;
   padding: 12px;
-  background: #1a1d17;
+  background: #141920;
   border: 1px solid var(--border);
   border-radius: 10px;
   color: inherit;

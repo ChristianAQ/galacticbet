@@ -58,7 +58,7 @@
 }
 .live-event-minute {
   font-variant-numeric: tabular-nums;
-  color: #d4dacf;
+  color: #ced3db;
   font-weight: 650;
 }
 .live-event-player {
@@ -76,9 +76,9 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #f0f2ee;
-  box-shadow: inset 0 0 0 2px #1b1e19;
-  outline: 1px solid #f0f2ee;
+  background: #eeeff2;
+  box-shadow: inset 0 0 0 2px #191b1e;
+  outline: 1px solid #eeeff2;
 }
 .live-icon-own-goal {
   background: #ef7772;
@@ -109,7 +109,7 @@
   overflow: auto;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: #111310;
+  background: #0f1114;
 }
 .share-preview img {
   display: block;

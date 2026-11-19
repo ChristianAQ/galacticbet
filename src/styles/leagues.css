@@ -33,7 +33,7 @@ main:has(.leagues-page) > .main-footer {
   padding: 12px var(--league-inset-right) 0 var(--league-inset-left);
   margin: 0 calc(-1 * var(--league-inset-right)) 18px
     calc(-1 * var(--league-inset-left));
-  background: #151813f5;
+  background: #10151bf5;
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--border);
@@ -137,7 +137,7 @@ main:has(.leagues-page) > .main-footer {
 }
 .league-tabs button[aria-selected="true"] {
   color: #edf5e0;
-  background: linear-gradient(0deg, color-mix(in srgb, var(--accent) 5%, transparent), transparent);
+  background: linear-gradient(0deg, #c5f66a0c, transparent);
 }
 .league-tabs button:focus-visible {
   outline: 2px solid var(--brand-accent);
@@ -235,11 +235,11 @@ main:has(.leagues-page) > .main-footer {
     box-shadow 180ms ease;
 }
 .competition-table thead.is-stuck th {
-  background: #2c3128;
-  color: #e7eae5;
+  background: #232a36;
+  color: #e0e6ef;
   box-shadow:
     inset 0 1px 0 #ffffff0b,
-    0 1px 0 #485042,
+    0 1px 0 #3b4657,
     0 6px 12px #00000024;
 }
 .competition-col-position {
@@ -261,7 +261,7 @@ main:has(.leagues-page) > .main-footer {
   font-weight: 500;
 }
 .competition-table tbody th {
-  color: #e9ece6;
+  color: #e3e8ef;
 }
 .competition-table .league-team {
   gap: 5px;
@@ -453,7 +453,7 @@ main:has(.leagues-page) > .main-footer {
 }
 @media (prefers-reduced-transparency: reduce) {
   .league-navigation {
-    background: #151813;
+    background: #10151b;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }

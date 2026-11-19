@@ -41,7 +41,6 @@ import { roundOptions } from "../lib/roundOptions";
 import { useGroupSelection } from "../lib/useGroupSelection";
 import { useRoundDelivery } from "../lib/useRoundDelivery";
 import { useStuck } from "../lib/useStuck";
-import { navigateWithTransition } from "../lib/viewTransition";
 import { PotAmount } from "../components/PotCard";
 import { euroShort, groupPotCents } from "../lib/pot";
 import { euro } from "../lib/porra";
@@ -355,21 +354,15 @@ export default function PredictionsPage({
   selectedRef.current = selected;
   const onDetails = useCallback(
     (id: string) => {
-      navigateWithTransition(
-        () => {
-          setSearchParams(
-            (previous) => {
-              const next = new URLSearchParams(previous);
-              next.set("round", selectedRef.current);
-              return next;
-            },
-            { replace: true },
-          );
-          navigate(`/partido/${encodeURIComponent(id)}`);
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          next.set("round", selectedRef.current);
+          return next;
         },
-        "push",
-        import("./MatchPage"),
+        { replace: true },
       );
+      navigate(`/partido/${encodeURIComponent(id)}`);
     },
     [navigate, setSearchParams],
   );

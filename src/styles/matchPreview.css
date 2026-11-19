@@ -3,7 +3,7 @@
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: linear-gradient(180deg, #1b1e19, #151813);
+  background: linear-gradient(180deg, #151a22, #11141a);
 }
 .match-preview-heading {
   display: flex;
@@ -16,21 +16,21 @@
 .match-preview-heading h3 {
   margin: 0;
   font-size: 14px;
-  color: #f1f3ef;
+  color: #eef0f4;
 }
 .match-preview-countdown {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border: 1px solid var(--brand-border, color-mix(in srgb, var(--accent) 19%, transparent));
+  border: 1px solid var(--brand-border, #c5f66a30);
   border-radius: 999px;
-  background: var(--brand-tint, color-mix(in srgb, var(--accent) 5%, transparent));
-  color: #d1d7cc;
+  background: var(--brand-tint, #c5f66a0d);
+  color: #c9d0da;
   font-size: 11px;
 }
 .match-preview-countdown strong {
-  color: var(--brand-accent, var(--accent));
+  color: var(--brand-accent, #c5f66a);
   font-variant-numeric: tabular-nums;
 }
 .preview-table-duel {
@@ -41,7 +41,7 @@
   margin-bottom: 16px;
   padding: 12px;
   border-radius: 12px;
-  background: #0e100d;
+  background: #0b0e12;
   text-align: center;
 }
 .preview-table-duel > span {
@@ -55,26 +55,26 @@
   font-variant-numeric: tabular-nums;
 }
 .preview-table-duel > span:first-child strong {
-  color: var(--brand-accent, var(--accent));
+  color: var(--brand-accent, #c5f66a);
 }
 .preview-table-duel > span:last-child strong {
   color: #a9d8ff;
 }
 .preview-table-duel small {
-  color: #a4ae9c;
+  color: #9ca3ae;
   font-size: 10px;
   line-height: 1.4;
 }
 .preview-block {
   padding: 14px 0;
-  border-top: 1px solid #2e342a;
+  border-top: 1px solid #262d38;
 }
 .preview-block h4 {
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 0 0 12px;
-  color: #dce1d8;
+  color: #d5dae4;
   font-size: 12px;
   font-weight: 600;
 }
@@ -106,12 +106,12 @@
   text-align: center;
 }
 .preview-compare-row small {
-  color: #a4ae9c;
+  color: #9ca3ae;
   font-size: 10px;
 }
 .preview-compare-head {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  color: #ced4c9;
+  color: #c6ccd7;
   font-size: 11px;
   font-weight: 600;
 }
@@ -125,8 +125,8 @@
 .preview-compare-bar i {
   display: block;
   height: 100%;
-  background: var(--brand-accent, var(--accent));
-  border-right: 2px solid #151813;
+  background: var(--brand-accent, #c5f66a);
+  border-right: 2px solid #11141a;
 }
 .preview-venue {
   display: grid;
@@ -138,10 +138,10 @@
   min-width: 0;
   padding: 10px;
   border-radius: 10px;
-  background: #0e100d;
+  background: #0b0e12;
 }
 .preview-venue dt {
-  color: #9aa790;
+  color: #8f98a8;
   font-size: 10px;
   overflow-wrap: anywhere;
 }
@@ -161,7 +161,7 @@
 }
 .preview-form-team h5 {
   margin: 0 0 8px;
-  color: #ced4c9;
+  color: #c6ccd7;
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -187,14 +187,14 @@
   white-space: nowrap;
 }
 .preview-form-team li small {
-  color: #9aa790;
+  color: #8f98a8;
 }
 .preview-form-team li strong {
   font-variant-numeric: tabular-nums;
 }
 .preview-form-team time {
   grid-column: 2 / 4;
-  color: #89967f;
+  color: #7f8896;
   font-size: 9px;
 }
 .preview-result {
@@ -204,7 +204,7 @@
   width: 20px;
   height: 20px;
   border-radius: 6px;
-  color: #181a16;
+  color: #12171e;
   font-size: 10px;
 }
 .preview-h2h {
@@ -220,13 +220,13 @@
   min-width: 26px;
   font-size: 11px;
   font-weight: 700;
-  color: #181a16;
+  color: #12171e;
 }
 .h2h-home {
-  background: var(--brand-accent, var(--accent));
+  background: var(--brand-accent, #c5f66a);
 }
 .h2h-draw {
-  background: #979e92;
+  background: #929b9e;
 }
 .h2h-away {
   background: #7cc4ff;
@@ -236,7 +236,7 @@
   justify-content: space-between;
   gap: 8px;
   margin-top: 6px;
-  color: #9aa790;
+  color: #8f98a8;
   font-size: 10px;
 }
 .preview-facts {
@@ -250,8 +250,8 @@
   position: relative;
   padding: 10px 12px 10px 26px;
   border-radius: 10px;
-  background: #0e100d;
-  color: #dce1d8;
+  background: #0b0e12;
+  color: #d5dae4;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -263,7 +263,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--brand-accent, var(--accent));
+  background: var(--brand-accent, #c5f66a);
 }
 @media (max-width: 480px) {
   .match-preview {

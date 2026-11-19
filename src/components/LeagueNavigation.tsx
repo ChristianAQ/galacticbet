@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LEAGUE_TABS, type LeagueTab } from "../lib/leagueHub";
-import { canTransition } from "../lib/viewTransition";
 
 export default function LeagueNavigation({
   tab,
@@ -8,8 +7,7 @@ export default function LeagueNavigation({
   children,
 }: {
   tab: LeagueTab;
-  /** `beforeUpdate` runs inside the tab transition (instant scroll). */
-  onChange: (tab: LeagueTab, beforeUpdate?: () => void) => void;
+  onChange: (tab: LeagueTab) => void;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -64,7 +62,6 @@ export default function LeagueNavigation({
     if (next === tab) return;
     const panel = document.getElementById("league-panel");
     const header = ref.current;
-    let scroll: (() => void) | undefined;
     if (panel && header) {
       const offset =
         parseFloat(header.style.getPropertyValue("--league-header-offset")) ||
@@ -75,20 +72,15 @@ export default function LeagueNavigation({
         header.offsetHeight -
         offset -
         12;
-      if (window.scrollY > target + 12) {
-        const top = Math.max(0, target);
-        // A smooth scroll would run under the frozen transition snapshot.
-        if (canTransition()) scroll = () => window.scrollTo({ top });
-        else
-          window.scrollTo({
-            top,
-            behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-              ? "auto"
-              : "smooth",
-          });
-      }
+      if (window.scrollY > target + 12)
+        window.scrollTo({
+          top: Math.max(0, target),
+          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto"
+            : "smooth",
+        });
     }
-    onChange(next, scroll);
+    onChange(next);
   }
   return (
     <>

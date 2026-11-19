@@ -8,7 +8,6 @@ import { FormGuide } from "../components/TeamForm";
 import { Empty, PageTitle, readableError } from "../components/ui";
 import type { Group } from "../lib/data";
 import { logout, saveDisplayName } from "../lib/firebase";
-import { switchTab, tabDirection } from "../lib/viewTransition";
 
 const tabs = [
   { id: "profile", label: "Mi perfil" },
@@ -74,11 +73,7 @@ export default function ProfilePage({
     }
   }
   function select(id: string) {
-    if (id === tab) return;
-    const ids = tabs.map((t) => t.id as string);
-    switchTab(tabDirection(ids.indexOf(tab), ids.indexOf(id)), () =>
-      setParams({ tab: id }, { replace: true }),
-    );
+    setParams({ tab: id }, { replace: true });
   }
   return (
     <>
