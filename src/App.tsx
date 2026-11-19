@@ -330,7 +330,12 @@ export default function App() {
             </footer>
           </div>
           <PullToRefresh enabled={isTabRoot(pathname)} onRefresh={refreshAll} />
-          <BottomNavigation items={nav} inactive={false} onPrefetch={preloadPage} />
+          {/* Perfil (and its Grupos) is a settings screen: no tab bar, like iOS. */}
+          <BottomNavigation
+            items={nav}
+            inactive={pathname === "/perfil" || pathname === "/grupos"}
+            onPrefetch={preloadPage}
+          />
           {demo && (
             <div className="demo-pill" role="status">
               <span>Modo demo</span>

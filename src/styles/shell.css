@@ -289,9 +289,18 @@ body {
     transform var(--spring-smooth-ms) var(--spring-smooth),
     opacity 200ms ease;
 }
-.bottom-nav.keyboard-open {
+.bottom-nav.keyboard-open,
+.bottom-nav.is-concealed {
   transform: translate3d(0, 160%, 0);
   opacity: 0;
+  pointer-events: none;
+}
+/* Without the tab bar the page only needs room for the home indicator. */
+.app-shell:has(.bottom-nav.is-concealed) .main-footer {
+  padding-bottom: calc(24px + var(--safe-bottom));
+}
+.app-shell:has(.bottom-nav.is-concealed) .demo-pill {
+  bottom: calc(16px + var(--safe-bottom));
 }
 .bottom-nav-items {
   position: relative;

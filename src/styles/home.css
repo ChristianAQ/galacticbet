@@ -44,30 +44,37 @@
   margin-top: 26px;
   color: var(--accent);
 }
+/* «1 día | 22 horas»: each number carries its unit beside it, a rule between. */
 .spotlight-countdown {
   display: flex;
   align-items: flex-end;
-  gap: 20px;
-  margin-top: 6px;
+  flex-wrap: wrap;
+  gap: 8px 0;
+  margin-top: 8px;
 }
 .countdown-part {
-  display: grid;
+  display: flex;
+  align-items: baseline;
   gap: 8px;
 }
+.countdown-part + .countdown-part {
+  margin-left: 18px;
+  padding-left: 18px;
+  border-left: 1px solid var(--masthead-rule);
+}
 .countdown-part b {
-  font-size: clamp(76px, 25vw, 120px);
-  line-height: 0.78;
+  font-size: clamp(64px, 20vw, 104px);
+  line-height: 0.8;
   letter-spacing: -0.02em;
   color: var(--accent);
 }
 .countdown-part small {
   font-family: var(--font-display);
-  font-stretch: var(--stretch-wide);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--masthead-ink-2);
+  font-stretch: var(--stretch-condensed);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--masthead-ink);
 }
 .spotlight-meta {
   margin-top: 16px;

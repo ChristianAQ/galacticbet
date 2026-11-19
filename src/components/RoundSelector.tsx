@@ -45,9 +45,11 @@ function RoundSelector({
       behavior: smooth && !reduce ? "smooth" : "auto",
     });
   };
+  // Only a round the player picks glides into place; opening the screen or
+  // data arriving later jumps straight to it, without animation.
   useLayoutEffect(() => {
     centre(animate.current);
-    animate.current = true;
+    animate.current = false;
   }, [value, rounds.length]);
   // A page prepared off screen has no width yet: centre once it gets one.
   useEffect(() => {
@@ -65,6 +67,7 @@ function RoundSelector({
   const go = (step: number) => {
     const next = rounds[index + step];
     if (!next) return;
+    animate.current = true;
     haptic();
     onChange(next.id);
   };
@@ -97,7 +100,10 @@ function RoundSelector({
             type="button"
             className="round-current"
             disabled={disabled}
-            onClick={() => onChange(current)}
+            onClick={() => {
+              animate.current = true;
+              onChange(current);
+            }}
           >
             <LocateFixed size={14} aria-hidden="true" />
             Actual
@@ -146,7 +152,10 @@ function RoundSelector({
               tabIndex={i === Math.max(index, 0) ? 0 : -1}
               disabled={disabled}
               onClick={() => {
-                if (r.id !== value) haptic();
+                if (r.id !== value) {
+                  animate.current = true;
+                  haptic();
+                }
                 onChange(r.id);
               }}
             >

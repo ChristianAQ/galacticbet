@@ -63,7 +63,7 @@ export default function BottomNavigation({
   const hidden = inactive || keyboardOpen;
   return (
     <nav
-      className={`bottom-nav${keyboardOpen ? " keyboard-open" : ""}`}
+      className={`bottom-nav${keyboardOpen ? " keyboard-open" : ""}${inactive ? " is-concealed" : ""}`}
       aria-label="Secciones"
       inert={hidden || undefined}
       aria-hidden={hidden || undefined}

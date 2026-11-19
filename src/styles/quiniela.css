@@ -677,12 +677,29 @@
   color: var(--live);
 }
 /* The real match: teams either side, the 90-minute score in the middle. */
+/* The whole fixture is the way into the match page. */
 .gm-fixture {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  padding: 12px 0 10px;
+  margin: 0 -8px;
+  padding: 12px 8px 10px;
+  border-radius: var(--r-sm);
+  color: inherit;
+  transition:
+    background-color 160ms ease,
+    transform 160ms var(--press);
+}
+.gm-fixture:active {
+  background: var(--paper-2);
+  transform: scale(0.985);
+  transition-duration: 60ms;
+}
+@media (hover: hover) {
+  .gm-fixture:hover {
+    background: var(--paper-2);
+  }
 }
 .saved-team {
   display: flex;
@@ -882,33 +899,6 @@
   padding-top: 8px;
 }
 
-/* Secondary links of the fixture. */
-.gm-links {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-top: 1px dashed var(--rule);
-}
-.gm-links a,
-.gm-links button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 44px;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--ink-2);
-}
-.gm-links button svg {
-  transition: transform var(--spring-snappy-ms) var(--spring-snappy);
-}
-.gm-links button[aria-expanded="true"] svg {
-  transform: rotate(180deg);
-}
-.gm-statistics {
-  padding-bottom: 12px;
-}
 .rivals-error {
   display: grid;
   justify-items: start;

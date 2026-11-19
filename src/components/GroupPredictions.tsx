@@ -5,13 +5,12 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { Check, ChevronDown, ChevronRight, Trophy, X } from "lucide-react";
+import { Check, Trophy, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   lazy,
   Suspense,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -30,7 +29,6 @@ import { db } from "../lib/firebase";
 import { kickoffLabel } from "../lib/matchInsights";
 import { Team, readableError } from "./ui";
 import TeamForm from "./TeamForm";
-import { MatchResultStatistics } from "./MatchResult";
 import { finishedMatchResult } from "../lib/matchResult";
 import { decodeDelivery } from "../lib/roundDelivery";
 import { LiveEvents, LiveMinute } from "./LiveStatus";
@@ -252,7 +250,6 @@ export default function GroupPredictions({
       )}
       {matches.map((m) => (
         <RivalsCard
-          demo={demo}
           key={m.id}
           match={m}
           history={history}
@@ -325,7 +322,6 @@ function RoundBoardPanel({
   );
 }
 function RivalsCard({
-  demo,
   match,
   history,
   participants,
@@ -342,7 +338,6 @@ function RivalsCard({
   mode,
   onRetry,
 }: {
-  demo: boolean;
   match: Match;
   history: Match[];
   participants: Participant[];
@@ -359,8 +354,6 @@ function RivalsCard({
   mode: Mode;
   onRetry: () => void;
 }) {
-  const [statsOpen, setStatsOpen] = useState(false);
-  const statsId = useId();
   const visible = participants.filter(
     (p) => p.id !== userId && completedIds.includes(p.id),
   );
@@ -373,7 +366,6 @@ function RivalsCard({
       ? { home: match.homeScore, away: match.awayScore }
       : null;
   const sign = score ? outcome(score.home, score.away) : null;
-  const showStatistics = finished && !demo;
   return (
     <article className="group-match-card" data-vt-match={match.id}>
       <header className="saved-match-heading">
@@ -393,8 +385,13 @@ function RivalsCard({
         </span>
       </header>
 
-      {/* The real match first: teams and the score that decides the signs. */}
-      <div className="gm-fixture">
+      {/* The real match first: teams and the score that decides the signs.
+          Tapping it opens the match page (preview before kick-off, ficha after). */}
+      <Link
+        className="gm-fixture"
+        to={`/partido/${encodeURIComponent(match.id)}`}
+        aria-label={`${scheduled ? "Previa" : "Ficha"} de ${match.home} contra ${match.away}`}
+      >
         <div className="saved-team">
           <Team name={match.home} crest={match.homeCrest} part="home-crest" />
           <TeamForm match={match} side="home" matches={history} />
@@ -422,7 +419,7 @@ function RivalsCard({
           <Team name={match.away} crest={match.awayCrest} part="away-crest" />
           <TeamForm match={match} side="away" matches={history} />
         </div>
-      </div>
+      </Link>
       {result?.extended && result.winnerName && (
         <p className="gm-decision">
           <Trophy size={13} aria-hidden="true" />
@@ -479,32 +476,6 @@ function RivalsCard({
           ))}
       </section>
 
-      <footer className="gm-links">
-        <Link to={`/partido/${encodeURIComponent(match.id)}`}>
-          {scheduled ? "Previa y cuotas" : "Ficha del partido"}
-          <ChevronRight size={15} aria-hidden="true" />
-        </Link>
-        {showStatistics && (
-          <button
-            type="button"
-            aria-expanded={statsOpen}
-            aria-controls={statsId}
-            onClick={() => setStatsOpen((v) => !v)}
-          >
-            Estadísticas
-            <ChevronDown size={15} aria-hidden="true" />
-          </button>
-        )}
-      </footer>
-      {showStatistics && (
-        <div
-          id={statsId}
-          hidden={!statsOpen}
-          className="match-extra-panel match-statistics-panel gm-statistics"
-        >
-          {statsOpen && <MatchResultStatistics match={match} />}
-        </div>
-      )}
     </article>
   );
 }

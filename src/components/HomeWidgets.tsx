@@ -36,7 +36,7 @@ const unitNames: Record<string, [string, string]> = {
   min: ["minuto", "minutos"],
 };
 
-/** «2 d 14 h» → big numerals with their unit underneath. */
+/** «2 d 14 h» → big numerals, each with its unit beside it. */
 function Countdown({ kickoff, now }: { kickoff: string; now: number }) {
   const label = countdownLabel(kickoff, now);
   const parts = [...label.matchAll(/(\d+)\s*(d|h|min)/g)].map((m) => ({
