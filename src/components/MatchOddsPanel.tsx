@@ -6,6 +6,8 @@ import {
   ODDS_OUTCOMES,
   type MatchOdds,
 } from "../lib/odds";
+import { Skeleton } from "./Skeleton";
+import { Empty } from "./ui";
 
 const decimal = new Intl.NumberFormat("es", {
   minimumFractionDigits: 2,
@@ -19,6 +21,7 @@ const updated = new Intl.DateTimeFormat("es", {
   minute: "2-digit",
 });
 
+/** Printed odds board: best price per sign, market split and every bookmaker. */
 export default function MatchOddsPanel({
   match,
   odds,
@@ -39,31 +42,43 @@ export default function MatchOddsPanel({
   const codes = { home: "1", draw: "X", away: "2" };
   if (demo)
     return (
-      <p className="match-extra-empty">La demo no consulta cuotas reales.</p>
+      <Empty art="slip" title="Sin cuotas en la demo">
+        Fuera del modo demo verás las cuotas reales de varias casas.
+      </Empty>
     );
   if (loading)
     return (
-      <p className="match-extra-empty" role="status">
-        Cargando cuotas…
-      </p>
+      <div className="odds-panel" role="status" aria-label="Cargando cuotas">
+        <div className="odds-best">
+          {ODDS_OUTCOMES.map((o) => (
+            <div key={o} className="odds-best-item">
+              <Skeleton width={46} height={10} />
+              <Skeleton width={64} height={30} radius={6} />
+              <Skeleton width={58} height={10} />
+            </div>
+          ))}
+        </div>
+      </div>
     );
   if (error || !best || !odds)
     return (
-      <div className="odds-empty">
-        <p className="match-extra-empty">
-          {error
-            ? "No se han podido cargar las cuotas. Inténtalo más tarde."
-            : "Cuotas aún no publicadas para este partido. Se actualizan dos veces al día durante los cuatro días previos."}
-        </p>
-      </div>
+      <Empty
+        art={error ? "whistle" : "slip"}
+        title={error ? "Las cuotas no han llegado" : "Cuotas aún sin publicar"}
+      >
+        {error
+          ? "No se han podido cargar las cuotas. Inténtalo más tarde."
+          : "Se actualizan dos veces al día durante los cuatro días previos al partido."}
+      </Empty>
     );
   return (
-    <section className="odds-panel" aria-label="Cuotas 1X2">
-      <div className="odds-best" role="list" aria-label="Mejor cuota">
+    <section className="match-block odds-panel" aria-label="Cuotas 1X2">
+      <h3 className="match-block-title">Mejor cuota</h3>
+      <div className="odds-best" role="list">
         {ODDS_OUTCOMES.map((o) => (
-          <div key={o} className="odds-best-item" role="listitem">
+          <div key={o} className={`odds-best-item is-${o}`} role="listitem">
             <small>
-              {codes[o]} · {labels[o]}
+              <b>{codes[o]}</b> {labels[o]}
             </small>
             <strong>{decimal.format(best[o].price)}</strong>
             <span title={best[o].titles.join(", ")}>
@@ -78,13 +93,13 @@ export default function MatchOddsPanel({
         <div className="odds-market">
           <div className="probability-bar" aria-hidden="true">
             {ODDS_OUTCOMES.map((o) => (
-              <span key={o} style={{ flexGrow: market[o] }} />
+              <span key={o} className={`is-${o}`} style={{ flexGrow: market[o] }} />
             ))}
           </div>
           <p>
-            Probabilidad según el mercado:{" "}
+            Lo que dice el mercado:{" "}
             {ODDS_OUTCOMES.map(
-              (o) => `${codes[o]} ${percent.format(market[o])}%`,
+              (o) => `${codes[o]} ${percent.format(market[o])} %`,
             ).join(" · ")}
           </p>
         </div>

@@ -1,5 +1,4 @@
 import { Share2 } from "lucide-react";
-import "../styles/live.css";
 
 export default function ShareTrigger({
   label = "Compartir",

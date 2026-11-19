@@ -1,37 +1,16 @@
 import BottomNavigation from "./components/BottomNavigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import {
-  Activity,
-  ArrowUpRight,
-  CalendarDays,
-  ChevronRight,
-  Home,
-  Menu,
-  ShieldCheck,
-  Target,
-  Trophy,
-  X,
-} from "lucide-react";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import {
-  Link,
-  Navigate,
-  Route,
-  Routes,
-  useNavigate,
-  useLocation,
-} from "react-router-dom";
+import { CalendarDays, Home, Target, Trophy, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Navigate, Route, Routes, useLocation, type Location } from "react-router-dom";
 import LoginModal from "./components/LoginModal";
 import Sidebar from "./components/Sidebar";
-import { Empty, PrivateGate, readableError } from "./components/ui";
+import NavBar from "./components/NavBar";
+import StackNavigator from "./components/StackNavigator";
+import PullToRefresh from "./components/PullToRefresh";
+import ContextMenuHost from "./components/ContextMenu";
+import { Empty, PageTitle, PrivateGate, readableError } from "./components/ui";
 import {
   loadGroups,
   loadMatches,
@@ -40,57 +19,39 @@ import {
 } from "./lib/data";
 import { demoMatches } from "./lib/demo";
 import { type Match } from "./lib/domain";
-import { MOBILE_LAYOUT_QUERY } from "./lib/mobileViewport";
 import { auth, configured, db } from "./lib/firebase";
 import { privateCache } from "./lib/memoryCache";
 import { applyLiveBoard } from "./lib/liveBoard";
-import { LiveContext, useLiveBoard } from "./lib/useLiveBoard";
-const pageLoaders = {
-  "/equipos": () => import("./pages/TeamsPage"),
-  "/": () => import("./pages/HomePage"),
-  "/ligas": () => import("./pages/MatchesPage"),
-  "/quiniela": () => import("./pages/PredictionsPage"),
-  "/grupos": () => import("./pages/GroupsPage"),
-  "/clasificacion": () => import("./pages/StandingsPage"),
-  "/perfil": () => import("./pages/ProfilePage"),
-  "/porra": () => import("./pages/PorraPage"),
-  "/partido": () => import("./pages/MatchPage"),
-};
-const TeamsPage = lazy(pageLoaders["/equipos"]);
-const HomePage = lazy(pageLoaders["/"]);
-const MatchesPage = lazy(pageLoaders["/ligas"]);
-const PredictionsPage = lazy(pageLoaders["/quiniela"]);
-const GroupsPage = lazy(pageLoaders["/grupos"]);
-const StandingsPage = lazy(pageLoaders["/clasificacion"]);
-const ProfilePage = lazy(pageLoaders["/perfil"]);
-const PorraPage = lazy(pageLoaders["/porra"]);
-const MatchPage = lazy(pageLoaders["/partido"]);
-function preloadPage(path: string) {
-  const load = pageLoaders[path as keyof typeof pageLoaders];
-  if (load) void load().catch(() => {});
-}
+import { LiveContext, STANDINGS_UPDATED, useLiveBoard } from "./lib/useLiveBoard";
+import { REFRESH_EVENT, RefreshContext } from "./lib/chrome";
+import { interceptLinks, isTabRoot } from "./lib/navigation";
+import {
+  GroupsPage,
+  HomePage,
+  MatchesPage,
+  MatchPage,
+  PorraPage,
+  PredictionsPage,
+  preloadPage,
+  preloadTabsWhenIdle,
+  ProfilePage,
+  StandingsPage,
+  TeamsPage,
+} from "./lib/pages";
+
 const nav = [
   { to: "/", label: "Inicio", icon: Home },
   { to: "/ligas", label: "Ligas", icon: CalendarDays },
   { to: "/quiniela", label: "Mi quiniela", short: "Quiniela", icon: Target },
   { to: "/clasificacion", label: "Clasificación", icon: Trophy },
 ];
-// Group management remains available from the profile and the group actions.
-const bottomNav = nav;
 function LegacyMatchesRoute() {
   const { search, hash } = useLocation();
   return <Navigate to={{ pathname: "/ligas", search, hash }} replace />;
 }
+
 export default function App() {
-  const navigate = useNavigate();
   const { pathname } = useLocation();
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      if (document.body.style.position !== "fixed")
-        window.scrollTo({ top: 0, behavior: "auto" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [pathname]);
   const [, setProfileVersion] = useState(0);
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(!auth);
@@ -108,21 +69,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [login, setLogin] = useState(false);
-  const [menu, setMenu] = useState(false);
-  const [mobile, setMobile] = useState(
-    () => window.matchMedia(MOBILE_LAYOUT_QUERY).matches,
-  );
-  const closeMenu = useCallback(() => setMenu(false), []);
-  const mobileMenuOpen = mobile && menu;
-  useEffect(() => {
-    const query = window.matchMedia(MOBILE_LAYOUT_QUERY);
-    const update = () => {
-      setMobile(query.matches);
-      if (!query.matches) setMenu(false);
-    };
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
+  useEffect(() => interceptLinks(), []);
+  useEffect(() => preloadTabsWhenIdle(), []);
   useEffect(
     () =>
       auth
@@ -214,236 +162,195 @@ export default function App() {
     setGroups([]);
     void refreshGroups();
   }, [user]);
-  return (
-    <LiveContext.Provider value={live}>
-      <div className="app-shell">
-        <Sidebar
-          open={mobileMenuOpen}
-          mobile={mobile}
-          onClose={closeMenu}
-          items={nav}
-          onPrefetch={preloadPage}
-        />
-        <div
-          className="main-shell"
-          inert={mobileMenuOpen}
-          aria-hidden={mobileMenuOpen || undefined}
-        >
-          <header className="topbar">
-            <button
-              className="mobile-menu icon-button"
-              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="app-sidebar"
-              onClick={() => setMenu((value) => !value)}
-            >
-              <Menu />
-            </button>
-            <div className="topbar-breadcrumb">
-              Tu comunidad. Tu fútbol.<span>/</span>
-              <strong>Temporada 2026 / 27</strong>
-            </div>
-            <div className="topbar-right">
-              <span className="private-label">
-                <ShieldCheck size={15} /> Ligas privadas, rivalidad real
-              </span>
-              <button
-                aria-label="Ver perfil"
-                onPointerEnter={() => preloadPage("/perfil")}
-                onFocus={() => preloadPage("/perfil")}
-                onPointerDown={() => preloadPage("/perfil")}
-                className="profile-button"
-                onClick={() => navigate("/perfil")}
-              >
-                <span className="avatar">
-                  {user?.photoURL ? (
-                    <img src={user.photoURL} alt="Tu avatar" />
-                  ) : (
-                    user?.displayName?.charAt(0) || "G"
-                  )}
-                </span>
-                <span>{user?.displayName || "Mi perfil"}</span>
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          </header>
-          <main>
-            {demo && (
-              <div className="demo-banner">
-                <span>
-                  <Activity size={15} /> Modo demo · Calendario y resultados de
-                  ejemplo. Los pronósticos no se guardan en la nube.
-                </span>
-                <button onClick={() => setDemo(false)}>
-                  Salir de demo <X size={14} />
-                </button>
-              </div>
-            )}
-            {error && (
-              <div className="error" role="alert">
-                {error}
-                <button onClick={() => setError("")} aria-label="Cerrar error">
-                  <X size={16} />
-                </button>
-              </div>
-            )}
-            <Suspense
-              fallback={
-                <div
-                  className="page-skeleton"
-                  role="status"
-                  aria-label="Cargando página"
-                >
-                  <span />
-                  <span />
-                  <span />
-                </div>
+  /**
+   * Pull to refresh: calendar at most a minute old, groups and rankings again.
+   * Quotas stay safe because the loader still deduplicates and caches.
+   */
+  const refreshAll = useCallback(async () => {
+    window.dispatchEvent(new Event(REFRESH_EVENT));
+    if (demo || !configured) return;
+    window.dispatchEvent(new Event(STANDINGS_UPDATED));
+    await Promise.allSettled([
+      loadMatches({ maxAge: 60_000 }).then(setMatches, (e) =>
+        setError(readableError(e)),
+      ),
+      refreshGroups(),
+    ]);
+  }, [demo, user]);
+
+  const renderRoutes = (location: Location) => (
+    <Routes location={location}>
+      <Route path="/partidos" element={<LegacyMatchesRoute />} />
+      <Route path="/equipos" element={<TeamsPage matches={matches} demo={demo} />} />
+      <Route
+        path="/"
+        element={
+          <HomePage
+            userId={user?.uid || ""}
+            user={user}
+            groups={activeGroups}
+            matches={matches}
+            loading={loading}
+            demo={demo}
+            onLogin={() => setLogin(true)}
+          />
+        }
+      />
+      <Route
+        path="/partido/:id"
+        element={
+          <MatchPage
+            matches={matches}
+            loading={loading}
+            demo={demo}
+            userId={user?.uid || ""}
+          />
+        }
+      />
+      <Route
+        path="/ligas"
+        element={
+          <MatchesPage
+            matches={matches}
+            demo={demo}
+            onDemo={() => setDemo(true)}
+            loading={loading}
+            userId={user?.uid || ""}
+          />
+        }
+      />
+      <Route
+        path="/quiniela"
+        element={
+          !authReady ? (
+            <PageTitle title="Mi quiniela" eyebrow="Comprobando tu ficha…" />
+          ) : !user && !demo ? (
+            <>
+              <PageTitle title="Mi quiniela" eyebrow="Quiniela" />
+              <PrivateGate
+                onLogin={() => setLogin(true)}
+                onDemo={() => setDemo(true)}
+              />
+            </>
+          ) : (
+            <PredictionsPage
+              matches={matches}
+              groups={activeGroups}
+              user={user}
+              demo={demo}
+            />
+          )
+        }
+      />
+      <Route
+        path="/grupos"
+        element={
+          <GroupsPage
+            user={user}
+            groups={activeGroups}
+            refresh={refreshGroups}
+            onLogin={() => setLogin(true)}
+          />
+        }
+      />
+      <Route
+        path="/clasificacion"
+        element={
+          <StandingsPage
+            groups={activeGroups}
+            matches={matches}
+            loading={loading}
+            user={user}
+            onLogin={() => setLogin(true)}
+          />
+        }
+      />
+      <Route
+        path="/perfil"
+        element={
+          <ProfilePage
+            user={user}
+            groups={activeGroups}
+            onLogin={() => setLogin(true)}
+            onUpdated={() => setProfileVersion((v) => v + 1)}
+          />
+        }
+      />
+      <Route
+        path="/porra"
+        element={
+          !authReady ? (
+            <PageTitle title="Porra rápida" eyebrow="Preparando tus porras…" />
+          ) : (
+            <PorraPage
+              key={user?.uid || "guest"}
+              owner={user?.uid || "guest"}
+              matches={matches}
+              demo={demo}
+              loading={loading}
+            />
+          )
+        }
+      />
+      <Route
+        path="*"
+        element={
+          <>
+            <PageTitle title="Fuera de juego" eyebrow="Error 404" />
+            <Empty
+              art="flag"
+              title="El linier ha levantado la bandera"
+              action={
+                <a className="button primary" href="#/" data-nav="tab">
+                  Volver al inicio
+                </a>
               }
             >
-              <div className="route-view" key={pathname}>
-                <Routes>
-                  <Route path="/partidos" element={<LegacyMatchesRoute />} />
-                  <Route
-                    path="/equipos"
-                    element={<TeamsPage matches={matches} demo={demo} />}
-                  />
-                  <Route
-                    path="/"
-                    element={
-                      <HomePage
-                        userId={user?.uid || ""}
-                        matches={matches}
-                        loading={loading}
-                        demo={demo}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/partido/:id"
-                    element={
-                      <MatchPage
-                        matches={matches}
-                        loading={loading}
-                        demo={demo}
-                        userId={user?.uid || ""}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/ligas"
-                    element={
-                      <MatchesPage
-                        matches={matches}
-                        demo={demo}
-                        onDemo={() => setDemo(true)}
-                        loading={loading}
-                        userId={user?.uid || ""}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/quiniela"
-                    element={
-                      !authReady ? (
-                        <Empty title="Comprobando sesión…">Un momento.</Empty>
-                      ) : !user && !demo ? (
-                        <PrivateGate
-                          onLogin={() => setLogin(true)}
-                          onDemo={() => setDemo(true)}
-                        />
-                      ) : (
-                        <PredictionsPage
-                          matches={matches}
-                          groups={activeGroups}
-                          user={user}
-                          demo={demo}
-                        />
-                      )
-                    }
-                  />
-                  <Route
-                    path="/grupos"
-                    element={
-                      <GroupsPage
-                        user={user}
-                        groups={activeGroups}
-                        refresh={refreshGroups}
-                        onLogin={() => setLogin(true)}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/clasificacion"
-                    element={
-                      <StandingsPage
-                        groups={activeGroups}
-                        matches={matches}
-                        loading={loading}
-                        user={user}
-                        onLogin={() => setLogin(true)}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/perfil"
-                    element={
-                      <ProfilePage
-                        user={user}
-                        groups={activeGroups}
-                        onLogin={() => setLogin(true)}
-                        onUpdated={() => setProfileVersion((v) => v + 1)}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/porra"
-                    element={
-                      !authReady ? (
-                        <Empty title="Preparando tus porras…">
-                          Un momento.
-                        </Empty>
-                      ) : (
-                        <PorraPage
-                          key={user?.uid || "guest"}
-                          owner={user?.uid || "guest"}
-                          matches={matches}
-                          demo={demo}
-                          loading={loading}
-                        />
-                      )
-                    }
-                  />
-                  <Route
-                    path="*"
-                    element={
-                      <Empty title="Fuera de juego">
-                        Esta página no existe.{" "}
-                        <Link to="/">Volver al inicio</Link>
-                      </Empty>
-                    }
-                  />
-                </Routes>
-              </div>
-            </Suspense>
+              Esta página no existe o se quedó en el vestuario.
+            </Empty>
+          </>
+        }
+      />
+    </Routes>
+  );
+
+  return (
+    <LiveContext.Provider value={live}>
+      <RefreshContext.Provider value={refreshAll}>
+        <div className="app-shell">
+          <Sidebar items={nav} onPrefetch={preloadPage} />
+          <div className="main-shell">
+            <NavBar user={user} />
+            <main className="main">
+              <StackNavigator render={renderRoutes} />
+            </main>
             <footer className="main-footer">
               <span>© {new Date().getFullYear()} GalacticBet</span>
-              <span>
-                Fútbol real. Rivalidad sana.{" "}
-                <span className="green-text">Siempre entre amigos.</span>
-              </span>
-              <Link to="/perfil?tab=play">
-                Cómo jugar <ArrowUpRight size={13} />
-              </Link>
+              <span>Fútbol real. Rivalidad sana. Siempre entre amigos.</span>
             </footer>
-          </main>
+          </div>
+          <PullToRefresh enabled={isTabRoot(pathname)} onRefresh={refreshAll} />
+          <BottomNavigation items={nav} inactive={false} onPrefetch={preloadPage} />
+          {demo && (
+            <div className="demo-pill" role="status">
+              <span>Modo demo</span>
+              <button type="button" onClick={() => setDemo(false)}>
+                Salir
+              </button>
+            </div>
+          )}
+          {error && (
+            <div className="toast is-error" role="alert">
+              <p>{error}</p>
+              <button onClick={() => setError("")} aria-label="Cerrar aviso">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          <ContextMenuHost />
+          {login && <LoginModal close={() => setLogin(false)} />}
         </div>
-        <BottomNavigation
-          items={bottomNav}
-          inactive={mobileMenuOpen}
-          onPrefetch={preloadPage}
-        />
-        {login && <LoginModal close={() => setLogin(false)} />}
-      </div>
+      </RefreshContext.Provider>
     </LiveContext.Provider>
   );
 }

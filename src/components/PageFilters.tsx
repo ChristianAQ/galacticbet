@@ -79,33 +79,4 @@ export default function PageFilters({
   );
 }
 
-/** Two or three mutually exclusive options in a compact pill. */
-export function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="segmented" role="group" aria-label={label}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={value === o.value}
-          onClick={() => {
-            if (o.value !== value) haptic();
-            onChange(o.value);
-          }}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+export { default as Segmented } from "./Segmented";

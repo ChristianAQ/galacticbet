@@ -12,7 +12,11 @@ export function configureMobileViewport() {
     passive: false,
   });
   document.addEventListener("touchmove", preventPinch, { passive: false });
+  // iOS only applies :active styles when the page listens to touches.
+  const activate = () => {};
+  document.addEventListener("touchstart", activate, { passive: true });
   return () => {
+    document.removeEventListener("touchstart", activate);
     document.removeEventListener("gesturestart", preventGesture);
     document.removeEventListener("gesturechange", preventGesture);
     document.removeEventListener("touchmove", preventPinch);

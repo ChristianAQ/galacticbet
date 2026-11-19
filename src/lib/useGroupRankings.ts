@@ -23,7 +23,12 @@ export function useGroupRankings(userId: string, group?: Group) {
   useEffect(() => {
     if (!key || !group) return;
     let active = true;
-    setResult({ key, data: getCachedGroupRankings(group) });
+    // Re-run when an <Activity> page is shown again: keep the totals on screen.
+    setResult((previous) =>
+      previous.key === key && previous.data
+        ? previous
+        : { key, data: getCachedGroupRankings(group) },
+    );
     void loadGroupRankings(group).then(
       (data) => {
         if (active) setResult({ key, data });

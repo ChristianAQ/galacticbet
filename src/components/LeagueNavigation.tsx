@@ -1,80 +1,85 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { LEAGUE_TABS, type LeagueTab } from "../lib/leagueHub";
+import Segmented from "./Segmented";
 
+/** Short labels so four segments fit a phone; the panel titles stay complete. */
+const shortLabels: Partial<Record<LeagueTab, string>> = {
+  clasificacion: "Tabla",
+};
+
+/**
+ * The four sections of a competition as a segmented control pinned under the
+ * navigation bar. It publishes its height so day headers and the table header
+ * can pin right below it.
+ */
 export default function LeagueNavigation({
   tab,
   onChange,
-  children,
+  panel,
+  idPrefix,
+  panelId,
 }: {
   tab: LeagueTab;
   onChange: (tab: LeagueTab) => void;
-  children: ReactNode;
+  /** The tab panel, to scroll back to its top when switching far down. */
+  panel: RefObject<HTMLElement | null>;
+  idPrefix: string;
+  panelId: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLSpanElement>(null);
-  const [compact, setCompact] = useState(false);
+  const [stuck, setStuck] = useState(false);
   useLayoutEffect(() => {
-    const topbar = document.querySelector<HTMLElement>(".topbar");
-    let pinned: IntersectionObserver | undefined;
-    let observedOffset = -1;
+    const nav = ref.current;
+    const mark = sentinel.current;
+    if (!nav || !mark) return;
+    const page = nav.closest<HTMLElement>(".leagues-page");
+    let observer: IntersectionObserver | undefined;
+    let offset = -1;
     const update = () => {
-      const style = topbar && getComputedStyle(topbar);
-      const offset =
-        topbar && style && ["sticky", "fixed"].includes(style.position)
-          ? topbar.getBoundingClientRect().height + (parseFloat(style.top) || 0)
-          : 0;
-      ref.current?.style.setProperty("--league-header-offset", `${offset}px`);
-      ref.current?.parentElement?.style.setProperty(
-        "--league-header-offset",
-        `${offset}px`,
-      );
-      ref.current?.parentElement?.style.setProperty(
+      page?.style.setProperty(
         "--league-navigation-height",
-        `${ref.current.getBoundingClientRect().height}px`,
+        `${nav.getBoundingClientRect().height}px`,
       );
-      if (observedOffset === offset || !sentinel.current) return;
-      observedOffset = offset;
-      pinned?.disconnect();
-      // A fixed origin keeps the logos compact until the navigation returns to
-      // its resting position, even when scrolling up or changing tabs.
-      pinned = new IntersectionObserver(
+      const bar = document.querySelector<HTMLElement>(".nav-bar");
+      const next = Math.round(bar?.getBoundingClientRect().height || 0);
+      if (next === offset) return;
+      offset = next;
+      observer?.disconnect();
+      observer = new IntersectionObserver(
         ([entry]) =>
-          setCompact(
-            !entry.isIntersecting && entry.boundingClientRect.top < offset,
-          ),
-        { rootMargin: `-${offset}px 0px 0px 0px`, threshold: 0 },
+          setStuck(!entry.isIntersecting && entry.boundingClientRect.top < offset + 1),
+        { rootMargin: `-${offset + 1}px 0px 0px 0px`, threshold: 0 },
       );
-      pinned.observe(sentinel.current);
+      observer.observe(mark);
     };
     update();
-    const observer = new ResizeObserver(update);
-    // Safe-area padding changes the outer height even when the content box stays equal.
-    if (topbar) observer.observe(topbar, { box: "border-box" });
-    if (ref.current) observer.observe(ref.current, { box: "border-box" });
+    const resize = new ResizeObserver(update);
+    resize.observe(nav, { box: "border-box" });
     window.addEventListener("resize", update);
     return () => {
-      observer.disconnect();
-      pinned?.disconnect();
+      observer?.disconnect();
+      resize.disconnect();
       window.removeEventListener("resize", update);
     };
   }, []);
   function select(next: LeagueTab) {
     if (next === tab) return;
-    const panel = document.getElementById("league-panel");
+    const target = panel.current;
     const header = ref.current;
-    if (panel && header) {
-      const offset =
-        parseFloat(header.style.getPropertyValue("--league-header-offset")) ||
-        0;
-      const target =
-        panel.getBoundingClientRect().top +
+    if (target && header) {
+      const bar =
+        document.querySelector<HTMLElement>(".nav-bar")?.getBoundingClientRect()
+          .height || 0;
+      const top =
+        target.getBoundingClientRect().top +
         window.scrollY -
         header.offsetHeight -
-        offset -
-        12;
-      if (window.scrollY > target + 12)
+        bar -
+        8;
+      if (window.scrollY > top + 8)
         window.scrollTo({
-          top: Math.max(0, target),
+          top: Math.max(0, top),
           behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
             ? "auto"
             : "smooth",
@@ -86,56 +91,19 @@ export default function LeagueNavigation({
     <>
       <span ref={sentinel} className="sticky-sentinel" aria-hidden="true" />
       <div
-        className={`league-navigation${compact ? " is-compact" : ""}`}
         ref={ref}
+        className={`league-navigation${stuck ? " is-stuck" : ""}`}
       >
-        {children}
-        <div
-          className="league-tabs"
-          role="tablist"
-          aria-label="Información de la liga"
-          onKeyDown={(e) => {
-            const current = LEAGUE_TABS.findIndex((t) => t.id === tab);
-            const next =
-              e.key === "Home"
-                ? 0
-                : e.key === "End"
-                  ? 3
-                  : e.key === "ArrowRight"
-                    ? (current + 1) % 4
-                    : e.key === "ArrowLeft"
-                      ? (current + 3) % 4
-                      : null;
-            if (next === null) return;
-            e.preventDefault();
-            select(LEAGUE_TABS[next].id);
-            ref.current
-              ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-              [next]?.focus({ preventScroll: true });
-          }}
-        >
-          <span
-            className="league-tab-indicator"
-            aria-hidden="true"
-            style={{
-              transform: `translateX(${LEAGUE_TABS.findIndex((t) => t.id === tab) * 100}%)`,
-            }}
-          />
-          {LEAGUE_TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              id={`league-tab-${t.id}`}
-              aria-selected={t.id === tab}
-              aria-controls="league-panel"
-              tabIndex={t.id === tab ? 0 : -1}
-              onClick={() => select(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <Segmented<LeagueTab>
+          label="Información de la liga"
+          value={tab}
+          options={LEAGUE_TABS.map((t) => ({
+            value: t.id,
+            label: shortLabels[t.id] || t.label,
+          }))}
+          onChange={select}
+          tabs={{ idPrefix, controls: panelId }}
+        />
       </div>
     </>
   );

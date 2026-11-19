@@ -41,12 +41,13 @@ export function createCalendarLoader(
       /* Safari private mode / full storage: use memory instead. */
     }
   }
-  return function load() {
+  /** `maxAge` lets pull-to-refresh ask for fresher data than the usual TTL. */
+  return function load({ maxAge = CALENDAR_TTL }: { maxAge?: number } = {}) {
     restore();
     if (
       cached &&
       Date.now() >= cached.savedAt &&
-      Date.now() - cached.savedAt < CALENDAR_TTL
+      Date.now() - cached.savedAt < Math.min(maxAge, CALENDAR_TTL)
     )
       return Promise.resolve(cached.matches);
     if (pending) return pending;

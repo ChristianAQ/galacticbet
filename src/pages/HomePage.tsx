@@ -1,21 +1,48 @@
 import { useEffect, useMemo, useState } from "react";
+import type { User } from "firebase/auth";
 import UpcomingSchedule from "../components/UpcomingSchedule";
 import NewsSection from "../components/NewsSection";
-import { MatchTicker, QuinielaSpotlight } from "../components/HomeWidgets";
+import {
+  HomeTools,
+  MatchTicker,
+  QuinielaSpotlight,
+} from "../components/HomeWidgets";
+import { PageTitle } from "../components/ui";
+import type { Group } from "../lib/data";
 import type { Match } from "../lib/domain";
 import { openRounds } from "../lib/homeDashboard";
 import { upcomingMatches } from "../lib/schedule";
 
+const dayParts = new Intl.DateTimeFormat("es", {
+  weekday: "long",
+  day: "numeric",
+  month: "short",
+});
+/** «jueves, 19 nov» → «Jueves 19 nov», printed as the masthead dateline. */
+function dateline(now: number) {
+  return dayParts
+    .formatToParts(now)
+    .filter((p) => p.type !== "literal")
+    .map((p) => p.value.replace(".", ""))
+    .join(" ");
+}
+
 export default function HomePage({
   userId,
+  user,
+  groups,
   matches,
   loading,
   demo = false,
+  onLogin,
 }: {
   userId: string;
+  user: User | null;
+  groups: Group[];
   matches: Match[];
   loading: boolean;
   demo?: boolean;
+  onLogin: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -33,22 +60,30 @@ export default function HomePage({
   }, []);
   const upcoming = useMemo(() => upcomingMatches(matches, now), [matches, now]);
   const rounds = useMemo(() => openRounds(matches, now), [matches, now]);
+  const firstName = user?.displayName?.trim().split(/\s+/)[0];
   return (
-    <>
-      <h1 className="sr-only">Inicio</h1>
-      <div className="home-top-grid">
-        {!loading && (
-          <QuinielaSpotlight rounds={rounds} now={now} userId={userId} />
-        )}
-        <UpcomingSchedule
-          matches={matches}
-          upcoming={upcoming}
+    <div className="home-page">
+      <PageTitle
+        eyebrow={dateline(now)}
+        title={firstName ? `Hola, ${firstName}` : "Hoy se juega"}
+        navTitle="Inicio"
+      >
+        <QuinielaSpotlight
+          rounds={rounds}
           now={now}
+          userId={userId}
           loading={loading}
         />
-      </div>
+      </PageTitle>
       {!loading && <MatchTicker matches={matches} now={now} />}
+      <UpcomingSchedule
+        matches={matches}
+        upcoming={upcoming}
+        now={now}
+        loading={loading}
+      />
+      <HomeTools user={user} groups={groups} onLogin={onLogin} />
       <NewsSection demo={demo} />
-    </>
+    </div>
   );
 }

@@ -1,107 +1,119 @@
-/* Informational round pot. Gold = money, lime = brand. Motion only via transform/opacity. */
+/*
+ * Round pot, printed as a ticket: an ink stub with the amount, a perforated
+ * fold and the small print. Also the pot settings used by group forms.
+ */
 .pot-card {
   position: relative;
   overflow: hidden;
   display: grid;
-  gap: 14px;
-  margin: 0 0 16px;
-  padding: 18px 18px 14px;
-  border: 1px solid #f0d58c33;
-  border-radius: 20px;
-  background:
-    radial-gradient(120% 90% at 100% 0%, #f0d58c1f, transparent 55%),
-    radial-gradient(90% 70% at 0% 100%, #c5f66a12, transparent 60%),
-    var(--panel);
-  animation: pot-enter 420ms var(--navigation-ease, ease) both;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  animation: pot-in var(--spring-bouncy-ms) var(--spring-bouncy) both;
 }
-.pot-card::after {
-  /* One soft sheen when the card appears. */
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 35%,
-    #ffffff12 50%,
-    transparent 65%
-  );
-  transform: translateX(-100%);
-  animation: pot-sheen 1.4s 250ms var(--navigation-ease, ease) forwards;
-  pointer-events: none;
+@keyframes pot-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.98);
+  }
+}
+.pot-stub {
+  padding: 14px 16px 18px;
+  background: var(--masthead);
+  color: var(--masthead-ink);
 }
 .pot-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 28px;
+  min-height: 32px;
 }
 .pot-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   margin-right: auto;
-  color: var(--gold);
-  font-size: 11px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--accent);
 }
 .pot-state {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  min-height: 24px;
+  padding: 0 10px;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  background: #ffffff0d;
-  color: #c6ccd7;
+  background: color-mix(in srgb, var(--masthead-ink) 12%, transparent);
+  color: var(--masthead-ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
 }
-.pot-state.is-open {
-  background: #c5f66a1a;
-  color: var(--brand-accent);
-}
-.pot-state.is-live {
-  background: #ff5d5d1a;
-  color: #ff8b8b;
-}
-.pot-state.is-live i {
-  width: 6px;
-  height: 6px;
+.pot-state i {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: currentColor;
-  animation: pot-pulse 1.4s ease-in-out infinite;
+  background: var(--live);
+  animation: live-pulse 1.6s ease-in-out infinite;
 }
-.pot-state.is-settled {
-  background: #f0d58c1f;
-  color: var(--gold);
+.pot-state.is-settled,
+.pot-state.is-empty {
+  color: var(--masthead-ink-2);
 }
 .pot-manage {
-  margin: -8px -8px -8px 0;
-  min-width: 44px;
-  min-height: 44px;
-  border-radius: 12px;
+  margin: -6px -10px -6px 0;
+  color: var(--masthead-ink-2);
+}
+.pot-manage:active {
+  background: color-mix(in srgb, var(--masthead-ink) 12%, transparent) !important;
 }
 .pot-main {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
 }
 .pot-amount {
-  font-size: clamp(34px, 11vw, 46px);
-  font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-tight);
+  font-size: 58px;
+  font-weight: 900;
+  line-height: 0.88;
+  letter-spacing: -0.01em;
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(180deg, #fff6d6, #e7c467);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
 }
 .pot-formula {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--masthead-ink-2);
+}
+/* Perforation: a dashed fold with two punched notches. */
+.pot-body {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-top: 2px dashed var(--rule);
+}
+.pot-body::before,
+.pot-body::after {
+  content: "";
+  position: absolute;
+  top: -11px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.pot-body::before {
+  left: -11px;
+}
+.pot-body::after {
+  right: -11px;
 }
 .pot-players {
   display: flex;
@@ -111,328 +123,220 @@
 }
 .pot-stack {
   display: flex;
-  flex: none;
+  flex-shrink: 0;
+  padding-left: 8px;
 }
 .pot-stack .rival-avatar {
-  width: 28px;
-  height: 28px;
-  font-size: 11px;
-  border: 2px solid var(--panel);
-  animation: pot-pop 360ms var(--navigation-ease, ease) both;
-}
-.pot-stack .rival-avatar + .rival-avatar {
-  margin-left: -9px;
-}
-.pot-stack .rival-avatar:nth-child(2) {
-  animation-delay: 40ms;
-}
-.pot-stack .rival-avatar:nth-child(3) {
-  animation-delay: 80ms;
-}
-.pot-stack .rival-avatar:nth-child(4) {
-  animation-delay: 120ms;
-}
-.pot-stack .rival-avatar:nth-child(5) {
-  animation-delay: 160ms;
-}
-.pot-stack .rival-avatar:nth-child(n + 6) {
-  animation-delay: 200ms;
+  width: 30px;
+  height: 30px;
+  margin-left: -8px;
+  font-size: 14px;
+  box-shadow: 0 0 0 2px var(--card);
 }
 .pot-more {
-  background: #ffffff14;
-  color: #c6ccd7;
-  font-size: 10px !important;
+  background: var(--paper-3) !important;
+  color: var(--ink) !important;
+  font-family: var(--font-text) !important;
+  font-size: 11px !important;
 }
 .pot-players-text {
   min-width: 0;
-  overflow: hidden;
-  font-size: 12px;
-  color: #b2b8c2;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.pot-note {
+  font-size: var(--text-sm);
+  color: var(--ink-2);
 }
 .pot-winners {
   display: grid;
   gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid #ffffff0f;
 }
 .pot-winners-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8f9db5;
+  color: var(--ink-3);
 }
 .pot-winners ul {
   display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  gap: 8px;
 }
 .pot-winners li {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 48px;
-  padding: 6px 12px 6px 6px;
-  border-radius: 14px;
-  background: #ffffff08;
-  animation: pot-enter 380ms 120ms var(--navigation-ease, ease) both;
-}
-.pot-winners li.is-me {
-  background: linear-gradient(90deg, #f0d58c26, #f0d58c0a);
-  box-shadow: inset 0 0 0 1px #f0d58c40;
+  min-height: 44px;
 }
 .pot-winner-avatar {
   position: relative;
-  flex: none;
+  flex-shrink: 0;
+}
+.pot-winner-avatar .rival-avatar {
+  width: 36px;
+  height: 36px;
 }
 .pot-winner-avatar svg {
   position: absolute;
   top: -7px;
-  right: -5px;
-  color: var(--gold);
-  fill: var(--gold);
-  filter: drop-shadow(0 1px 2px #0008);
+  right: -6px;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  width: 18px;
+  height: 18px;
 }
 .pot-winner-name {
   display: grid;
+  flex: 1;
   min-width: 0;
-  margin-right: auto;
-  font-weight: 600;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .pot-winner-name > span {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
 }
 .pot-winner-name small {
-  color: var(--brand-accent);
+  color: var(--ink-3);
   font-weight: 600;
 }
-.pot-winner-name .pot-winner-points {
-  color: var(--muted);
-  font-weight: 400;
-  font-size: 11px;
+.pot-winner-points {
+  font-size: var(--text-xs);
 }
 .pot-winner-share {
-  flex: none;
-  color: var(--gold);
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-tight);
+  font-size: 24px;
+  font-weight: 900;
+}
+.pot-winners li.is-me .pot-winner-share {
+  padding: 0 4px;
+  background: linear-gradient(transparent 45%, var(--accent) 45%, var(--accent) 92%, transparent 92%);
 }
 .pot-winners-more {
-  justify-content: center;
-  color: var(--muted);
-  font-size: 12px;
-}
-.pot-note {
-  margin: 0;
-  font-size: 12px;
-  color: #b2b8c2;
+  min-height: 0 !important;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 .pot-disclaimer {
   display: flex;
+  align-items: flex-start;
   gap: 6px;
-  margin: 0;
-  font-size: 10.5px;
-  line-height: 1.45;
-  color: #7f8794;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-3);
 }
 .pot-disclaimer svg {
-  flex: none;
   margin-top: 2px;
 }
-.pot-card.is-mine {
-  border-color: #f0d58c66;
-  box-shadow: 0 10px 40px #f0d58c14;
+/* Your ticket won: the stub turns yellow. */
+.pot-card.is-mine .pot-stub {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.pot-card.is-mine .pot-eyebrow,
+.pot-card.is-mine .pot-amount,
+.pot-card.is-mine .pot-formula,
+.pot-card.is-mine .pot-state,
+.pot-card.is-mine .pot-manage {
+  color: var(--accent-ink);
+}
+.pot-card.is-mine .pot-state {
+  background: color-mix(in srgb, var(--accent-ink) 12%, transparent);
 }
 
-/* Compact chip for the quiniela screen. */
-.pot-chip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 14px;
-  padding: 10px 14px;
-  border: 1px solid #f0d58c2e;
-  border-radius: 16px;
-  background:
-    radial-gradient(120% 120% at 100% 0%, #f0d58c17, transparent 60%),
-    var(--panel);
-  color: inherit;
-  text-decoration: none;
-  animation: pot-enter 320ms var(--navigation-ease, ease) both;
-}
-.pot-chip > svg:first-child {
-  flex: none;
-  color: var(--gold);
-}
-.pot-chip-text {
-  display: grid;
-  min-width: 0;
-  margin-right: auto;
-}
-.pot-chip-text small {
-  font-size: 11px;
-  color: var(--muted);
-}
-.pot-chip .pot-amount {
-  font-size: 20px;
-}
-.pot-chip > svg:last-child {
-  flex: none;
-  color: #6f7888;
-}
-
-/* Group settings. */
+/* ---------- Pot settings (group forms) ---------- */
 .pot-settings {
   display: grid;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid #f0d58c26;
-  border-radius: 16px;
-  background: #f0d58c08;
-}
-.pot-settings p {
-  margin: 0;
-  font-size: 12px;
-}
-.pot-intro {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  line-height: 1.5;
-}
-.pot-intro svg {
-  flex: none;
-  margin-top: 2px;
-  color: var(--gold);
+  gap: 12px;
 }
 .pot-presets {
-  display: grid;
-  grid-template-columns: auto repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .pot-presets button {
-  min-width: 0;
   min-height: 44px;
-  padding: 0 10px;
-  white-space: nowrap;
-  border: 1px solid var(--border);
+  padding: 0 16px;
   border-radius: 999px;
-  background: #ffffff08;
-  color: #d5dae2;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    transform 160ms var(--navigation-ease, ease);
+    background-color 160ms ease,
+    transform 160ms var(--press);
 }
 .pot-presets button[aria-pressed="true"] {
-  border-color: var(--gold);
-  background: #f0d58c22;
-  color: var(--gold);
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1.5px var(--accent-ink);
 }
-.pot-presets button:active {
+.pot-presets button:active:not(:disabled) {
   transform: scale(0.94);
+}
+.pot-presets button:disabled {
+  opacity: 0.45;
 }
 .pot-input {
   position: relative;
-  display: block;
+  display: flex;
+  align-items: center;
 }
 .pot-input input {
-  width: 100%;
-  padding-right: 36px;
+  padding-right: 44px !important;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 22px !important;
+  font-weight: 850 !important;
 }
 .pot-input > span {
   position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--muted);
+  right: 16px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 20px;
+  font-weight: 850;
+  color: var(--ink-3);
   pointer-events: none;
 }
-.pot-settings-actions {
+.pot-intro {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--ink-3);
 }
-.pot-settings-actions .button {
-  margin: 0;
+.pot-intro svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 .pot-preview {
-  font-size: 12px;
-  color: var(--muted);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
 }
 .pot-preview strong {
-  color: var(--gold);
-  font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 .group-pot-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #f0d58c1a;
-  color: var(--gold);
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-xs);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-@keyframes pot-enter {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes pot-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes pot-sheen {
-  to {
-    transform: translateX(100%);
-  }
-}
-@keyframes pot-pulse {
-  50% {
-    opacity: 0.35;
-    transform: scale(0.8);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pot-card,
-  .pot-card::after,
-  .pot-chip,
-  .pot-stack .rival-avatar,
-  .pot-winners li,
-  .pot-state.is-live i {
-    animation: none;
-  }
-  .pot-card::after {
-    display: none;
-  }
-  .pot-presets button {
-    transition: none;
-  }
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }

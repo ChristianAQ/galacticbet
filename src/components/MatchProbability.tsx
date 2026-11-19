@@ -1,6 +1,17 @@
 import { hasCurrentProbability } from "../lib/matchProbability";
 import type { Match } from "../lib/domain";
 import type { MatchProbability as Probability } from "../lib/matchProbability";
+
+const stamp = new Intl.DateTimeFormat("es", {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const format = (n: number) =>
+  new Intl.NumberFormat("es", { maximumFractionDigits: 1 }).format(n);
+
+/** Pre-match 1X2 probability as a split bar: ink for home, yellow for away. */
 export default function MatchProbability({
   match,
   probability,
@@ -13,61 +24,58 @@ export default function MatchProbability({
   if (!probability || !hasCurrentProbability(match, probability, now))
     return null;
   const options = [
-    { label: match.home, value: probability.home, code: "1" },
-    { label: "Empate", value: probability.draw, code: "X" },
-    { label: match.away, value: probability.away, code: "2" },
+    { label: match.home, value: probability.home, code: "1", side: "home" },
+    { label: "Empate", value: probability.draw, code: "X", side: "draw" },
+    { label: match.away, value: probability.away, code: "2", side: "away" },
   ];
-  const format = (n: number) =>
-    new Intl.NumberFormat("es", { maximumFractionDigits: 1 }).format(n);
+  const favourite = options.reduce((a, b) => (b.value > a.value ? b : a));
   return (
     <section
-      className="match-probability"
+      className="match-block match-probability"
       aria-label="Probabilidad previa al partido"
     >
+      <h3 className="match-block-title">Quién parte con ventaja</h3>
       <div className="probability-values">
         {options.map((p) => (
-          <div key={p.code}>
-            <span>{p.label}</span>
+          <div
+            key={p.code}
+            className={`is-${p.side}${p === favourite ? " is-favourite" : ""}`}
+          >
+            <small className="probability-code">{p.code}</small>
             <strong>
               {format(p.value)}
               <small>%</small>
             </strong>
-            <small>{p.code}</small>
+            <span>{p.label}</span>
           </div>
         ))}
       </div>
       <div className="probability-bar" aria-hidden="true">
         {options.map((p) => (
-          <span key={p.code} style={{ flexGrow: p.value }} />
+          <span
+            key={p.code}
+            className={`is-${p.side}`}
+            style={{ flexGrow: p.value }}
+          />
         ))}
       </div>
-      <p>
+      <p className="match-extra-note">
         {probability.model === "ESPN_ODDS"
           ? `Probabilidad implícita de cuotas 1X2 · ${probability.bookmaker} vía ESPN. Margen eliminado; no es un modelo estadístico.`
           : "Estimación del modelo ESPN; no garantiza el resultado."}
-      </p>
-      {probability.marketUpdatedAt && (
-        <small className="probability-market-time">
-          Cuotas actualizadas{" "}
-          {new Intl.DateTimeFormat("es", {
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-          }).format(new Date(probability.marketUpdatedAt))}
-        </small>
-      )}
-      <small>
+        {probability.marketUpdatedAt && (
+          <>
+            {" "}
+            Cuotas actualizadas{" "}
+            {stamp.format(new Date(probability.marketUpdatedAt))}.
+          </>
+        )}{" "}
         Consultado{" "}
         <time dateTime={probability.fetchedAt}>
-          {new Intl.DateTimeFormat("es", {
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-          }).format(new Date(probability.fetchedAt))}
+          {stamp.format(new Date(probability.fetchedAt))}
         </time>
-      </small>
+        .
+      </p>
     </section>
   );
 }

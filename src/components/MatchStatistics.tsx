@@ -1,7 +1,9 @@
+import type { CSSProperties } from "react";
 import type { Match } from "../lib/domain";
 import type { MatchStatistic } from "../lib/matchInsightsData";
 import { statisticShares } from "../lib/matchPresentation";
 import { Team } from "./ui";
+import "../styles/matchExtras.css";
 
 const lowerIsBetter = new Set([
   "Faltas",
@@ -17,6 +19,7 @@ const labels: Record<string, string> = {
   Córners: "Saques de esquina",
 };
 
+/** Mirrored bars from the centre: the team on top of each stat is marked in yellow. */
 export default function MatchStatistics({
   match,
   statistics,
@@ -25,7 +28,7 @@ export default function MatchStatistics({
   statistics: MatchStatistic[];
 }) {
   return (
-    <div className="match-statistics-card">
+    <div className="match-block match-statistics-card">
       <table className="match-extra-stats">
         <caption className="sr-only">
           Estadísticas del partido según ESPN. Se destaca la cifra más
@@ -36,7 +39,9 @@ export default function MatchStatistics({
             <th scope="col">
               <Team name={match.home} crest={match.homeCrest} />
             </th>
-            <th scope="col">Estadísticas de equipo</th>
+            <th scope="col">
+              <span className="sr-only">Estadística</span>
+            </th>
             <th scope="col">
               <Team name={match.away} crest={match.awayCrest} />
             </th>
@@ -72,7 +77,23 @@ export default function MatchStatistics({
             return (
               <tr key={`${stat.label}-${index}`}>
                 <td>{value("home")}</td>
-                <th scope="row">{labels[stat.label] || stat.label}</th>
+                <th scope="row">
+                  <span className="stat-label">
+                    {labels[stat.label] || stat.label}
+                  </span>
+                  {shares && (
+                    <span className="stat-bars" aria-hidden="true">
+                      <i
+                        className={`is-home${highlighted === "home" ? " is-highlighted" : ""}`}
+                        style={{ "--share": shares[0] / 100 } as CSSProperties}
+                      />
+                      <i
+                        className={`is-away${highlighted === "away" ? " is-highlighted" : ""}`}
+                        style={{ "--share": shares[1] / 100 } as CSSProperties}
+                      />
+                    </span>
+                  )}
+                </th>
                 <td>{value("away")}</td>
               </tr>
             );

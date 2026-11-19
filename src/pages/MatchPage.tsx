@@ -1,18 +1,12 @@
 import {
-  ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
   CalendarDays,
   MapPin,
-  Target,
   Tv,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import CompetitionLogo from "../components/CompetitionLogo";
 import LeagueTable from "../components/LeagueTable";
 import LineupPitch from "../components/LineupPitch";
@@ -27,7 +21,8 @@ import MatchStatistics from "../components/MatchStatistics";
 import MatchTimeline from "../components/MatchTimeline";
 import Matchups from "../components/Matchups";
 import TeamForm from "../components/TeamForm";
-import { Crest, Empty } from "../components/ui";
+import { Skeleton, SkeletonRows } from "../components/Skeleton";
+import { Empty, PageTitle, useCollapsingTitle } from "../components/ui";
 import { competitionName } from "../lib/competitions";
 import {
   canPredict,
@@ -51,6 +46,8 @@ import { chronologicalGoals } from "../lib/matchPresentation";
 import { finishedMatchResult } from "../lib/matchResult";
 import { countdownLabel } from "../lib/matchPreview";
 import { preferenceStore } from "../lib/preferences";
+import { useNavTitle } from "../lib/chrome";
+import { haptic } from "../lib/motion";
 import { useLiveMatch } from "../lib/useLiveBoard";
 import { useMatchInsight } from "../lib/useMatchInsight";
 import { useMatchOdds } from "../lib/useMatchOdds";
@@ -67,6 +64,24 @@ const kickoffDay = new Intl.DateTimeFormat("es", {
   month: "long",
 });
 
+/** Ink scoreboard placeholder while the calendar loads. */
+function MatchSkeleton() {
+  return (
+    <div className="match-page" role="status" aria-label="Cargando partido">
+      <div className="masthead match-hero match-hero-skeleton">
+        <Skeleton width={150} height={11} className="on-ink" />
+        <div className="match-hero-board">
+          <Skeleton width={64} height={64} radius="50%" className="on-ink" />
+          <Skeleton width={104} height={56} radius={10} className="on-ink" />
+          <Skeleton width={64} height={64} radius="50%" className="on-ink" />
+        </div>
+        <Skeleton width="60%" height={12} className="on-ink" />
+      </div>
+      <SkeletonRows rows={4} variant="line" label="Cargando ficha" />
+    </div>
+  );
+}
+
 export default function MatchPage({
   matches,
   loading,
@@ -82,16 +97,22 @@ export default function MatchPage({
   const match = matches.find((m) => m.id === id);
   if (!match)
     return loading ? (
-      <div className="match-page-skeleton" role="status" aria-label="Cargando">
-        <span />
-        <span />
-        <span />
-      </div>
+      <MatchSkeleton />
     ) : (
-      <Empty title="Partido no encontrado">
-        Puede que pertenezca a otra temporada.{" "}
-        <Link to="/ligas">Ver el calendario</Link>
-      </Empty>
+      <>
+        <PageTitle eyebrow="Fuera de juego" title="Partido" />
+        <Empty
+          art="flag"
+          title="Este partido no está en el calendario"
+          action={
+            <Link className="button primary" to="/ligas">
+              Ver el calendario <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          }
+        >
+          Puede que sea de otra temporada o que el enlace haya caducado.
+        </Empty>
+      </>
     );
   return (
     <MatchView
@@ -135,6 +156,27 @@ function useScorers(match: Match, insight: MatchInsight | null) {
   }, [live, insight, match]);
 }
 
+/** Large crest that morphs from the fixture row (shared view-transition part). */
+function HeroCrest({ src, part }: { src?: string; part: string }) {
+  const [failed, setFailed] = useState(false);
+  return src && !failed ? (
+    <img
+      className="match-hero-crest"
+      src={src}
+      alt=""
+      decoding="async"
+      data-vt-part={part}
+      onError={() => setFailed(true)}
+    />
+  ) : (
+    <span
+      className="match-hero-crest crest-placeholder"
+      data-vt-part={part}
+      aria-hidden="true"
+    />
+  );
+}
+
 function MatchView({
   match,
   matches,
@@ -146,13 +188,14 @@ function MatchView({
   demo: boolean;
   userId: string;
 }) {
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+  useNavTitle(`${match.home} – ${match.away}`);
+  const board = useCollapsingTitle<HTMLDivElement>();
   const { insight, loading, error, onRetry } = useMatchInsight(match, demo);
   const upcoming =
     ["TIMED", "SCHEDULED"].includes(match.status) &&
@@ -183,6 +226,7 @@ function MatchView({
   );
   const requested = params.get("tab") as MatchPageTab | null;
   const tab = requested && tabs.includes(requested) ? requested : tabs[0];
+  const tabsAnchor = useRef<HTMLSpanElement>(null);
   const tabsRef = useRef<HTMLElement>(null);
   const scorers = useScorers(match, demo ? null : insight);
   const tie = knockoutContext(match, matches);
@@ -197,6 +241,8 @@ function MatchView({
     awayScore: m.awayScore!,
   }));
   function selectTab(next: MatchPageTab) {
+    if (next === tab) return;
+    haptic();
     setParams(
       (previous) => {
         const value = new URLSearchParams(previous);
@@ -205,97 +251,90 @@ function MatchView({
       },
       { replace: true },
     );
-    // Keep the menu in view when switching from far down a long section.
+    // Pinned under the bar: keep the menu where it is while the panel changes.
     const bar = tabsRef.current;
-    if (bar && bar.getBoundingClientRect().top <= 0) {
+    const anchor = tabsAnchor.current;
+    if (bar && anchor) {
       const offset = parseFloat(getComputedStyle(bar).top) || 0;
-      window.scrollTo({
-        top: window.scrollY + bar.getBoundingClientRect().top - offset,
-      });
+      if (bar.getBoundingClientRect().top <= offset + 1)
+        window.scrollTo({
+          top: window.scrollY + anchor.getBoundingClientRect().top - offset,
+        });
     }
-  }
-  function back() {
-    // React Router keeps the history index: only go back inside the app.
-    if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
-    else navigate(`/ligas?competition=${match.competition}`);
   }
   const result = finishedMatchResult(match);
   const canPlay = !demo && canPredict(match.utcDate, now, match.status);
+  const status = playing ? (
+    <LiveMinute match={match} />
+  ) : upcoming ? (
+    <>
+      Empieza en <b>{countdownLabel(match.utcDate, now)}</b>
+    </>
+  ) : result ? (
+    result.extended && result.winnerName ? (
+      `Gana ${result.winnerName} ${result.decision.toLowerCase()}`
+    ) : (
+      "Final"
+    )
+  ) : (
+    matchStatusLabel[match.status] || match.status
+  );
   return (
     <article
       className="match-page"
       aria-label={`${match.home} contra ${match.away}`}
     >
-      <div className="match-page-bar">
-        <button
-          type="button"
-          className="icon-button match-page-back"
-          aria-label="Volver"
-          onClick={back}
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <span className="match-page-competition">
+      <header
+        className={`masthead match-hero${playing ? " is-live" : ""}${scored ? " is-scored" : ""}`}
+        data-vt-match={match.id}
+        data-vt-hero
+      >
+        <h1 className="sr-only">
+          {match.home} contra {match.away}
+        </h1>
+        <p className="match-hero-meta">
           <CompetitionLogo code={match.competition} small />
-          <span>
-            <strong>{competitionName(match.competition)}</strong>
-            <small>
-              {roundLabel(match)}
-              {tie?.leg ? ` · ${tie.leg === 1 ? "Ida" : "Vuelta"}` : ""}
-            </small>
+          <span className="eyebrow">
+            {competitionName(match.competition)} · {roundLabel(match)}
+            {tie?.leg ? ` · ${tie.leg === 1 ? "Ida" : "Vuelta"}` : ""}
           </span>
-        </span>
-      </div>
-
-      <header className={`match-hero${playing ? " is-live" : ""}`}>
-        <div className="match-hero-team">
-          <span className="match-hero-crest">
-            <Crest src={match.homeCrest} />
-          </span>
-          <strong>{match.home}</strong>
-          <TeamForm match={match} side="home" matches={matches} />
-        </div>
-        <div className="match-hero-center">
-          {scored ? (
-            <strong className="match-hero-score">
-              {match.homeScore}
-              <i>–</i>
-              {match.awayScore}
-            </strong>
-          ) : (
-            <strong className="match-hero-time">
-              {["POSTPONED", "CANCELLED"].includes(match.status)
-                ? "—"
-                : kickoffTime.format(new Date(match.utcDate))}
-            </strong>
-          )}
-          <span className="match-hero-status">
-            {playing ? (
-              <LiveMinute match={match} />
-            ) : upcoming ? (
-              `Empieza en ${countdownLabel(match.utcDate, now)}`
-            ) : result ? (
-              result.extended && result.winnerName ? (
-                `Gana ${result.winnerName} ${result.decision.toLowerCase()}`
-              ) : (
-                "Final"
-              )
+        </p>
+        <div className="match-hero-board" ref={board}>
+          <div className="match-hero-team is-home">
+            <HeroCrest src={match.homeCrest} part="home-crest" />
+            <strong className="match-hero-name">{match.home}</strong>
+            <TeamForm match={match} side="home" matches={matches} />
+          </div>
+          <div className="match-hero-center">
+            {scored ? (
+              <strong
+                className="match-hero-score"
+                data-vt-part="score"
+                aria-label={`${match.homeScore} a ${match.awayScore}`}
+              >
+                <span>{match.homeScore}</span>
+                <i aria-hidden="true">–</i>
+                <span>{match.awayScore}</span>
+              </strong>
             ) : (
-              matchStatusLabel[match.status] || match.status
+              <strong className="match-hero-time" data-vt-part="score">
+                {["POSTPONED", "CANCELLED"].includes(match.status)
+                  ? "—"
+                  : kickoffTime.format(new Date(match.utcDate))}
+              </strong>
             )}
-          </span>
-          {result?.halfTime && (
-            <small className="match-hero-half">
-              Descanso {result.halfTime.home}–{result.halfTime.away}
-            </small>
-          )}
-        </div>
-        <div className="match-hero-team">
-          <span className="match-hero-crest">
-            <Crest src={match.awayCrest} />
-          </span>
-          <strong>{match.away}</strong>
-          <TeamForm match={match} side="away" matches={matches} />
+            <span className="match-hero-status">{status}</span>
+            {result?.halfTime && (
+              <small className="match-hero-half">
+                Descanso {result.halfTime.home}–{result.halfTime.away}
+              </small>
+            )}
+          </div>
+          <div className="match-hero-team is-away">
+            <HeroCrest src={match.awayCrest} part="away-crest" />
+            <strong className="match-hero-name">{match.away}</strong>
+            <TeamForm match={match} side="away" matches={matches} />
+          </div>
         </div>
         {(scorers.home.length > 0 || scorers.away.length > 0) && (
           <div className="match-hero-scorers" aria-label="Goleadores">
@@ -319,31 +358,32 @@ function MatchView({
           </div>
         )}
         <p className="match-hero-date">
-          <CalendarDays size={13} aria-hidden="true" />
+          <CalendarDays size={14} aria-hidden="true" />
           <time dateTime={match.utcDate}>
             {kickoffDay.format(new Date(match.utcDate))} ·{" "}
             {kickoffTime.format(new Date(match.utcDate))}
           </time>
           {fits && insight?.venue && (
             <>
-              <MapPin size={13} aria-hidden="true" />
+              <MapPin size={14} aria-hidden="true" />
               <span>{insight.venue}</span>
             </>
           )}
         </p>
         {canPlay && (
           <Link
-            className="match-hero-cta"
+            className="button primary full match-hero-cta"
             to={`/quiniela?round=${encodeURIComponent(match.roundId)}`}
             onClick={() =>
               preferenceStore.update(userId, { competition: match.competition })
             }
           >
-            <Target size={15} aria-hidden="true" /> Hacer mi quiniela
+            Hacer mi quiniela <ArrowRight size={17} aria-hidden="true" />
           </Link>
         )}
       </header>
 
+      <span ref={tabsAnchor} className="sticky-sentinel" aria-hidden="true" />
       <nav
         ref={tabsRef}
         className="match-tabs"
@@ -355,15 +395,37 @@ function MatchView({
             key={t}
             type="button"
             role="tab"
+            id={`match-tab-${t}`}
+            aria-controls="match-panel"
             aria-selected={tab === t}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => selectTab(t)}
+            onKeyDown={(e) => {
+              const index = tabs.indexOf(t);
+              const next =
+                e.key === "ArrowRight"
+                  ? tabs[(index + 1) % tabs.length]
+                  : e.key === "ArrowLeft"
+                    ? tabs[(index - 1 + tabs.length) % tabs.length]
+                    : null;
+              if (!next) return;
+              e.preventDefault();
+              selectTab(next);
+              document.getElementById(`match-tab-${next}`)?.focus();
+            }}
           >
             {matchPageTabLabels[t]}
           </button>
         ))}
       </nav>
 
-      <section className="match-page-panel" role="tabpanel" key={tab}>
+      <section
+        className="match-page-panel"
+        role="tabpanel"
+        id="match-panel"
+        aria-labelledby={`match-tab-${tab}`}
+        key={tab}
+      >
         {tab === "preview" && (
           <>
             {fits && (
@@ -400,13 +462,12 @@ function MatchView({
         {tab === "events" && (
           <>
             {demo ? (
-              <p className="match-extra-empty">
-                La demo no consulta información de partidos reales.
-              </p>
+              <Empty art="whistle" title="El VAR no mira la demo">
+                En modo demo no consultamos goles ni tarjetas de partidos
+                reales.
+              </Empty>
             ) : loading ? (
-              <p className="match-extra-empty" role="status">
-                Cargando eventos…
-              </p>
+              <SkeletonRows rows={4} variant="line" label="Cargando eventos" />
             ) : error ? (
               <div className="match-extra-empty" role="status">
                 <p>{error}</p>
@@ -422,11 +483,14 @@ function MatchView({
               (insight!.goals.length || insight!.incidents?.length) ? (
               <MatchTimeline match={match} insight={insight!} />
             ) : (
-              <p className="match-extra-empty">
+              <Empty
+                art={playing ? "whistle" : "net"}
+                title={playing ? "Se juega, pero sin noticias" : "Acta sin eventos"}
+              >
                 {playing
-                  ? "Los eventos aparecerán en cuanto se publiquen."
-                  : "Eventos de este partido no disponibles."}
-              </p>
+                  ? "Los goles y tarjetas aparecerán aquí en cuanto se publiquen."
+                  : "No hay goles, tarjetas ni cambios publicados para este partido."}
+              </Empty>
             )}
             {!demo && <MatchMeta insight={insight} />}
           </>
@@ -435,7 +499,10 @@ function MatchView({
           <>
             <LineupPitch match={match} lineups={insight!.lineups} />
             <details className="lineup-full-list">
-              <summary>Ver lista completa y suplentes</summary>
+              <summary>
+                Lista completa y suplentes
+                <ArrowRight size={16} aria-hidden="true" />
+              </summary>
               <div className="match-extra-lineups">
                 <TeamLineup
                   name={match.home}
@@ -464,20 +531,25 @@ function MatchView({
       </section>
 
       {!demo && (
-        <div className="match-page-links">
+        <nav className="match-page-links" aria-label="Enlaces externos">
           <a href={links.television} target="_blank" rel="noopener noreferrer">
-            <Tv size={17} aria-hidden="true" /> Dónde verlo
-            <ArrowUpRight size={14} aria-hidden="true" />
+            <Tv size={18} aria-hidden="true" />
+            <span>Dónde verlo</span>
+            <ArrowUpRight size={16} aria-hidden="true" />
           </a>
           <a href={links.details} target="_blank" rel="noopener noreferrer">
-            Más información <ArrowUpRight size={14} aria-hidden="true" />
+            <CalendarDays size={18} aria-hidden="true" />
+            <span>Más información</span>
+            <ArrowUpRight size={16} aria-hidden="true" />
           </a>
           {links.source && (
             <a href={links.source} target="_blank" rel="noopener noreferrer">
-              Ficha en ESPN <ArrowUpRight size={14} aria-hidden="true" />
+              <MapPin size={18} aria-hidden="true" />
+              <span>Ficha en ESPN</span>
+              <ArrowUpRight size={16} aria-hidden="true" />
             </a>
           )}
-        </div>
+        </nav>
       )}
     </article>
   );

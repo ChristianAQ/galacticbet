@@ -1,7 +1,8 @@
 import { Plus, UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
+import "../styles/profile.css";
 
-/** Entry points reuse the existing group page and its create/join dialogs. */
+/** Entry points reuse the existing group page and its create/join sheets. */
 export default function GroupActions({
   onCreate,
   onJoin,
@@ -19,7 +20,7 @@ export default function GroupActions({
     },
     {
       id: "join",
-      label: "Unirme a grupo",
+      label: "Unirme con código",
       icon: UserPlus,
       style: "secondary",
       onClick: onJoin,

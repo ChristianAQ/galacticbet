@@ -2,7 +2,7 @@ import type { Participant } from "../lib/data";
 import { countdownLabel } from "../lib/matchPreview";
 
 /**
- * Shown only while the round is open and someone still has to save: who is
+ * Shown only while the round is open and someone still has to seal: who is
  * missing, the group progress and the time left before the first kick-off.
  */
 export default function RoundDeliveryStatus({
@@ -39,26 +39,26 @@ export default function RoundDeliveryStatus({
         minute: "2-digit",
       }).format(deadline)
     : "";
-  const progress = memberIds.length
-    ? (done.length / memberIds.length) * 100
-    : 0;
+  const progress = memberIds.length ? done.length / memberIds.length : 0;
   return (
-    <section className="delivery-alert panel" aria-label="Entregas pendientes">
+    <section className="delivery-alert" aria-label="Boletos pendientes">
       <div className="delivery-alert-head">
         <div>
           <strong>
             {missing.length === 1
               ? me
                 ? "Solo faltas tú"
-                : "Falta 1 por guardar"
-              : `Faltan ${missing.length} por guardar`}
+                : "Falta uno por sellar"
+              : me
+                ? `Faltáis ${missing.length}, tú incluido`
+                : `Faltan ${missing.length} por sellar`}
           </strong>
           <span>
             {validDate ? (
               <>
                 Cierra en{" "}
-                {countdownLabel(new Date(deadline).toISOString(), clock)} ·{" "}
-                <time dateTime={new Date(deadline).toISOString()}>{date}</time>
+                <b>{countdownLabel(new Date(deadline).toISOString(), clock)}</b>{" "}
+                · <time dateTime={new Date(deadline).toISOString()}>{date}</time>
               </>
             ) : (
               "Fecha de cierre pendiente"
@@ -67,14 +67,14 @@ export default function RoundDeliveryStatus({
         </div>
         <span
           className="delivery-alert-count"
-          aria-label={`${done.length} de ${memberIds.length} han guardado`}
+          aria-label={`${done.length} de ${memberIds.length} han sellado`}
         >
           {done.length}
           <small>/{memberIds.length}</small>
         </span>
       </div>
       <div className="delivery-alert-track" aria-hidden="true">
-        <span style={{ width: `${progress}%` }} />
+        <span style={{ transform: `scaleX(${progress})` }} />
       </div>
       <ul className="delivery-alert-people" aria-label="Pendientes">
         {ordered.map((id) => {

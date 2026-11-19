@@ -21,7 +21,7 @@ Sin configuración de Firebase la aplicación arranca y muestra estados vacíos 
 
 | Fase                   | Archivos principales                                                                                 | Implementado                                                                                                                                                       | Validación / pendiente                                                               |
 | ---------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| 1. Base y arquitectura | `src/main.tsx`, `App.tsx`, `components/`, `pages/`, `lib/domain.ts`, `styles.css`, Vite y TypeScript | Navegación, diseño móvil y escritorio, estados vacíos, carga, errores y demo explícita; rutas cargadas bajo demanda                                                | Compilación y navegación en Chromium comprobadas                                     |
+| 1. Base y arquitectura | `src/main.tsx`, `App.tsx`, `components/`, `pages/`, `lib/domain.ts`, `styles/`, Vite y TypeScript | Navegación, diseño móvil y escritorio, estados vacíos, carga, errores y demo explícita; rutas cargadas bajo demanda                                                | Compilación y navegación en Chromium comprobadas                                     |
 | 2. Firebase            | `src/lib/firebase.ts`, `components/LoginModal.tsx`, `.env.example`                                   | Google, registro/correo, sesión persistente del SDK, logout solo desde el perfil, nombre editable y pestañas de grupos y ayuda                                                                                        | Falta un proyecto Firebase para verificar proveedores reales                         |
 | 3. Grupos              | `src/lib/data.ts`, `pages/GroupsPage.tsx`, `firestore.rules`                                         | Lista con nombres de miembros, detalles al pulsar, crear/unirse en modales, ambas competiciones incluidas, invitaciones, abandono y nombre administrable | Flujo remoto pendiente de configuración Firebase y de validar los servicios reales   |
 | 4. Calendario          | `scripts/normalize.ts`, `scripts/sync.ts`, `pages/MatchesPage.tsx`                                   | API v4 PD/CL, fases y jornadas, partidos normalizados, escudos, resultados y estados                                                                               | Requiere token Football-Data y permisos de Firestore; no se ha llamado a la API real |
@@ -194,9 +194,11 @@ Se utiliza `BASE_PATH=/<nombre-repositorio>/` y `HashRouter`, por lo que las rec
 
 ## PWA
 
-En HTTPS, Android/Chrome puede instalar desde su menú; en iOS/Safari usa Compartir → Añadir a pantalla de inicio. Se incluyen iconos PNG de 192/512 y Apple Touch de 180, manifest con rutas relativas y modo standalone. El service worker muestra una respuesta de desconexión al navegar sin red. No mantiene caché persistente de pronósticos, perfiles ni respuestas Firebase. No ofrece edición offline: el backend tiene que confirmar el guardado antes del inicio. No se ha probado todavía la instalación en dispositivos físicos.
+En HTTPS, Android/Chrome puede instalar desde su menú; en iOS/Safari usa Compartir → Añadir a pantalla de inicio. El manifest (rutas relativas, `standalone`, vertical, atajos a Mi quiniela y Clasificación) incluye iconos PNG de 192/512, uno `maskable` y el Apple Touch de 180. `index.html` declara pantallas de arranque (`apple-touch-startup-image`) para los iPhone desde el SE hasta el 17 Pro Max y el Air, y la barra de estado `black-translucent`: el contenido pasa por debajo y la cabecera de tinta mantiene legible el texto blanco del sistema.
 
-La vista de iPhone respeta las zonas seguras de la barra de estado y del indicador inferior, también en horizontal. El panel lateral se cierra con su botón, al tocar el fondo, con Escape y al navegar; conserva el desplazamiento de la pantalla y devuelve el foco al control de apertura. Los gestos de ampliación están desactivados dentro de la aplicación y los campos usan 16 px para evitar el autozoom de Safari. El logo de Champions utiliza una placa clara para conservar el contraste. Estos ajustes se comprueban en emulación móvil; la instalación y los gestos nativos siguen pendientes de verificación en un iPhone físico.
+El service worker sirve desde caché los ficheros estáticos con hash (`assets/`, iconos, pantallas de arranque), así que abrir la app desde la pantalla de inicio es inmediato; recorta la caché a 90 entradas y la renueva en cada versión. Las navegaciones van siempre a la red y, sin conexión, muestran una página propia. No guarda pronósticos, perfiles ni respuestas de Firebase. No ofrece edición offline: el backend tiene que confirmar el guardado antes del inicio.
+
+Los iconos y las pantallas de arranque son PNG generados desde la misma geometría que `BrandMark` (casilla con la X a rotulador sobre amarillo). Los gestos de ampliación están desactivados dentro de la aplicación y los campos usan 16 px para evitar el autozoom de Safari. Las zonas seguras se respetan también en horizontal. La instalación y los gestos se verifican en un iPhone físico.
 
 ## Organización
 
@@ -230,7 +232,7 @@ El ganador oficial tras prórroga o penaltis se obtiene del campo `score.winner`
 
 ## Porra rápida: herramienta independiente
 
-La ruta `#/porra` está disponible desde Inicio y el apartado Herramientas del menú lateral. Usa los próximos partidos reales ya cargados de LaLiga y Champions, sin consultas propias a Firestore ni peticiones a Football-Data. Permite anotar hasta 30 participantes con nombre y marcador exacto, fijar una aportación por persona en euros y calcular el bote con céntimos enteros. Las porras guardadas se pueden volver a editar, incluso después de iniciarse el partido: son una anotación independiente de las quinielas oficiales de los grupos y no modifican sus puntos ni sus cierres.
+La ruta `#/porra` está disponible desde Inicio («En el banquillo»), Perfil → Más y, en escritorio, el menú lateral. Usa los próximos partidos reales ya cargados de LaLiga y Champions, sin consultas propias a Firestore ni peticiones a Football-Data. Permite anotar hasta 30 participantes con nombre y marcador exacto, fijar una aportación por persona en euros y calcular el bote con céntimos enteros. Las porras guardadas se pueden volver a editar, incluso después de iniciarse el partido: son una anotación independiente de las quinielas oficiales de los grupos y no modifican sus puntos ni sus cierres.
 
 Se guardan hasta 20 porras en `localStorage`, separadas por cuenta y con un espacio de invitado. Solo están disponibles en ese navegador/dispositivo y no se sincronizan con Firebase. Cambiar de cuenta desmonta la herramienta y cambia su espacio local. Los registros incluyen una copia del partido, de modo que siguen siendo editables cuando ese calendario ya no está cargado. No se sobrescriben archivos incompatibles ni datos corruptos; si el almacenamiento está bloqueado o lleno, se indica que la vista no se ha guardado y sigue disponible para descargar o compartir. Borrar los datos del navegador elimina estas porras.
 
@@ -246,12 +248,18 @@ Entran en el bote los miembros que guardan su quiniela de esa jornada (`roundAtt
 
 Es una anotación: GalacticBet no cobra, no guarda ni paga dinero y no se queda comisión; los pagos los organiza el grupo por su cuenta. El cálculo vive en `src/lib/pot.ts` y lo cubre `tests/pot.test.ts`; las reglas, `tests/firestore.rules.test.ts`.
 
-## Experiencia iPhone
+## Diseño y experiencia iPhone
 
-- Las ventanas se abren como hojas inferiores con asa: se cierran deslizando hacia abajo desde arriba del contenido, con la X o tocando fuera, y acompañan al dedo con resistencia.
-- Cambiar de pestaña en la barra inferior usa View Transitions (Safari 18+): la página se desliza en la dirección de la pestaña mientras la barra superior y la inferior quedan fijas. Volver a tocar la pestaña activa sube al inicio.
-- Respuesta háptica ligera al cambiar de pestaña, competición, jornada o periodo y al guardar el bote (interruptor nativo de Safari 18 en iPhone; vibración en Android).
-- Respuesta visual al pulsar botones, tarjetas y chips, sin selección de texto ni menús de pulsación larga en los controles.
+**Dirección «Boleto».** Estética deportiva y editorial inspirada en el boleto de la quiniela y en la prensa deportiva: papel y tinta, filetes en lugar de sombras, filas numeradas como en el boleto y un único acento, el amarillo «tarjeta» (`#FFD100`), usado como rotulador sobre lo importante (tu pronóstico, la acción principal, el bote, tu posición). Modo claro «papel» y modo oscuro «edición de noche» según el sistema, con contrastes AA comprobados.
+
+- **Tipografía**: Anybody (variable de anchura: condensada en titulares y marcadores, expandida en etiquetas) e Instrument Sans para el texto, servidas desde el propio sitio con `@fontsource-variable` (sin CDN de Google).
+- **Estilos**: `src/styles/tokens.css` (colores claro/oscuro, tipos, radios y curvas de muelle muestreadas en `linear()`), `base.css`, `shell.css` (barra de navegación, cabecera, pila de pantallas, tab bar, transiciones) y `components.css`; cada página añade su hoja (`home`, `leagues`, `quiniela`, `standings`, `pot`, `live`, `matchPage`, `matchExtras`, `matchPreview`, `teams`, `profile`, `porra`, `share`).
+- **Navegación nativa**: `StackNavigator` mantiene las pantallas en una pila dentro de `<Activity>` de React 19: volver es instantáneo y conserva desplazamiento, filtros y estado. Las raíces de cada pestaña se conservan al cambiar de pestaña. La barra superior fija muestra «‹ Pantalla anterior» y el título compacto cuando el título grande se pliega al desplazarse. En la app instalada, deslizar desde el borde izquierdo arrastra la pantalla y deja ver la anterior real.
+- **Transiciones**: todos los enlaces internos usan View Transitions (Safari 18+): apilar o volver con desplazamiento lateral, pestañas con un leve empuje en su dirección y los escudos y el marcador de un partido se transforman desde la lista hasta la cabecera de la ficha.
+- **Gestos**: tirar para actualizar en las cuatro pestañas (calendario con un minuto de antigüedad como máximo, grupos y clasificaciones), acciones al deslizar en listas (partidos, grupos, porras), menús contextuales con pulsación larga (partidos, noticias, grupos, porras) y controles segmentados. Todas esas acciones siguen disponibles con controles visibles.
+- **Hojas inferiores** con detents medio/completo que siguen al dedo, se cierran arrastrando o con un gesto rápido y conservan su pie de acciones visible en cada detent.
+- **Respuesta táctil**: escala inmediata al pulsar y vibración (Vibration API; en iPhone, el interruptor nativo de Safari 18+). Picks optimistas en Mi quiniela: cada pronóstico se marca al instante y solo se revierte si falla su guardado.
+- **Fluidez**: solo se animan `transform` y `opacity`, con física de muelle; skeletons en lugar de spinners; áreas táctiles de 44 px, teclados adecuados (`inputMode`, `enterKeyHint`) y campos de 16 px.
 - Todo respeta «Reducir movimiento» y «Reducir transparencia».
 
 ## Ficha ampliada de partidos
@@ -286,7 +294,7 @@ Estas mejoras reutilizan la información de Football-Data y ESPN ya disponible; 
 
 LaLiga, Champions y Premier League son las tres competiciones activas, definidas en `src/lib/competitions.ts`. Copa del Rey se ha retirado de selectores, preparación de grupos, sincronización, puntuación y clasificación global. Sus documentos anteriores se conservan, pero no se consultan sus clasificaciones. Los calendarios antiguos y las porras locales siguen siendo legibles: los datos de Copa se filtran también al restaurar la caché, sin invalidar las otras competiciones. No hace falta eliminar documentos de Firestore. Las reglas impiden crear nuevas temporadas de Copa desde el cliente.
 
-Los tres emblemas comparten tamaño, fondo claro y espaciado, con una alternativa visible si falla la imagen. El tema común de `src/styles/sportsTheme.css` unifica fondos neutros oscuros, acentos verdes, tarjetas compactas, filtros y navegación. Está inspirado en interfaces deportivas como FotMob y reutiliza los datos existentes; no añade peticiones ni dependencias. La porra mantiene sus propios tonos claros.
+Los tres emblemas comparten tamaño, fondo claro y espaciado, con una alternativa visible si falla la imagen. El aspecto general sigue el diseño «Boleto» descrito en «Diseño y experiencia iPhone»; no añade peticiones a datos.
 
 En Mi quiniela, `RoundDeliveryStatus` empieza cerrado y muestra únicamente el recuento de entregas y la fecha a la derecha. Al abrirlo aparecen «Inicio del primer partido de la jornada» y los participantes pendientes; muestra carga, fecha pendiente o todas las entregas completadas cuando corresponde. El plazo procede del servidor y la fecha se representa en la zona horaria del dispositivo. Cambiar de grupo o jornada vuelve a cerrar el panel; abrirlo no crea consultas ni cambia la privacidad.
 
@@ -332,7 +340,7 @@ Corrección de titulares: los enlaces HTTP de dominios ESPN permitidos se normal
 
 ### Herramienta Equipos y jugadores
 
-Disponible en el menú lateral → Herramientas → Equipos y jugadores (`/equipos`). Incluye 12 clubes destacados, búsqueda en la plantilla, posición, nacionalidad y edad calculada desde la fecha de nacimiento. La pestaña Alineaciones permite escoger el próximo partido o uno de los cinco últimos del calendario sincronizado y reutiliza las fichas ESPN guardadas, sin consultas directas del navegador al proveedor. Se distingue la plantilla del once de un encuentro concreto.
+Disponible desde Inicio, Perfil → Más y el menú lateral de escritorio → Equipos y jugadores (`/equipos`). Incluye 12 clubes destacados, búsqueda en la plantilla, posición, nacionalidad y edad calculada desde la fecha de nacimiento. La pestaña Alineaciones permite escoger el próximo partido o uno de los cinco últimos del calendario sincronizado y reutiliza las fichas ESPN guardadas, sin consultas directas del navegador al proveedor. Se distingue la plantilla del once de un encuentro concreto.
 
 La sincronización consulta `/v4/teams/{id}` de Football-Data.org con el token existente: máximo tres equipos por ejecución (además de posibles reintentos del cliente), rotación por bloques de dos horas y caché mínima de 24 horas por plantilla. La primera carga es progresiva. Las respuestas vacías o fallidas conservan datos anteriores. El plan contratado debe permitir acceder a las plantillas; la cobertura real se revisa en los mensajes `Plantillas` de Actions. No se necesitan nuevos secrets.
 
@@ -352,7 +360,7 @@ Cuotas internas: 1.800 intentos/24 h y 12.000/mes, por debajo del plan Free publ
 
 ### Página de partido, directo y cuotas
 
-Cada partido tiene su propia pantalla en `#/partido/{id}` (desde Inicio, Partidos y Quiniela): cabecera con escudos, resultado y goleadores, y un menú deslizable. Jugados o en juego: **Eventos · Alineaciones · Estadísticas · Clasificación** (la tabla resalta a ambos equipos). Por jugar: **Previa · Cuotas · Alineaciones · Clasificación**. Las secciones sin datos reales no aparecen. La barra inferior muestra Inicio, Partidos, Quiniela y Clasificación; los grupos (crear y **unirme**) están en el menú lateral.
+Cada partido tiene su propia pantalla en `#/partido/{id}` (desde Inicio, Partidos y Quiniela): cabecera con escudos, resultado y goleadores, y un menú deslizable. Jugados o en juego: **Eventos · Alineaciones · Estadísticas · Clasificación** (la tabla resalta a ambos equipos). Por jugar: **Previa · Cuotas · Alineaciones · Clasificación**. Las secciones sin datos reales no aparecen. La barra inferior muestra Inicio, Ligas, Quiniela y Clasificación; los grupos (crear y **unirme**) están en Perfil → Más, en Inicio cuando aún no tienes grupo y en el menú lateral de escritorio.
 
 **Directo:** mientras hay partidos en juego, `Update live football scores` mantiene un bucle de hasta 25 minutos: SportAPI cada minuto, goles y tarjetas de ESPN cada dos minutos y Football-Data cada 30 minutos. Publica `live/football`, un documento público pequeño que la web escucha solo cerca de los partidos y con la pestaña visible.
 

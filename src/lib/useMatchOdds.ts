@@ -39,7 +39,12 @@ export function useMatchOdds(matchId: string, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     let active = true;
-    setState({ id: matchId, odds: null, loading: true, error: false });
+    // Revealing the page again keeps the board it already showed.
+    setState((previous) =>
+      previous.id === matchId && !previous.loading && !previous.error
+        ? previous
+        : { id: matchId, odds: null, loading: true, error: false },
+    );
     loadOdds().then(
       (board) => {
         if (active)

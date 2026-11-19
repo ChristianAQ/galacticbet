@@ -44,7 +44,7 @@ function CompareRow({
       <div>
         <small>{label}</small>
         <span className="preview-compare-bar" aria-hidden="true">
-          <i style={{ width: `${share}%` }} />
+          <i style={{ transform: `scaleX(${share / 100})` }} />
         </span>
       </div>
       <span className={better === "away" ? "is-better" : undefined}>
@@ -108,12 +108,16 @@ export default function MatchPreview({
   const { home, away, headToHead: h2h } = preview;
   const showTable = home.position !== null && away.position !== null;
   return (
-    <section className="match-preview" aria-labelledby={headingId}>
+    <section className="match-block match-preview" aria-labelledby={headingId}>
       <header className="match-preview-heading">
-        <h3 id={headingId}>Previa del partido</h3>
+        <h3 id={headingId} className="match-block-title">
+          La previa
+        </h3>
         <span className="match-preview-countdown">
           <Hourglass size={14} aria-hidden="true" />
-          Empieza en <strong>{countdownLabel(match.utcDate, now)}</strong>
+          <span>
+            Saque en <strong>{countdownLabel(match.utcDate, now)}</strong>
+          </span>
         </span>
       </header>
       {showTable && (
@@ -135,7 +139,8 @@ export default function MatchPreview({
       )}
       {!preview.hasData ? (
         <p className="match-extra-empty">
-          Aún no hay resultados previos suficientes para preparar la previa.
+          Aún no hay rodaje suficiente esta temporada para preparar la previa.
+          Vuelve tras la primera jornada.
         </p>
       ) : (
         <>

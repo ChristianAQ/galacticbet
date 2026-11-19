@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import type { Match } from "../lib/domain";
 import type { MatchLineup, MatchPlayer } from "../lib/matchInsightsData";
 import { pitchRows, shortPlayerName } from "../lib/matchPresentation";
+import Segmented from "./Segmented";
+import "../styles/matchExtras.css";
 
 type Side = "home" | "away";
 type View = Side | "both";
@@ -97,26 +99,19 @@ export default function LineupPitch({
   const captionSide: Side = view === "both" ? "home" : view;
   return (
     <section className="lineup-map" aria-label="Alineaciones sobre el campo">
-      <div
+      <Segmented<View>
+        label="Equipo sobre el campo"
         className="pitch-team-switch"
-        style={{ gridTemplateColumns: `repeat(${views.length}, 1fr)` }}
-        role="group"
-        aria-label="Equipo sobre el campo"
-      >
-        {views.map((v) => (
-          <button
-            type="button"
-            key={v}
-            aria-pressed={view === v}
-            onClick={() => setView(v)}
-          >
-            {v === "both" ? "Ambos" : match[v]}
-            {v !== "both" && data[v].formation && (
-              <small>{data[v].formation}</small>
-            )}
-          </button>
-        ))}
-      </div>
+        value={view}
+        options={views.map((v) => ({
+          value: v,
+          label:
+            v === "both"
+              ? "Ambos"
+              : `${match[v]}${data[v].formation ? ` · ${data[v].formation}` : ""}`,
+        }))}
+        onChange={setView}
+      />
       {hasRows ? (
         <>
           {view === "both" && (
@@ -155,7 +150,7 @@ export default function LineupPitch({
         </>
       ) : (
         <p className="match-extra-empty">
-          Posiciones de los titulares no disponibles.
+          El once todavía no tiene posiciones publicadas.
         </p>
       )}
       {unknown.length > 0 && (
