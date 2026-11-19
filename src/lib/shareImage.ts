@@ -14,13 +14,13 @@ import {
 const WIDTH = 1080;
 const PAD = 48;
 const colors = {
-  background: "#0b0d0a",
-  panel: "#151913",
-  row: "#1b2019",
-  border: "#2a3027",
-  text: "#efeee4",
-  muted: "#959a8c",
-  accent: "#ff6a3d",
+  background: "#111317",
+  panel: "#191c21",
+  row: "#1f2329",
+  border: "#2e333b",
+  text: "#eeeff2",
+  muted: "#9ca3ad",
+  accent: "#c5f66a",
   hit: "#8cdb63",
   miss: "#ef7772",
   gold: "#f0d58c",
@@ -351,7 +351,7 @@ export async function standingsImage(s: StandingsShare): Promise<Blob> {
         y + rowH - 5,
         ((WIDTH - PAD * 2 + 24) * r.points) / leader,
         5,
-        "#ff6a3d33",
+        "#c5f66a33",
         3,
       );
     }

@@ -10,7 +10,7 @@
   border-radius: 20px;
   background:
     radial-gradient(120% 90% at 100% 0%, #f0d58c1f, transparent 55%),
-    radial-gradient(90% 70% at 0% 100%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
+    radial-gradient(90% 70% at 0% 100%, #c5f66a12, transparent 60%),
     var(--panel);
   animation: pot-enter 420ms var(--navigation-ease, ease) both;
 }
@@ -55,10 +55,10 @@
   font-size: 11px;
   font-weight: 600;
   background: #ffffff0d;
-  color: #ced4c9;
+  color: #c6ccd7;
 }
 .pot-state.is-open {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: #c5f66a1a;
   color: var(--brand-accent);
 }
 .pot-state.is-live {
@@ -140,14 +140,14 @@
 }
 .pot-more {
   background: #ffffff14;
-  color: #ced4c9;
+  color: #c6ccd7;
   font-size: 10px !important;
 }
 .pot-players-text {
   min-width: 0;
   overflow: hidden;
   font-size: 12px;
-  color: #b9c2b2;
+  color: #b2b8c2;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -162,7 +162,7 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #a0ad97;
+  color: #8f9db5;
 }
 .pot-winners ul {
   display: grid;
@@ -233,7 +233,7 @@
 .pot-note {
   margin: 0;
   font-size: 12px;
-  color: #b9c2b2;
+  color: #b2b8c2;
 }
 .pot-disclaimer {
   display: flex;
@@ -241,7 +241,7 @@
   margin: 0;
   font-size: 10.5px;
   line-height: 1.45;
-  color: #88947f;
+  color: #7f8794;
 }
 .pot-disclaimer svg {
   flex: none;
@@ -286,7 +286,7 @@
 }
 .pot-chip > svg:last-child {
   flex: none;
-  color: #79886f;
+  color: #6f7888;
 }
 
 /* Group settings. */
@@ -326,7 +326,7 @@
   border: 1px solid var(--border);
   border-radius: 999px;
   background: #ffffff08;
-  color: #dbe0d7;
+  color: #d5dae2;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   transition:

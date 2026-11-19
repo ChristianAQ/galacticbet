@@ -45,7 +45,6 @@ import { auth, configured, db } from "./lib/firebase";
 import { privateCache } from "./lib/memoryCache";
 import { applyLiveBoard } from "./lib/liveBoard";
 import { LiveContext, useLiveBoard } from "./lib/useLiveBoard";
-import { navigateWithTransition, routeDirection } from "./lib/viewTransition";
 const pageLoaders = {
   "/equipos": () => import("./pages/TeamsPage"),
   "/": () => import("./pages/HomePage"),
@@ -66,10 +65,9 @@ const StandingsPage = lazy(pageLoaders["/clasificacion"]);
 const ProfilePage = lazy(pageLoaders["/perfil"]);
 const PorraPage = lazy(pageLoaders["/porra"]);
 const MatchPage = lazy(pageLoaders["/partido"]);
-function preloadPage(path: string): Promise<unknown> | undefined {
-  const key = path.startsWith("/partido/") ? "/partido" : path.split("?")[0];
-  const load = pageLoaders[key as keyof typeof pageLoaders];
-  return load?.().catch(() => {});
+function preloadPage(path: string) {
+  const load = pageLoaders[path as keyof typeof pageLoaders];
+  if (load) void load().catch(() => {});
 }
 const nav = [
   { to: "/", label: "Inicio", icon: Home },
@@ -93,53 +91,6 @@ export default function App() {
     });
     return () => cancelAnimationFrame(frame);
   }, [pathname]);
-  // Every in-app link animates through the View Transitions API. Capturing on
-  // the document runs before React Router's Link handler, which then sees the
-  // event as handled; the Link's own onClick (side effects) still runs.
-  useEffect(() => {
-    function onClick(event: MouseEvent) {
-      if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      )
-        return;
-      const link =
-        event.target instanceof Element
-          ? event.target.closest<HTMLAnchorElement>("a[href]")
-          : null;
-      if (
-        !link ||
-        (link.target && link.target !== "_self") ||
-        link.hasAttribute("download") ||
-        link.closest("[data-own-transition]")
-      )
-        return;
-      const url = new URL(link.href, location.href);
-      if (
-        url.origin !== location.origin ||
-        url.pathname !== location.pathname ||
-        !url.hash.startsWith("#/")
-      )
-        return;
-      const to = url.hash.slice(1);
-      const current = location.hash.slice(1) || "/";
-      if (to === current) return;
-      event.preventDefault();
-      const toPath = to.split("?")[0];
-      const fromPath = current.split("?")[0];
-      navigateWithTransition(
-        () => navigate(to),
-        routeDirection(fromPath, toPath),
-        preloadPage(toPath),
-      );
-    }
-    document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
-  }, [navigate]);
   const [, setProfileVersion] = useState(0);
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(!auth);
@@ -302,13 +253,7 @@ export default function App() {
                 onFocus={() => preloadPage("/perfil")}
                 onPointerDown={() => preloadPage("/perfil")}
                 className="profile-button"
-                onClick={() =>
-                  navigateWithTransition(
-                    () => navigate("/perfil"),
-                    routeDirection(pathname, "/perfil"),
-                    preloadPage("/perfil"),
-                  )
-                }
+                onClick={() => navigate("/perfil")}
               >
                 <span className="avatar">
                   {user?.photoURL ? (

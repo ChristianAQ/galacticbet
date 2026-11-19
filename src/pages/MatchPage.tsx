@@ -30,12 +30,6 @@ import TeamForm from "../components/TeamForm";
 import { Crest, Empty } from "../components/ui";
 import { competitionName } from "../lib/competitions";
 import {
-  backWithTransition,
-  navigateWithTransition,
-  switchTab,
-  tabDirection,
-} from "../lib/viewTransition";
-import {
   canPredict,
   matchStatusLabel,
   roundLabel,
@@ -203,12 +197,6 @@ function MatchView({
     awayScore: m.awayScore!,
   }));
   function selectTab(next: MatchPageTab) {
-    if (next === tab) return;
-    switchTab(tabDirection(tabs.indexOf(tab), tabs.indexOf(next)), () =>
-      applyTab(next),
-    );
-  }
-  function applyTab(next: MatchPageTab) {
     setParams(
       (previous) => {
         const value = new URLSearchParams(previous);
@@ -228,13 +216,8 @@ function MatchView({
   }
   function back() {
     // React Router keeps the history index: only go back inside the app.
-    if ((window.history.state?.idx ?? 0) > 0)
-      backWithTransition(() => navigate(-1));
-    else
-      navigateWithTransition(
-        () => navigate(`/ligas?competition=${match.competition}`),
-        "pop",
-      );
+    if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
+    else navigate(`/ligas?competition=${match.competition}`);
   }
   const result = finishedMatchResult(match);
   const canPlay = !demo && canPredict(match.utcDate, now, match.status);

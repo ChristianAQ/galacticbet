@@ -6,7 +6,7 @@
   height: 26px;
   border-radius: 8px;
   background: #ffffff0d;
-  color: #ced4c9;
+  color: #c6ccd7;
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -16,8 +16,8 @@
   color: #2a2208;
 }
 .rank-badge.rank-2 {
-  background: linear-gradient(135deg, #f1f3f0, #b8c1b1);
-  color: #262a23;
+  background: linear-gradient(135deg, #eef1f5, #aeb7c4);
+  color: #1f252e;
 }
 .rank-badge.rank-3 {
   background: linear-gradient(135deg, #f0c09a, #b9774a);
@@ -56,7 +56,7 @@
   border: 1px solid var(--brand-border);
   border-radius: 16px;
   background:
-    radial-gradient(90% 80% at 0% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%), var(--panel);
+    radial-gradient(90% 80% at 0% 0%, #c5f66a17, transparent 60%), var(--panel);
 }
 .home-spotlight .eyebrow {
   margin: 0;
@@ -94,8 +94,8 @@
   margin: 0;
   padding: 10px 14px;
   border-radius: 12px;
-  background: #10120e;
-  color: #d1d7cc;
+  background: #0b0f15;
+  color: #c9d0da;
   font-size: 13px;
 }
 .spotlight-countdown svg,
@@ -110,7 +110,7 @@
   margin-top: auto;
   background: var(--brand-accent);
   border-color: transparent;
-  color: #181a16;
+  color: #12171e;
   font-size: 13px;
 }
 .button.spotlight-cta:hover:not(:disabled) {
@@ -153,7 +153,7 @@
   font-size: 11px;
 }
 .spotlight-more a > small:last-child {
-  color: #d1d7cc;
+  color: #c9d0da;
   white-space: nowrap;
 }
 .spotlight-empty {
@@ -209,7 +209,7 @@
   transition: border-color 0.15s;
 }
 .ticker-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 33%, transparent);
+  border-color: #c5f66a55;
 }
 .ticker-card:focus-visible {
   outline: 2px solid var(--brand-accent);
@@ -224,7 +224,7 @@
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  color: #c2cabc;
+  color: #b9c1cd;
   font-size: 12px;
 }
 .ticker-team img {
@@ -292,7 +292,7 @@
   text-align: left;
 }
 .league-table tbody th {
-  color: #e9ece6;
+  color: #e3e8ef;
   font-size: 13px;
   font-weight: 500;
 }
@@ -396,7 +396,7 @@
   list-style: none;
 }
 .podium-step {
-  --podium-color: #cbd3c6;
+  --podium-color: #c3cbd6;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -432,7 +432,7 @@
   padding: 3px;
   box-sizing: content-box;
   border-radius: 50%;
-  background: #161914;
+  background: #11151c;
   color: var(--podium-color);
 }
 .podium-1 .podium-avatar > svg {
@@ -495,7 +495,7 @@
   padding: 14px 16px;
   border: 1px solid var(--brand-border);
   border-radius: 14px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 7%, transparent), color-mix(in srgb, var(--accent) 1%, transparent));
+  background: linear-gradient(135deg, #c5f66a12, #c5f66a03);
 }
 .my-rank-position {
   display: grid;
@@ -514,7 +514,7 @@
   font-variant-numeric: tabular-nums;
 }
 .my-rank-position strong small {
-  color: #d1d7cc;
+  color: #c9d0da;
   font-size: 13px;
   font-weight: 500;
 }
@@ -541,7 +541,7 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  color: #d1d7cc;
+  color: #c9d0da;
   font-size: 12px;
 }
 .my-rank-status svg {
@@ -560,7 +560,7 @@
   background: #ffffff05;
 }
 .standings-table tbody tr.standings-me {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%);
+  background: linear-gradient(90deg, #c5f66a14, transparent 70%);
   box-shadow: inset 3px 0 0 var(--brand-accent);
 }
 .standings-name {

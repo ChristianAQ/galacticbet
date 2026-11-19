@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { flushSync } from "react-dom";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { haptic, prefersReducedMotion } from "../lib/motion";
-import { navigateWithTransition, routeDirection } from "../lib/viewTransition";
 import type { LucideIcon } from "lucide-react";
 
 function useKeyboardOpen() {
@@ -50,7 +50,7 @@ export default function BottomNavigation({
 }: {
   items: { to: string; label: string; short?: string; icon: LucideIcon }[];
   inactive: boolean;
-  onPrefetch: (path: string) => Promise<unknown> | void;
+  onPrefetch: (path: string) => void;
 }) {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
@@ -64,7 +64,6 @@ export default function BottomNavigation({
     <nav
       className={`bottom-nav${keyboardOpen ? " keyboard-open" : ""}`}
       aria-label="Navegación inferior"
-      data-own-transition=""
       inert={inactive || keyboardOpen}
       aria-hidden={inactive || keyboardOpen || undefined}
     >
@@ -100,8 +99,11 @@ export default function BottomNavigation({
               haptic();
               navigateWithTransition(
                 () => navigate(item.to),
-                routeDirection(pathname, item.to),
-                onPrefetch(item.to) || undefined,
+                index < 0 || position === index
+                  ? "fade"
+                  : position > index
+                    ? "forward"
+                    : "back",
               );
             }}
             onPointerEnter={() => onPrefetch(item.to)}
@@ -115,4 +117,26 @@ export default function BottomNavigation({
       </div>
     </nav>
   );
+}
+
+type Direction = "forward" | "back" | "fade";
+/**
+ * Same-document View Transition (Safari 18+, Chrome): the page slides in the
+ * direction of the tab while the app bar and the tab bar stay still. Browsers
+ * without support, or with reduced motion, just navigate.
+ */
+export function navigateWithTransition(go: () => void, direction: Direction) {
+  const root = document.documentElement;
+  if (!document.startViewTransition || prefersReducedMotion()) {
+    go();
+    return;
+  }
+  root.dataset.navDirection = direction;
+  const transition = document.startViewTransition(() => {
+    flushSync(go);
+    window.scrollTo(0, 0);
+  });
+  void transition.finished.finally(() => {
+    if (root.dataset.navDirection === direction) delete root.dataset.navDirection;
+  });
 }
