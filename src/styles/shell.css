@@ -97,6 +97,40 @@ body {
   opacity: calc(1 - var(--swipe, 0));
   transform: none;
 }
+/* Inicio: the brand lockup where other screens put «‹ Atrás». */
+.nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  margin-left: calc(var(--gutter) - 4px);
+  color: var(--masthead-ink);
+  transition: transform 160ms var(--press);
+}
+.nav-brand:active {
+  transform: scale(0.96);
+}
+.nav-brand .brand-mark {
+  flex-shrink: 0;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px #ffffff14;
+}
+.nav-brand-word {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.nav-brand-word b {
+  color: var(--accent);
+  font-weight: 900;
+}
+/* The brand already says where you are; no compact «Inicio» beside it. */
+.nav-bar.has-brand .nav-bar-title {
+  visibility: hidden;
+}
 .nav-avatar {
   position: relative;
   display: grid;
@@ -531,6 +565,13 @@ body {
   }
   .bottom-nav {
     display: none;
+  }
+  /* The sidebar carries the brand on wide screens. */
+  .nav-brand {
+    display: none;
+  }
+  .nav-bar.has-brand .nav-bar-title {
+    visibility: visible;
   }
   .demo-pill {
     left: calc(50% + var(--sidebar-w) / 2);

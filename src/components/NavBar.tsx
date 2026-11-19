@@ -9,8 +9,9 @@ import {
   parentOf,
   routeTitle,
 } from "../lib/navigation";
-import { haptic } from "../lib/motion";
+import { haptic, prefersReducedMotion } from "../lib/motion";
 import { preloadPage } from "../lib/pages";
+import BrandMark from "./BrandMark";
 
 /**
  * Fixed iOS-style navigation bar on the ink masthead: back button with the
@@ -27,10 +28,32 @@ export default function NavBar({ user }: { user: User | null }) {
       ? previous?.title || "Atrás"
       : routeTitle(parentOf(pathname)) || "Inicio";
   const title = top.title || routeTitle(pathname);
+  // Inicio wears the brand: on a phone there is no sidebar to carry it.
+  const branded = pathname === "/" && depth <= 1;
   return (
-    <header className={`nav-bar topbar${top.collapsed ? " is-collapsed" : ""}`}>
+    <header
+      className={`nav-bar topbar${top.collapsed ? " is-collapsed" : ""}${branded ? " has-brand" : ""}`}
+    >
       <div className="nav-bar-inner">
         <div className="nav-bar-leading">
+          {branded && (
+            <button
+              type="button"
+              className="nav-brand"
+              aria-label="GalacticBet, volver arriba"
+              onClick={() =>
+                window.scrollTo({
+                  top: 0,
+                  behavior: prefersReducedMotion() ? "auto" : "smooth",
+                })
+              }
+            >
+              <BrandMark size={30} />
+              <span className="nav-brand-word" aria-hidden="true">
+                galactic<b>bet</b>
+              </span>
+            </button>
+          )}
           {canGoBack && (
             <button
               type="button"
