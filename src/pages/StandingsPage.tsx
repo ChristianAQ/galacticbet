@@ -1,7 +1,14 @@
-import { competitionName } from "../lib/competitions";
+import { competitionName, isCompetition } from "../lib/competitions";
 import type { AppUser as User } from "../lib/session";
 import { ChevronDown, ChevronUp, Crown } from "lucide-react";
-import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
 import { Empty, PageTitle, PrivateGate } from "../components/ui";
@@ -14,6 +21,8 @@ import {
   type Match,
 } from "../lib/domain";
 import PotCard from "../components/PotCard";
+import RoundRecap from "../components/RoundRecap";
+import { roundRecap } from "../lib/roundRecap";
 import { groupPotCents, potText, roundPot } from "../lib/pot";
 import { useRoundAttendance } from "../lib/useRoundAttendance";
 import PageFilters, { Segmented } from "../components/PageFilters";
@@ -110,7 +119,18 @@ function GroupStandings({
     params.get("period") === "all" ? "all" : "round",
   );
   const scope = period === "all" && combined ? "global" : competition;
-  const [round, setRound] = useState("");
+  // An aviso links here with ?round=: open that round (and its competition).
+  const requestedRound = params.get("round") || "";
+  const [round, setRound] = useState(requestedRound);
+  useEffect(() => {
+    if (!requestedRound) return;
+    const code = requestedRound.split("-")[0];
+    if (isCompetition(code) && code !== preferences.competition)
+      preferenceStore.update(user.uid, { competition: code });
+    setCombined(false);
+    setPeriod("round");
+    setRound(requestedRound);
+  }, [requestedRound]);
   const [sharing, setSharing] = useState(false);
   const selectedGroup = groups.find((g) => g.id === groupId);
   const { data, error, retry } = useGroupRankings(user.uid, selectedGroup);
@@ -202,6 +222,32 @@ function GroupStandings({
     });
   }, [potRound, data, matches, potCents, rows, attendance.ids]);
   const hasPoints = rows.some((r) => r.points > 0);
+  // A finished round tells its story: winner, your round, the highlights.
+  const roundFixtures = useMemo(
+    () => matches.filter((m) => m.roundId === selectedRound),
+    [matches, selectedRound],
+  );
+  const recap = useMemo(
+    () =>
+      period === "round" &&
+      data &&
+      selectedRound &&
+      scope !== "global" &&
+      isRoundComplete(roundFixtures)
+        ? roundRecap({
+            participants: data.participants,
+            seasons: data.seasons,
+            scope,
+            roundIds: rounds.map((r) => r.id),
+            roundId: selectedRound,
+            userId: user.uid,
+            fixtures: roundFixtures,
+          })
+        : null,
+    [period, data, selectedRound, scope, roundFixtures, rounds, user.uid],
+  );
+  const recapMode =
+    data?.seasons.find((s) => selectedRound.startsWith(`${s.id}-`))?.mode || "classic";
   const shareGroup = selectedGroup?.name || "";
   const leaderPoints = rows[0]?.points || 0;
   const scopeName =
@@ -313,7 +359,22 @@ function GroupStandings({
             className="ranking-view"
             key={`${groupId}:${scope}:${period}:${selectedRound}`}
           >
-            <MyRankCard rows={rows} userId={user.uid} showHits={showHits} />
+            {recap ? (
+              <RoundRecap
+                recap={recap}
+                title={rounds.find((r) => r.id === selectedRound)?.label.replace(/ · \d{4}\/\d{2}$/, "") || "Jornada"}
+                shortTitle={roundChoices.find((r) => r.id === selectedRound)?.short || "Jornada"}
+                groupId={selectedGroup.id}
+                groupName={selectedGroup.name}
+                members={selectedGroup.memberIds}
+                mode={recapMode}
+                fixtures={roundFixtures}
+                showHits={showHits}
+                userId={user.uid}
+              />
+            ) : (
+              <MyRankCard rows={rows} userId={user.uid} showHits={showHits} />
+            )}
             {pot && attendance.ready && !attendance.error && (
               <PotCard
                 pot={pot}

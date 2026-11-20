@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AppUser as User } from "../lib/session";
 import UpcomingSchedule from "../components/UpcomingSchedule";
 import NewsSection from "../components/NewsSection";
+import { PushPrompt } from "../components/PushControls";
 import {
   HomeTools,
   MatchTicker,
@@ -75,6 +76,7 @@ export default function HomePage({
           loading={loading}
         />
       </PageTitle>
+      {userId && !demo && <PushPrompt uid={userId} />}
       {!loading && <MatchTicker matches={matches} now={now} />}
       <UpcomingSchedule
         matches={matches}

@@ -135,6 +135,11 @@ export default function PredictionsPage({
   // The progress panel pins under the app bar and slims down while scrolling.
   const { sentinel: saveSentinel, stuck: saveStuck } = useStuck();
   const requestedRound = searchParams.get("round") || "";
+  // Arriving from a reminder while the page is open: switch to its season.
+  useEffect(() => {
+    const target = seasons.find((s) => requestedRound.startsWith(`${s.id}-`));
+    if (target && target.id !== season) setSeason(target.id);
+  }, [requestedRound, seasons]);
   const selected = rounds.some((r) => r.id === round)
     ? round
     : rounds.some((r) => r.id === requestedRound)
@@ -245,8 +250,11 @@ export default function PredictionsPage({
             b.id.localeCompare(a.id, "es", { numeric: true }),
         );
         setSeasons(next);
+        // A reminder links to its round: open that competition's season.
+        const linked = new URLSearchParams(window.location.hash.split("?")[1] || "").get("round") || "";
         setSeason(
-          next.find((s) => s.competition === preferences.competition)?.id ||
+          next.find((s) => linked.startsWith(`${s.id}-`))?.id ||
+            next.find((s) => s.competition === preferences.competition)?.id ||
             next[0]?.id ||
             "",
         );

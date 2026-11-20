@@ -1,6 +1,7 @@
 import { isCompetition } from "../src/lib/competitions";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
-import type { Match, Mode } from "../src/lib/domain";
+import { isRoundComplete, type Match, type Mode } from "../src/lib/domain";
+import type { CompletedRound } from "./notifications";
 import { scoringCalendar } from "./calendarSync";
 import { migrateSubmissions } from "./migrateSubmissions";
 import { decodeDelivery, requiresDelivery } from "../src/lib/roundDelivery";
@@ -11,11 +12,16 @@ import {
   type Standing,
   type StoredPrediction,
 } from "./standings";
+/**
+ * Returns the rounds this run scored as complete (every fixture played), so
+ * the players can be told their points.
+ */
 export async function recompute(
   db: Firestore,
   cache: Map<string, Match[]>,
   policies = new Map<string, string>(),
-) {
+): Promise<CompletedRound[]> {
+  const completed: CompletedRound[] = [];
   // Current calendars come directly from the API; archived snapshots cost one read per season.
   const profiles = new Map<string, string>();
   const groups = await db.collection("groups").get();
@@ -69,6 +75,7 @@ export async function recompute(
       if (!changedRounds.length && !membershipChanged) continue;
       const previous = await season.ref.collection("standings").get();
       const totals = new Map<string, Standing>();
+      const finishedRounds: { rid: string; lastKickoff: number }[] = [];
       for (const uid of members) {
         const row = previous.docs.find((d) => d.id === uid);
         totals.set(uid, sumRounds(row?.data().rounds || {}));
@@ -112,6 +119,11 @@ export async function recompute(
           total.rounds[rid] = roundTotals.get(uid) || { points: 0, hits: 0 };
         }
         state[rid] = fingerprint;
+        if (isRoundComplete(games) && finished.length)
+          finishedRounds.push({
+            rid,
+            lastKickoff: Math.max(...games.map((m) => Date.parse(m.utcDate) || 0)),
+          });
       }
       const batch = db.batch();
       for (const row of previous.docs)
@@ -136,6 +148,20 @@ export async function recompute(
       // The round state and replacement totals commit atomically; never increment points.
       await batch.commit();
       console.log(`Clasificación actualizada: ${group.id}/${season.id}`);
+      const standings = new Map(
+        [...totals].map(([uid, total]) => [uid, sumRounds(total.rounds)]),
+      );
+      for (const { rid, lastKickoff } of finishedRounds)
+        completed.push({
+          groupId: group.id,
+          groupName: group.data().name || "tu grupo",
+          competition: config.competition,
+          roundId: rid,
+          lastKickoff,
+          standings,
+          names: new Map(members.map((uid) => [uid, profiles.get(uid) || "Jugador"])),
+        });
     }
   }
+  return completed;
 }

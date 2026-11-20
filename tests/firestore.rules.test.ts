@@ -57,6 +57,48 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
     await assertFails(setDoc(doc(db, "leagueStats/CL-2026"), {rankings:{}}));
     await assertFails(setDoc(doc(env.authenticatedContext("alice").firestore(), "leagueStats/CL-2026"), {rankings:{}}));
   });
+  it("guarda la suscripción de avisos solo en la cuenta propia y hacia servicios de avisos", async () => {
+    const id = "a".repeat(64);
+    const device = {
+      endpoint: "https://web.push.apple.com/QH8x-abc",
+      p256dh: "B".repeat(87),
+      auth: "c".repeat(22),
+      createdAt: serverTimestamp(),
+    };
+    const alice = env.authenticatedContext("alice").firestore();
+    const bob = env.authenticatedContext("bob").firestore();
+    await assertSucceeds(setDoc(doc(alice, `users/alice/push/${id}`), device));
+    await assertSucceeds(getDoc(doc(alice, `users/alice/push/${id}`)));
+    await assertSucceeds(getDocs(collection(alice, "users/alice/push")));
+    // Nobody else reads, writes or lists another player's devices.
+    await assertFails(getDoc(doc(bob, `users/alice/push/${id}`)));
+    await assertFails(getDocs(collection(bob, "users/alice/push")));
+    await assertFails(setDoc(doc(bob, `users/alice/push/${id}`), device));
+    await assertFails(deleteDoc(doc(bob, `users/alice/push/${id}`)));
+    // Only browser push services, a hashed id and the expected fields.
+    for (const endpoint of [
+      "http://web.push.apple.com/x",
+      "https://evil.test/web.push.apple.com/x",
+      "https://web.push.apple.com.evil.test/x",
+      "https://127.0.0.1/x",
+    ])
+      await assertFails(setDoc(doc(alice, `users/alice/push/${id}`), { ...device, endpoint }));
+    await assertFails(setDoc(doc(alice, "users/alice/push/not-a-hash"), device));
+    await assertFails(setDoc(doc(alice, `users/alice/push/${id}`), { ...device, extra: true }));
+    await assertSucceeds(
+      setDoc(doc(alice, `users/alice/push/${"b".repeat(64)}`), {
+        ...device,
+        endpoint: "https://fcm.googleapis.com/fcm/send/abc",
+      }),
+    );
+    await assertSucceeds(deleteDoc(doc(alice, `users/alice/push/${id}`)));
+    // The public key is readable; the private keys and send log are not.
+    const anyone = env.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(anyone, "config/push")));
+    await assertFails(getDoc(doc(alice, "private/push")));
+    await assertFails(getDoc(doc(alice, "pushLog/result_g_r")));
+    await assertFails(setDoc(doc(alice, "config/push"), { publicKey: "x" }));
+  });
   beforeEach(async () => {
     await env.clearFirestore();
     await env.withSecurityRulesDisabled(async (c) => {

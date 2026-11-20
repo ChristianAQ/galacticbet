@@ -18,6 +18,8 @@ import type { Group } from "../lib/data";
 import { logout, saveDisplayName } from "../lib/firebase";
 import { haptic } from "../lib/motion";
 import { setTheme, useTheme, type Theme } from "../lib/theme";
+import { disablePush } from "../lib/push";
+import { PushRow } from "../components/PushControls";
 import "../styles/profile.css";
 
 /**
@@ -85,6 +87,8 @@ export default function ProfilePage({
     setSigningOut(true);
     setLogoutError("");
     try {
+      // This device stops receiving the account's avisos.
+      if (user) await disablePush(user.uid).catch(() => {});
       await logout();
     } catch (e) {
       setLogoutError(readableError(e));
@@ -224,6 +228,16 @@ export default function ProfilePage({
               <div className="section-heading">
                 <h2 id="profile-more-title">Ajustes y más</h2>
               </div>
+              {user && (
+                <>
+                  <p className="more-caption">Avisos</p>
+                  <ul className="more-list">
+                    <li>
+                      <PushRow uid={user.uid} />
+                    </li>
+                  </ul>
+                </>
+              )}
               <p className="more-caption">Apariencia</p>
               <ul className="more-list">
                 <li>

@@ -11,7 +11,21 @@ service cloud.firestore {
    allow read: if signed();
    allow create, update: if signed() && request.auth.uid == uid && request.resource.data.keys().hasOnly(['name','avatar','updatedAt']) && request.resource.data.name is string && request.resource.data.name.size() <= 100 && (request.resource.data.avatar == null || request.resource.data.avatar is string) && request.resource.data.updatedAt == request.time;
    allow delete: if signed() && request.auth.uid == uid;
+   // One push subscription per browser (id = SHA-256 of its endpoint). Only the
+   // player reads or changes theirs; the backend sends to browser push services only.
+   match /push/{device} {
+    allow get, list, delete: if signed() && request.auth.uid == uid;
+    allow create, update: if signed() && request.auth.uid == uid && device.matches('^[a-f0-9]{64}$')
+      && request.resource.data.keys().hasOnly(['endpoint','p256dh','auth','createdAt'])
+      && request.resource.data.endpoint is string && request.resource.data.endpoint.size() <= 1000
+      && request.resource.data.endpoint.matches('https://(web[.]push[.]apple[.]com|fcm[.]googleapis[.]com|updates[.]push[.]services[.]mozilla[.]com|[a-z0-9-]+[.]notify[.]windows[.]com)/.+')
+      && request.resource.data.p256dh is string && request.resource.data.p256dh.size() >= 40 && request.resource.data.p256dh.size() <= 200
+      && request.resource.data.auth is string && request.resource.data.auth.size() >= 10 && request.resource.data.auth.size() <= 100
+      && request.resource.data.createdAt == request.time;
+   }
   }
+  // Public half of the push signing keys; the private half has no client rule.
+  match /config/push { allow get: if true; }
   match /competitions/{id} { allow read: if true; }
   match /seasons/{id} { allow read: if true; }
   match /rounds/{id} { allow read: if true; }

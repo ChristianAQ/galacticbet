@@ -27,7 +27,8 @@ import { privateCache } from "./lib/memoryCache";
 import { applyLiveBoard } from "./lib/liveBoard";
 import { LiveContext, STANDINGS_UPDATED, useLiveBoard } from "./lib/useLiveBoard";
 import { REFRESH_EVENT, RefreshContext } from "./lib/chrome";
-import { interceptLinks, isTabRoot } from "./lib/navigation";
+import { go, interceptLinks, isTabRoot } from "./lib/navigation";
+import { keepPushDevice } from "./lib/push";
 import {
   GroupsPage,
   HomePage,
@@ -89,6 +90,16 @@ export default function App() {
   const updateReady = useUpdateReady();
   const [updateDismissed, setUpdateDismissed] = useState(false);
   useEffect(() => interceptLinks(), []);
+  // A tapped aviso while the app is open: go to the screen it is about.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const open = (event: MessageEvent) => {
+      const hash = event.data?.type === "galacticbet:open" ? event.data.hash : "";
+      if (typeof hash === "string" && hash.startsWith("#/")) go(hash.slice(1), { reset: true });
+    };
+    navigator.serviceWorker.addEventListener("message", open);
+    return () => navigator.serviceWorker.removeEventListener("message", open);
+  }, []);
   useEffect(() => preloadTabsWhenIdle(), []);
   useEffect(
     () =>
@@ -98,6 +109,7 @@ export default function App() {
             // Same account as the remembered one: keep what already loaded.
             if (previous?.uid !== u?.uid) privateCache.clear();
             rememberSession(u);
+            if (u) void keepPushDevice(u.uid);
             setUser(u);
             if (u) setLogin(false);
             setAuthReady(true);

@@ -1,0 +1,96 @@
+/* ---------- Avisos: switch in Perfil, invitation in Inicio ---------- */
+.push-row .more-label small {
+  white-space: normal;
+  line-height: 1.35;
+}
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--paper-3);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  transition: background-color 200ms ease;
+}
+.switch > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px -1px #15140f59;
+  transition: transform var(--spring-snappy-ms) var(--spring-snappy);
+}
+.switch[aria-checked="true"] {
+  background: var(--accent);
+  box-shadow: none;
+}
+.switch[aria-checked="true"] > span {
+  transform: translate3d(20px, 0, 0);
+}
+.switch:disabled {
+  opacity: 0.45;
+}
+.push-error {
+  margin: 8px 4px 0;
+  color: var(--loss);
+  font-size: var(--text-sm);
+}
+
+.push-prompt {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+  padding: 16px 44px 16px 16px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow:
+    inset 0 0 0 1px var(--rule),
+    inset 4px 0 0 var(--accent);
+}
+.push-prompt-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.push-prompt-text {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.push-prompt h2 {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 21px;
+  font-weight: 850;
+  line-height: 1.05;
+}
+.push-prompt p {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.push-prompt p svg {
+  display: inline;
+  vertical-align: -2px;
+}
+.push-prompt .button {
+  justify-self: start;
+  min-height: 42px;
+  margin-top: 6px;
+}
+.push-prompt-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: var(--ink-3);
+}

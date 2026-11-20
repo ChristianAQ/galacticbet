@@ -127,3 +127,44 @@ self.addEventListener("fetch", (event) => {
   if (isHashed(url)) event.respondWith(cacheFirst(request));
   else if (isArtwork(url)) event.respondWith(staleWhileRevalidate(event));
 });
+
+// ---------- Avisos ----------
+// The backend sends { title, body, url, tag }. iOS requires every push to show
+// a notification, so a malformed one still shows the app's name.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "GalacticBet", {
+      body: data.body || "",
+      tag: data.tag || undefined,
+      icon: `${scopePath}icon-ink-192.png`,
+      badge: `${scopePath}icon-ink-192.png`,
+      data: { url: typeof data.url === "string" ? data.url : "./" },
+    }),
+  );
+});
+
+// Tap: bring the open app forward on that screen, or open it there.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "./", scope);
+  if (target.origin !== self.location.origin) return;
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const open = windows.find((client) => client.url.startsWith(scope));
+      if (open) {
+        // Tell the app first: focusing can be refused, the screen change cannot.
+        open.postMessage({ type: "galacticbet:open", hash: target.hash });
+        await open.focus().catch(() => {});
+        return;
+      }
+      await self.clients.openWindow(target.href);
+    })(),
+  );
+});

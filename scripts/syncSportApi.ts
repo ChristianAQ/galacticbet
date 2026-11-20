@@ -15,6 +15,7 @@ import {
 } from "./sportApi";
 import { reserveSportApiRequests } from "./sportApiBudget";
 import { recompute } from "./recompute";
+import { notifyCompletedRounds } from "./notifications";
 import { isHotMatch, normalizeLiveMinute } from "../src/lib/liveBoard";
 
 const day = new Intl.DateTimeFormat("en-CA", {
@@ -191,7 +192,8 @@ export async function syncSportApi(
   // A durable flag retries scoring even if the previous job died after publishing results.
   const scored = pending.size > 0;
   if (pending.size) {
-    await recompute(db, cache, policies);
+    const completed = await recompute(db, cache, policies);
+    await notifyCompletedRounds(db, completed);
     const batch = db.batch();
     for (const season of pending)
       batch.set(

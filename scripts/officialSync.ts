@@ -6,6 +6,7 @@ import type { Match } from "../src/lib/domain";
 import { type ApiMatch } from "./normalize";
 import { syncCalendars } from "./calendarSync";
 import { recompute } from "./recompute";
+import { notifyCompletedRounds, notifyPendingRounds } from "./notifications";
 import { syncMatchInsights } from "./syncMatchInsights";
 import { syncNews } from "./syncNews";
 import { syncOdds } from "./syncOdds";
@@ -95,7 +96,10 @@ export async function officialSync(db: Firestore, token: string) {
     throw new Error(
       "No se pudo sincronizar ninguna competición. Revisa acceso y disponibilidad del proveedor.",
     );
-  await recompute(db, cache, policies);
+  const completed = await recompute(db, cache, policies);
+  // Avisos never hold up or break the official results.
+  await notifyCompletedRounds(db, completed);
+  await notifyPendingRounds(db);
   if (process.env.SPORTAPI_KEY?.trim()) {
     try {
       await syncLeagueStats(
