@@ -60,11 +60,14 @@ const CustomStandings = lazy(() => import("../components/CustomStandings"));
 /** The group ranking only: competition tables live in each match page. */
 export default function StandingsPage({
   groups,
+  groupsReady,
   matches,
   user,
   onLogin,
 }: {
   groups: Group[];
+  /** Your groups have loaded (an empty list means you really have none). */
+  groupsReady: boolean;
   matches: Match[];
   loading: boolean;
   user: User | null;
@@ -75,7 +78,8 @@ export default function StandingsPage({
   const followed = useFollowedCompetitions(user?.uid || "");
   // Without a group there is no official table: open your league.
   const liga = user
-    ? params.get("liga") || (!groups.length ? followed[0]?.id || "" : "")
+    ? params.get("liga") ||
+      (groupsReady && !groups.length ? followed[0]?.id || "" : "")
     : "";
   const setLiga = (id: string) =>
     setParams(
@@ -233,7 +237,7 @@ function GroupStandings({
   );
   const competition = preferences.competition;
   const [combined, setCombined] = useState(false);
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [period, setPeriod] = useState<Period>(
     params.get("period") === "all" ? "all" : "round",
   );
@@ -249,6 +253,16 @@ function GroupStandings({
     setCombined(false);
     setPeriod("round");
     setRound(requestedRound);
+    // Applied once: showing the page again keeps your filters, and the same
+    // link later is a new visit that opens its round again.
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("round");
+        return next;
+      },
+      { replace: true },
+    );
   }, [requestedRound]);
   const [sharing, setSharing] = useState(false);
   const selectedGroup = groups.find((g) => g.id === groupId);

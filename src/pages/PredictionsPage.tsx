@@ -57,6 +57,9 @@ const CustomQuiniela = lazy(() => import("../components/CustomQuiniela"));
 const sameValue = (a?: PredictionValue, b?: PredictionValue) =>
   JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
+/** A slip that was never sealed doesn't count: the board shows none of it. */
+const NO_PICKS: Record<string, PredictionValue> = {};
+
 /** Demo groups show a 5 € pot so the feature can be explored without an account. */
 const DEMO_POT_CENTS = 500;
 
@@ -69,11 +72,14 @@ const demoPlayers: Participant[] = [
 export default function PredictionsPage({
   matches,
   groups,
+  groupsReady,
   user,
   demo,
 }: {
   matches: Match[];
   groups: Group[];
+  /** Your groups have loaded (an empty list means you really have none). */
+  groupsReady: boolean;
   user: User | null;
   demo: boolean;
 }) {
@@ -96,7 +102,6 @@ export default function PredictionsPage({
   const savingCount = Object.keys(saving).length;
   const [seasonsLoading, setSeasonsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [round, setRound] = useState("");
   const [clock, setClock] = useState(Date.now());
   const [loadingPredictions, setLoadingPredictions] = useState(!demo);
   const [loadingSeal, setLoadingSeal] = useState(!demo);
@@ -139,13 +144,28 @@ export default function PredictionsPage({
   // The progress panel pins under the app bar and slims down while scrolling.
   const { sentinel: saveSentinel, stuck: saveStuck } = useStuck();
   const requestedRound = searchParams.get("round") || "";
+  /*
+   * The round lives in the URL only: a page shown again, «Volver», a reminder
+   * or a link always land on the round it names, never on a stale one.
+   */
+  const setRound = (id: string) =>
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (id) next.set("round", id);
+        else next.delete("round");
+        return next;
+      },
+      { replace: true },
+    );
   // Your friends' competitions sit next to LaLiga, Champions and Premier.
   const followed = useFollowedCompetitions(demo ? "" : user?.uid || "");
   // Without a group the official competitions have no slip: open your league.
   const liga =
     demo || !user
       ? ""
-      : searchParams.get("liga") || (!groups.length ? followed[0]?.id || "" : "");
+      : searchParams.get("liga") ||
+        (groupsReady && !groups.length ? followed[0]?.id || "" : "");
   const ligaInfo = followed.find((c) => c.id === liga);
   const openLiga = (id: string) =>
     setSearchParams(
@@ -172,11 +192,9 @@ export default function PredictionsPage({
     const target = seasons.find((s) => requestedRound.startsWith(`${s.id}-`));
     if (target && target.id !== season) setSeason(target.id);
   }, [requestedRound, seasons]);
-  const selected = rounds.some((r) => r.id === round)
-    ? round
-    : rounds.some((r) => r.id === requestedRound)
-      ? requestedRound
-      : current;
+  const selected = rounds.some((r) => r.id === requestedRound)
+    ? requestedRound
+    : current;
   const list = useMemo(
     () => filtered.filter((m) => m.roundId === selected),
     [filtered, selected],
@@ -199,6 +217,14 @@ export default function PredictionsPage({
   });
   const deadlineClosed =
     delivery.deadline !== null && clock >= delivery.deadline;
+  // Nothing left to fill in: the round is shown as the group board, sealed or not.
+  const roundClosed =
+    deadlineClosed ||
+    (list.length > 0 &&
+      !list.some((m) => canPredict(m.utcDate, clock, m.status)));
+  const sealKnown = demo || (sealed.key === sealKey && !loadingSeal);
+  const showBoard = isSealed || roundClosed;
+  const missed = roundClosed && sealKnown && !isSealed;
   const potCents = demo ? DEMO_POT_CENTS : groupPotCents(selectedGroup);
   const potMembers = new Set(
     demo
@@ -263,7 +289,6 @@ export default function PredictionsPage({
     if (changed) {
       setSeasons([]);
       setSeason("");
-      setRound("");
       setSeasonsLoading(false);
     }
     if (!db || !group || demo) return;
@@ -303,10 +328,12 @@ export default function PredictionsPage({
   }, [group, demo, seasonsVersion]);
   useEffect(() => {
     const key = `${predictionKey}|${demo}`;
-    const changed = lastKeys.current.picks !== key;
+    const previous = lastKeys.current.picks;
+    const changed = previous !== key;
     lastKeys.current.picks = key;
     if (changed) {
-      setValues({});
+      // Demo picks only live here, for every round: keep them while exploring.
+      if (!(demo && previous.endsWith("|true"))) setValues({});
       setValuesKey(predictionKey);
       setSaving({});
       setError("");
@@ -519,12 +546,12 @@ export default function PredictionsPage({
   const progress = total ? completed / total : 0;
   const status = !list.length
     ? "Elige grupo y competición y aparecerá tu boleto."
-    : pending
-      ? "Comprobando tu boleto…"
-      : isSealed
-        ? "Boleto sellado. Ahora, a sufrir con el grupo."
-        : deadlineClosed
-          ? "Plazo cerrado: esta jornada se te escapó."
+    : isSealed
+      ? "Boleto sellado. Ahora, a sufrir con el grupo."
+      : missed
+        ? "Plazo cerrado: esta jornada se te escapó."
+        : pending
+          ? "Comprobando tu boleto…"
           : completed > 0
             ? "A medio rellenar. Séllalo antes del primer pitido."
             : "Jornada abierta. Marca tus signos antes del primer partido.";
@@ -576,13 +603,14 @@ export default function PredictionsPage({
               )
         }
         onCompetition={(code) => {
+          // One URL update: leaving your league also forgets its round.
           if (liga) closeLiga();
+          else setRound("");
           if (demo) setDemoCompetition(code);
           else {
             if (user) preferenceStore.update(user.uid, { competition: code });
             setSeason(seasons.find((s) => s.competition === code)?.id || "");
           }
-          setRound("");
         }}
         aside={
           <span className="page-filters-chip">
@@ -649,7 +677,7 @@ export default function PredictionsPage({
       )}
       {!demo &&
         !isSealed &&
-        !deadlineClosed &&
+        !roundClosed &&
         !delivery.prepared &&
         !delivery.checking &&
         !delivery.error && (
@@ -701,8 +729,8 @@ export default function PredictionsPage({
             clock={clock}
             userId={uid}
           />
-          {!isSealed && <div ref={saveSentinel} className="sticky-sentinel" />}
-          {!isSealed && (
+          {!showBoard && <div ref={saveSentinel} className="sticky-sentinel" />}
+          {!showBoard && (
             <section
               className={`round-save-panel${saveStuck ? " is-stuck" : ""}${canSubmit ? " is-ready" : ""}`}
               aria-label="Estado de tu boleto"
@@ -745,7 +773,7 @@ export default function PredictionsPage({
               </button>
             </section>
           )}
-          {!isSealed ? (
+          {!showBoard ? (
             <div
               id="mine-predictions"
               role="region"
@@ -762,17 +790,10 @@ export default function PredictionsPage({
                   value={values[m.id]}
                   mode={mode}
                   lock={
-                    isSealed
-                      ? "sealed"
-                      : deadlineClosed
-                        ? "deadline"
-                        : !canPredict(m.utcDate, clock, m.status)
-                          ? "kickoff"
-                          : null
+                    !canPredict(m.utcDate, clock, m.status) ? "kickoff" : null
                   }
                   disabled={disabled}
                   saving={Boolean(saving[m.id])}
-                  demo={demo}
                   onChoose={onChoose}
                   onDetails={onDetails}
                 />
@@ -795,9 +816,10 @@ export default function PredictionsPage({
                 seasonId={season}
                 clock={clock}
                 demo={demo}
-                ownValues={values}
+                ownValues={isSealed ? values : NO_PICKS}
                 sealed={isSealed}
-                loadingOwn={!demo && loadingPredictions}
+                missed={missed}
+                loadingOwn={!demo && (loadingPredictions || !sealKnown)}
                 canShare={canShare}
                 roundId={selected}
                 completedIds={delivery.completedIds}
@@ -808,6 +830,7 @@ export default function PredictionsPage({
                     : selectedGroup?.name || "Grupo"
                 }
                 roundTitle={`${competitionName(list[0].competition)} · ${roundLabel(list[0])}`}
+                onOpen={onDetails}
               />
             </div>
           )}

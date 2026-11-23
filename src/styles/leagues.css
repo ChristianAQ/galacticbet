@@ -168,14 +168,6 @@
     transform: translate3d(0, -10px, 0);
   }
 }
-.league-hint {
-  margin: 18px auto 0;
-  max-width: 30em;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  text-align: center;
-}
 .league-more {
   display: flex;
   justify-content: center;
@@ -216,8 +208,12 @@
 }
 
 /* ---------- League tables (Ligas and the match page) ---------- */
+/* Complete here: the generic heading of Clasificación may not be loaded yet. */
 .competition-table-panel .standings-heading {
+  display: block;
   margin: 22px 0 12px;
+  padding-top: 10px;
+  border-top: 3px solid var(--rule-strong);
 }
 .competition-table-panel .standings-heading h2 {
   font-size: var(--display-sm);

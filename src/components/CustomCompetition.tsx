@@ -1,4 +1,4 @@
-import { Check, Lock, MapPin, Plus, QrCode, Trophy } from "lucide-react";
+import { Check, Plus, QrCode, Trophy } from "lucide-react";
 import { lazy, Suspense, useMemo, useRef, useState, useId } from "react";
 import {
   FORMATS,
@@ -18,7 +18,7 @@ import {
   unfollowCompetition,
   type CompetitionData,
 } from "../lib/customCompetitionData";
-import { preferredRound } from "../lib/domain";
+import { preferredRound, type Match } from "../lib/domain";
 import { roundOptions } from "../lib/roundOptions";
 import { haptic } from "../lib/motion";
 import { go } from "../lib/navigation";
@@ -140,41 +140,42 @@ export function CustomSummary({
 
 export type CustomTab = "partidos" | "clasificacion" | "cuadro" | "gestion";
 
-/** A match row that opens its sheet: same row as any league fixture. */
+/**
+ * A match row that opens its sheet: the same row as any league fixture, with
+ * each side's form in this competition. Place and confirmation are in the sheet.
+ */
 function FixtureButton({
   match,
-  competition,
+  app,
+  history,
   onOpen,
 }: {
   match: ResolvedMatch;
-  competition: Competition;
+  app: Match;
+  history: Match[];
   onOpen: (id: string) => void;
 }) {
-  const app = toAppMatch(competition.id, match);
   return (
     <li className="fixture-item">
-      <button type="button" className="fixture-card-button custom-fixture" onClick={() => onOpen(match.id)}>
-        <MatchRow match={app} as="span" plainResult />
+      <button
+        type="button"
+        className="fixture-card-button custom-fixture"
+        aria-label={`Ver ficha de ${app.home} contra ${app.away}`}
+        onClick={() => onOpen(match.id)}
+      >
+        <MatchRow match={app} history={history} as="span" plainResult />
         {match.leg ? <span className="fixture-leg">{match.leg === 1 ? "Ida" : "Vuelta"}</span> : null}
-        {(match.location || match.locked) && (
-          <span className="custom-fixture-meta">
-            {match.location && (
-              <span>
-                <MapPin size={12} aria-hidden="true" />
-                {match.location}
-              </span>
-            )}
-            {match.locked && (
-              <span>
-                <Lock size={12} aria-hidden="true" />
-                Resultado confirmado
-              </span>
-            )}
-          </span>
-        )}
       </button>
     </li>
   );
+}
+
+/** The competition's matches as league fixtures, to show each side's form. */
+function useAppMatches(competition: Competition, view: CompetitionView) {
+  return useMemo(() => {
+    const app = view.matches.map((m) => toAppMatch(competition.id, m));
+    return { app, byId: new Map(app.map((m) => [m.id, m])) };
+  }, [view, competition.id]);
 }
 
 function FixturesPanel({
@@ -194,7 +195,7 @@ function FixturesPanel({
   canRun: boolean;
   onManage: () => void;
 }) {
-  const app = useMemo(() => view.matches.map((m) => toAppMatch(competition.id, m)), [view, competition.id]);
+  const { app, byId } = useAppMatches(competition, view);
   const rounds = useMemo(() => roundOptions(app), [app]);
   const current = useMemo(() => preferredRound(app), [app]);
   const selected = rounds.some((r) => r.id === round) ? round : current;
@@ -233,7 +234,7 @@ function FixturesPanel({
             <DayTitle date={new Date(items[0].startAt).toISOString()} count={items.length} />
             <ul className="fixture-list">
               {items.map((m) => (
-                <FixtureButton key={m.id} match={m} competition={competition} onOpen={onOpen} />
+                <FixtureButton key={m.id} match={m} app={byId.get(m.id)!} history={app} onOpen={onOpen} />
               ))}
             </ul>
           </section>
@@ -313,6 +314,7 @@ function BracketPanel({
   view: CompetitionView;
   onOpen: (id: string) => void;
 }) {
+  const { app, byId } = useAppMatches(competition, view);
   const knockout = view.matches.filter((m) => m.phase === "knockout");
   const stages = (Object.keys(STAGE_TITLES) as Stage[]).filter((s) => knockout.some((m) => m.stage === s));
   return (
@@ -344,7 +346,7 @@ function BracketPanel({
                   </header>
                   <ul className="fixture-list">
                     {legs.map((m) => (
-                      <FixtureButton key={m.id} match={m} competition={competition} onOpen={onOpen} />
+                      <FixtureButton key={m.id} match={m} app={byId.get(m.id)!} history={app} onOpen={onOpen} />
                     ))}
                   </ul>
                 </article>

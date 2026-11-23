@@ -493,7 +493,9 @@ export default function CompetitionCreatePage({
           ) : (
             summary && (
               <p className="cc-summary" role="status">
-                <strong>{summary.matches} partidos</strong> en {summary.days} {summary.days === 1 ? "jornada" : "jornadas"} · del{" "}
+                <strong>
+                  {summary.matches} {summary.matches === 1 ? "partido" : "partidos"}
+                </strong> en {summary.days} {summary.days === 1 ? "jornada" : "jornadas"} · del{" "}
                 {shortDate.format(new Date(`${start}T12:00:00`))} al {shortDate.format(new Date(`${summary.lastDate}T12:00:00`))}
               </p>
             )

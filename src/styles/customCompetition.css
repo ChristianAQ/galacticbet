@@ -32,20 +32,6 @@
   text-align: inherit;
   font: inherit;
 }
-.custom-fixture-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: -6px;
-  padding-bottom: 12px;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-.custom-fixture-meta > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
 
 .custom-champion {
   display: flex;
@@ -145,9 +131,6 @@
   align-items: center;
   gap: 8px;
 }
-.custom-match-facts li::first-letter {
-  text-transform: uppercase;
-}
 .custom-status {
   padding: 2px 9px;
   border-radius: 999px;
@@ -158,7 +141,7 @@
 }
 .custom-status.is-live {
   background: var(--live, #d4231a);
-  color: #fff;
+  color: var(--paper);
 }
 .custom-status.is-finished {
   background: var(--ink);
@@ -415,7 +398,8 @@
   font-size: 11px !important;
   font-weight: 700;
 }
-.cc-switch-row {
+/* Doubled class: beats .more-row whatever order the chunks load in. */
+.more-row.cc-switch-row {
   grid-template-columns: minmax(0, 1fr) auto;
   padding: 0;
   min-height: 52px;
@@ -469,7 +453,7 @@
 .invite-card > .button {
   width: 100%;
 }
-.invite-short code {
+.invite-code.invite-short code {
   text-align: center;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 26px;
@@ -580,29 +564,4 @@
   align-items: center;
   gap: 6px;
   margin-top: 12px;
-}
-/* Quiniela of a friends' competition: what a played match scored. */
-.custom-slip-result {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 2px 0 0;
-  padding: 10px 12px;
-  border-radius: var(--r-sm);
-  background: var(--paper-2);
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-}
-.custom-slip-result strong {
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-.custom-slip-result.is-exact,
-.custom-slip-result.is-outcome {
-  background: var(--win-soft);
-}
-.custom-slip-result.is-exact strong,
-.custom-slip-result.is-outcome strong {
-  color: var(--win);
 }

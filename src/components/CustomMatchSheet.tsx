@@ -44,7 +44,8 @@ const STAGE_NAMES: Record<string, string> = {
   THIRD_PLACE: "Tercer puesto",
   FINAL: "Final",
 };
-export function matchTitle(m: Pick<CustomMatch, "phase" | "stage" | "round" | "group" | "leg">) {
+export function matchTitle(m: Pick<ResolvedMatch, "phase" | "stage" | "round" | "group" | "leg" | "friendly">) {
+  if (m.friendly) return `Amistoso · Jornada ${m.round}`;
   if (m.phase === "knockout")
     return `${STAGE_NAMES[m.stage] || "Eliminatoria"}${m.leg ? ` · ${m.leg === 1 ? "ida" : "vuelta"}` : ""}`;
   return `${m.group ? `Grupo ${m.group} · ` : ""}Jornada ${m.round}`;
@@ -114,8 +115,9 @@ export default function CustomMatchSheet({
   const [location, setLocation] = useState(match.location);
   // Custom matches choose their sides; a knockout side can be set by hand while undecided.
   const pickSides = match.phase === "custom" || (match.phase === "knockout" && (match.home.pending || match.away.pending || match.homeId !== null));
-  const [homeId, setHomeId] = useState(match.homeId || match.home.id || "");
-  const [awayId, setAwayId] = useState(match.awayId || match.away.id || "");
+  // Only stored sides: an untouched «Según el cuadro» keeps following the bracket.
+  const [homeId, setHomeId] = useState(match.phase === "custom" ? match.homeId || match.home.id || "" : match.homeId || "");
+  const [awayId, setAwayId] = useState(match.phase === "custom" ? match.awayId || match.away.id || "" : match.awayId || "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState<"lock" | "delete" | null>(null);
@@ -181,6 +183,8 @@ export default function CustomMatchSheet({
       awayPenalties: ap,
       startAt: zonedInstant(date, timeToMinutes(time), tz),
       location: location.trim(),
+      // Only a final result stays confirmed (the owner may reopen it as anything else).
+      locked: match.locked && (status === "finished" || status === "cancelled"),
     };
   }
   function fail(message: string) {
@@ -203,7 +207,8 @@ export default function CustomMatchSheet({
       <ul className="custom-match-facts">
         <li>
           <CalendarClock size={16} aria-hidden="true" />
-          {when.format(match.startAt)}
+          {/* Capitalised here: ::first-letter doesn't apply to a flex row. */}
+          {when.format(match.startAt).replace(/^./, (c) => c.toUpperCase())}
         </li>
         {match.location && (
           <li>

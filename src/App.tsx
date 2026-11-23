@@ -83,6 +83,8 @@ export default function App() {
     user && storedGroups(user.uid) ? user.uid : "",
   );
   const activeGroups = user && groupsUid === user.uid ? groups : [];
+  // Until then «no groups» only means «not loaded yet».
+  const groupsReady = Boolean(user) && groupsUid === user?.uid;
   const [loading, setLoading] = useState(
     () => configured && calendar.length === 0,
   );
@@ -288,6 +290,7 @@ export default function App() {
             <PredictionsPage
               matches={matches}
               groups={activeGroups}
+              groupsReady={groupsReady}
               user={user}
               demo={demo}
             />
@@ -310,6 +313,7 @@ export default function App() {
         element={
           <StandingsPage
             groups={activeGroups}
+            groupsReady={groupsReady}
             matches={matches}
             loading={loading}
             user={user}

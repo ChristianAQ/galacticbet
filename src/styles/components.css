@@ -88,7 +88,8 @@
 }
 .button.danger {
   background: var(--loss);
-  color: #fff;
+  /* --loss turns light in the dark theme: the paper colour keeps it legible. */
+  color: var(--paper);
 }
 .button.full {
   width: 100%;
@@ -177,6 +178,16 @@
 }
 .share-trigger:disabled {
   opacity: 0.4;
+}
+
+/* A quiet centred hint under a list (Ligas and the Quiniela of a league). */
+.league-hint {
+  margin: 18px auto 0;
+  max-width: 30em;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  text-align: center;
 }
 
 /* Every tappable card gets the same immediate press. */
@@ -443,6 +454,13 @@
     background-color 200ms ease,
     color 200ms ease,
     transform 160ms var(--press);
+}
+/* Friends' competitions can have long names: the chip stays a chip. */
+.competition-tabs > button > span:last-child {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .competition-tabs > button .competition-logo.small {
   width: 32px;
@@ -1191,7 +1209,7 @@
   padding: 0 10px;
   font-size: var(--text-xs);
   font-weight: 600;
-  color: #fff;
+  color: var(--paper);
   background: var(--ink-2);
 }
 .swipe-action.is-destructive {

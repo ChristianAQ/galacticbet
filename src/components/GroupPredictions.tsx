@@ -14,6 +14,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import {
   hasMatchStarted,
@@ -39,6 +40,7 @@ import {
   roundBoard,
   roundHasStarted,
   type RoundPlayer,
+  type ScoreMode,
 } from "../lib/roundBoard";
 import { shareFileName } from "../lib/shareSummary";
 
@@ -57,12 +59,14 @@ export default function GroupPredictions({
   demo,
   ownValues,
   sealed = false,
+  missed = false,
   loadingOwn = false,
   canShare,
   completedIds,
   mode,
   groupName,
   roundTitle,
+  onOpen,
 }: {
   matches: Match[];
   history: Match[];
@@ -75,12 +79,16 @@ export default function GroupPredictions({
   demo: boolean;
   ownValues: Record<string, PredictionValue>;
   sealed?: boolean;
+  /** The round closed without your slip: same board, nothing of yours. */
+  missed?: boolean;
   loadingOwn?: boolean;
   canShare: boolean;
   completedIds: string[];
   mode: Mode;
   groupName: string;
   roundTitle: string;
+  /** Opens the match page (keeping the round to come back to). */
+  onOpen?: (id: string, from: Element | null) => void;
 }) {
   const [sharing, setSharing] = useState(false);
   const [entries, setEntries] = useState<SharedEntries>({});
@@ -210,7 +218,9 @@ export default function GroupPredictions({
     <section className="group-predictions" aria-label="Pronósticos del grupo">
       <div className="group-view-heading">
         <div className="group-view-title">
-          <span className="eyebrow">Tu boleto y el de los demás</span>
+          <span className="eyebrow">
+            {missed ? "Jornada cerrada sin tu boleto" : "Tu boleto y el de los demás"}
+          </span>
           <h2 tabIndex={-1}>El grupo</h2>
         </div>
         {sealed && (
@@ -228,6 +238,12 @@ export default function GroupPredictions({
           )}
         </span>
       </div>
+      {missed && (
+        <p className="group-view-note">
+          No sellaste esta jornada: no suma puntos y los boletos del grupo solo
+          se ven entre quienes sellan.
+        </p>
+      )}
       {shareReady && roundHasStarted(matches) && (
         <RoundBoardPanel
           rows={board}
@@ -266,13 +282,14 @@ export default function GroupPredictions({
           completedIds={completedIds}
           mode={mode}
           onRetry={() => setAttempt((n) => n + 1)}
+          onOpen={onOpen}
         />
       ))}
     </section>
   );
 }
 
-function RoundBoardPanel({
+export function RoundBoardPanel({
   rows,
   userId,
   live,
@@ -321,42 +338,30 @@ function RoundBoardPanel({
     </section>
   );
 }
-function RivalsCard({
+/**
+ * One fixture of a board: the real match first (teams and the score that
+ * decides the picks), then whatever picks go with it. Tapping the match opens
+ * its ficha.
+ */
+export function GroupMatchCard({
   match,
   history,
-  participants,
-  userId,
   started,
-  canShare,
-  ownValue,
-  loadingOwn,
-  entries,
-  pending,
-  ready,
-  error,
-  completedIds,
-  mode,
-  onRetry,
+  to,
+  onOpen,
+  plainResult = false,
+  children,
 }: {
   match: Match;
   history: Match[];
-  participants: Participant[];
-  userId: string;
   started: boolean;
-  canShare: boolean;
-  ownValue?: PredictionValue;
-  loadingOwn: boolean;
-  entries: SharedEntries;
-  pending: boolean;
-  ready: boolean;
-  error: string;
-  completedIds: string[];
-  mode: Mode;
-  onRetry: () => void;
+  /** The match page; without it the fixture is a button for `onOpen`. */
+  to?: string;
+  onOpen?: (id: string, from: Element | null) => void;
+  /** Friends' matches (any sport): no «a 90 minutos». */
+  plainResult?: boolean;
+  children: ReactNode;
 }) {
-  const visible = participants.filter(
-    (p) => p.id !== userId && completedIds.includes(p.id),
-  );
   const live = ["IN_PLAY", "PAUSED"].includes(match.status);
   const finished = match.status === "FINISHED";
   const scheduled = ["TIMED", "SCHEDULED"].includes(match.status);
@@ -366,6 +371,38 @@ function RivalsCard({
       ? { home: match.homeScore, away: match.awayScore }
       : null;
   const sign = score ? outcome(score.home, score.away) : null;
+  const label = `${scheduled && !plainResult ? "Previa" : "Ficha"} de ${match.home} contra ${match.away}`;
+  const fixture = (
+    <>
+      <div className="saved-team">
+        <Team name={match.home} crest={match.homeCrest} part="home-crest" />
+        <TeamForm match={match} side="home" matches={history} />
+      </div>
+      <div
+        className={`gm-score${live ? " is-live" : ""}${score ? "" : " is-pending"}`}
+        data-vt-part="score"
+      >
+        <strong
+          aria-label={
+            score
+              ? `${live ? "Marcador en juego" : plainResult ? "Resultado" : "Resultado a 90 minutos"}: ${score.home} a ${score.away}`
+              : "Sin resultado todavía"
+          }
+        >
+          {score ? `${score.home} – ${score.away}` : "vs"}
+        </strong>
+        {sign && (
+          <small>
+            {live ? "Ahora" : "Signo"} <b>{sign}</b>
+          </small>
+        )}
+      </div>
+      <div className="saved-team">
+        <Team name={match.away} crest={match.awayCrest} part="away-crest" />
+        <TeamForm match={match} side="away" matches={history} />
+      </div>
+    </>
+  );
   return (
     <article className="group-match-card" data-vt-match={match.id}>
       <header className="saved-match-heading">
@@ -384,51 +421,94 @@ function RivalsCard({
           )}
         </span>
       </header>
-
-      {/* The real match first: teams and the score that decides the signs.
-          Tapping it opens the match page (preview before kick-off, ficha after). */}
-      <Link
-        className="gm-fixture"
-        to={`/partido/${encodeURIComponent(match.id)}`}
-        aria-label={`${scheduled ? "Previa" : "Ficha"} de ${match.home} contra ${match.away}`}
-      >
-        <div className="saved-team">
-          <Team name={match.home} crest={match.homeCrest} part="home-crest" />
-          <TeamForm match={match} side="home" matches={history} />
-        </div>
-        <div
-          className={`gm-score${live ? " is-live" : ""}${score ? "" : " is-pending"}`}
-          data-vt-part="score"
+      {to ? (
+        <Link
+          className="gm-fixture"
+          to={to}
+          aria-label={label}
+          onClick={
+            onOpen &&
+            ((event) => {
+              event.preventDefault();
+              onOpen(match.id, event.currentTarget.closest("article"));
+            })
+          }
         >
-          <strong
-            aria-label={
-              score
-                ? `${live ? "Marcador en juego" : "Resultado a 90 minutos"}: ${score.home} a ${score.away}`
-                : "Sin resultado todavía"
-            }
-          >
-            {score ? `${score.home} – ${score.away}` : "vs"}
-          </strong>
-          {sign && (
-            <small>
-              {live ? "Ahora" : "Signo"} <b>{sign}</b>
-            </small>
-          )}
-        </div>
-        <div className="saved-team">
-          <Team name={match.away} crest={match.awayCrest} part="away-crest" />
-          <TeamForm match={match} side="away" matches={history} />
-        </div>
-      </Link>
+          {fixture}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className="gm-fixture"
+          aria-label={label}
+          onClick={(event) =>
+            onOpen?.(match.id, event.currentTarget.closest("article"))
+          }
+        >
+          {fixture}
+        </button>
+      )}
       {result?.extended && result.winnerName && (
         <p className="gm-decision">
           <Trophy size={13} aria-hidden="true" />
-          Pasa {result.winnerName} {result.decision.toLowerCase()}. La
-          quiniela cuenta el resultado a 90 minutos.
+          Pasa {result.winnerName} {result.decision.toLowerCase()}.{" "}
+          {plainResult
+            ? "Los pronósticos cuentan el marcador sin los penaltis."
+            : "La quiniela cuenta el resultado a 90 minutos."}
         </p>
       )}
       <LiveEvents match={match} />
+      {children}
+    </article>
+  );
+}
 
+function RivalsCard({
+  match,
+  history,
+  participants,
+  userId,
+  started,
+  canShare,
+  ownValue,
+  loadingOwn,
+  entries,
+  pending,
+  ready,
+  error,
+  completedIds,
+  mode,
+  onRetry,
+  onOpen,
+}: {
+  match: Match;
+  history: Match[];
+  participants: Participant[];
+  userId: string;
+  started: boolean;
+  canShare: boolean;
+  ownValue?: PredictionValue;
+  loadingOwn: boolean;
+  entries: SharedEntries;
+  pending: boolean;
+  ready: boolean;
+  error: string;
+  completedIds: string[];
+  mode: Mode;
+  onRetry: () => void;
+  onOpen?: (id: string, from: Element | null) => void;
+}) {
+  const visible = participants.filter(
+    (p) => p.id !== userId && completedIds.includes(p.id),
+  );
+  return (
+    <GroupMatchCard
+      match={match}
+      history={history}
+      started={started}
+      to={`/partido/${encodeURIComponent(match.id)}`}
+      onOpen={onOpen}
+    >
       {/* Then every pick of the group against that score. */}
       <section className="gm-picks" aria-label="Pronósticos del grupo">
         <ul className="gm-pick-list">
@@ -475,13 +555,12 @@ function RivalsCard({
             )
           ))}
       </section>
-
-    </article>
+    </GroupMatchCard>
   );
 }
 
 /** One person's pick: the sign, what it means and how it went. */
-function PickRow({
+export function PickRow({
   name,
   me = false,
   match,
@@ -492,7 +571,7 @@ function PickRow({
   name: string;
   me?: boolean;
   match: Match;
-  mode: Mode;
+  mode: ScoreMode;
   value?: PredictionValue;
   loading?: boolean;
 }) {

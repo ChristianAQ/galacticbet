@@ -14,6 +14,8 @@ export const MIN_PARTICIPANTS = 2;
 export const MAX_PARTICIPANTS = 32;
 export const MAX_MATCHES = 500;
 export const MAX_ICON_CHARS = 60_000;
+/** A participant's picture (the rules allow half of a competition's). */
+export const MAX_PARTICIPANT_ICON_CHARS = 30_000;
 
 export type Format =
   | "league"
@@ -691,6 +693,8 @@ export interface ResolvedSide {
 export interface ResolvedMatch extends CustomMatch {
   home: ResolvedSide;
   away: ResolvedSide;
+  /** A custom match in a league or tournament: its own rounds, outside the table and bracket. */
+  friendly?: boolean;
 }
 export interface TieResult {
   winner: string | null;
@@ -846,7 +850,12 @@ export function resolveCompetition(
     if (table?.complete && table.rows[0]) champion = side(table.rows[0].key, null);
   }
   return {
-    matches: matches.map((m) => resolved.get(m.id)!).sort((a, b) => a.startAt - b.startAt),
+    matches: matches
+      .map((m) => {
+        const r = resolved.get(m.id)!;
+        return setup.format !== "custom" && m.phase === "custom" ? { ...r, friendly: true } : r;
+      })
+      .sort((a, b) => a.startAt - b.startAt),
     tables,
     ties,
     champion,
@@ -863,9 +872,14 @@ const STATUS_TO_MATCH: Record<MatchStatus, string> = {
   cancelled: "CANCELLED",
 };
 
-/** Rounds of the selector: «J3» for league/group days, the stage for knockout. */
-export function roundKey(m: Pick<CustomMatch, "phase" | "stage" | "round">) {
-  return m.phase === "knockout" ? m.stage : `${m.phase === "group" ? "G" : "J"}${m.round}`;
+/**
+ * Rounds of the selector: «J3» for league/group days, the stage for knockout,
+ * and «A1» for friendlies (so they never join a league day).
+ */
+export function roundKey(m: Pick<ResolvedMatch, "phase" | "stage" | "round" | "friendly">) {
+  return m.phase === "knockout"
+    ? m.stage
+    : `${m.friendly ? "A" : m.phase === "group" ? "G" : "J"}${m.round}`;
 }
 
 /**
@@ -881,7 +895,7 @@ export function toAppMatch(competitionId: string, m: ResolvedMatch): Match {
     seasonId: competitionId,
     roundId: `${competitionId}:${roundKey(m)}`,
     matchday: m.phase === "knockout" ? 0 : m.round,
-    stage: m.stage,
+    stage: m.friendly ? "FRIENDLY" : m.stage,
     utcDate: new Date(m.startAt).toISOString(),
     status: STATUS_TO_MATCH[m.status],
     home: m.home.name,

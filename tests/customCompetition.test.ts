@@ -296,6 +296,30 @@ describe("Clasificación y cuadro calculados a partir de los resultados", () => 
     const rounds = roundOptions(view.matches.map((m) => toAppMatch("c1", m)));
     expect(rounds.map((r) => r.short)).toEqual(["J1", "J2", "J3", "Final"]);
   });
+
+  it("un amistoso en una liga va en su propia jornada, no se mezcla con la J1", () => {
+    const s = setup();
+    const league = generateFixtures(s, four).map((f) => asMatch(f));
+    const [friendly] = recurringFixtures({
+      homeId: "p1",
+      awayId: "p2",
+      start: "2026-11-07",
+      time: "18:30",
+      everyDays: 7,
+      count: 1,
+      location: "",
+      timeZone: "Europe/Madrid",
+      firstRound: 1,
+      id: () => "amistoso",
+    });
+    const view = resolveCompetition(s, four, [...league, asMatch(friendly)]);
+    const rounds = roundOptions(view.matches.map((m) => toAppMatch("c1", m)));
+    expect(rounds.find((r) => r.id === "c1:J1")?.matches).toBe(2);
+    expect(rounds.find((r) => r.id === "c1:A1")).toMatchObject({ short: "Amist. 1", matches: 1 });
+    // In a custom tournament its own matches are the rounds.
+    const custom = resolveCompetition({ format: "custom" }, four, [asMatch(friendly)]);
+    expect(roundOptions(custom.matches.map((m) => toAppMatch("c1", m)))[0]).toMatchObject({ id: "c1:J1", short: "J1" });
+  });
 });
 
 it("las fechas se editan en la hora local de la competición", () => {

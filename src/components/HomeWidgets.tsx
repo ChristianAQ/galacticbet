@@ -94,7 +94,8 @@ export function QuinielaSpotlight({
           <span className="spotlight-closes">Cierra en</span>
           <Countdown kickoff={main.start} now={now} />
           <p className="spotlight-meta">
-            {main.matches} partidos · {roundDateRange(main.start, main.end)}
+            {main.matches} {main.matches === 1 ? "partido" : "partidos"} ·{" "}
+            {roundDateRange(main.start, main.end)}
           </p>
           <Link
             className="button primary full spotlight-cta"

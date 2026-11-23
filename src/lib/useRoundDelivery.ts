@@ -28,6 +28,8 @@ export function useRoundDelivery({
     ids: [] as string[],
     deadline: null as number | null,
     prepared: false,
+    // A cached answer is not the server's: still checking, not «not prepared».
+    fromCache: false,
     error: "",
   });
   const [attendance, setAttendance] = useState({
@@ -54,6 +56,7 @@ export function useRoundDelivery({
           deadline: data?.submissionDeadline?.toMillis() ?? null,
           prepared:
             !snap.metadata.fromCache && Array.isArray(data?.requiredMatchIds),
+          fromCache: snap.metadata.fromCache,
           error: "",
         });
       },
@@ -63,6 +66,7 @@ export function useRoundDelivery({
           ids: [],
           deadline: null,
           prepared: false,
+          fromCache: false,
           error: readableError(e),
         }),
     );
@@ -114,7 +118,7 @@ export function useRoundDelivery({
       meta.key === key && meta.prepared ? meta.ids : fallback.matchIds,
     deadline:
       meta.key === key && meta.prepared ? meta.deadline : fallback.deadline,
-    checking: meta.key !== key,
+    checking: meta.key !== key || meta.fromCache,
     prepared: meta.key === key && meta.prepared,
     completedIds: attendance.key === key ? attendance.ids : [],
     attendanceReady: attendance.key === key && attendance.ready,

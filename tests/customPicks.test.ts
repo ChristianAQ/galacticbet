@@ -18,6 +18,8 @@ import {
   pickPoints,
   pickRanking,
 } from "../src/lib/customPicks";
+import type { Match } from "../src/lib/domain";
+import { pickState, roundBoard } from "../src/lib/roundBoard";
 
 describe("código corto de invitación", () => {
   it("son 6 caracteres sin 0/O, 1/I/L y todos salen", () => {
@@ -176,5 +178,28 @@ describe("pronósticos de una competición entre amigos", () => {
       { id: "ana", name: "Ana", avatar: null },
     ]);
     expect(rows[0]).toMatchObject({ points: 4, hits: 2, exact: 1 });
+  });
+
+  it("los puntos de la jornada en la Quiniela cuentan igual que la tabla", () => {
+    const played = (id: string, home: number, away: number): Match => ({
+      id,
+      competition: "PD",
+      seasonId: "c1",
+      roundId: "c1:J1",
+      matchday: 1,
+      stage: "REGULAR_SEASON",
+      utcDate: "2026-11-07T10:00:00Z",
+      status: "FINISHED",
+      home: "Local",
+      away: "Rival",
+      homeScore: home,
+      awayScore: away,
+    });
+    const [row] = roundBoard([played("m1", 1, 0), played("m2", 2, 2)], "own", [
+      { id: "ana", name: "Ana", picks: { m1: "1", m2: { home: 2, away: 2 } } },
+    ]);
+    expect(row).toMatchObject({ points: 4, hits: 2 });
+    expect(pickState("own", { home: 1, away: 1 }, played("m3", 0, 0))).toBe("hit");
+    expect(pickState("own", "2", played("m4", 0, 0))).toBe("miss");
   });
 });

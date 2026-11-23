@@ -88,7 +88,9 @@ function RoundSelector({
               {[
                 roundStateLabel[selected.state],
                 roundDateRange(selected.start, selected.end),
-                selected.matches ? `${selected.matches} partidos` : "",
+                selected.matches
+                  ? `${selected.matches} ${selected.matches === 1 ? "partido" : "partidos"}`
+                  : "",
               ]
                 .filter(Boolean)
                 .join(" · ")}

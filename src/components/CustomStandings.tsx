@@ -45,7 +45,7 @@ export default function CustomStandings({
     () => (view?.matches || []).filter((m) => m.startAt <= now && m.status !== "cancelled"),
     [view, now],
   );
-  const revealed = useStartedPicks(cid, started, user.uid);
+  const revealed = useStartedPicks(cid, started, user.uid, { enabled: Boolean(view), prune: true });
   const predictors = useMemo(
     () => [...new Set([...(c?.memberIds || []), ...Object.values(revealed || {}).flatMap((p) => Object.keys(p))])],
     [c, revealed],

@@ -31,6 +31,7 @@ const shortStages: Record<string, string> = {
   LAST_16: "Octavos",
   QUARTER_FINALS: "Cuartos",
   SEMI_FINALS: "Semis",
+  THIRD_PLACE: "3er puesto",
   FINAL: "Final",
   PRELIMINARY_ROUND: "Previa",
   FIRST_ROUND: "1ª ronda",
@@ -42,6 +43,7 @@ const roundStages = ["REGULAR_SEASON", "LEAGUE_STAGE", "GROUP_STAGE"];
 export function roundShortLabel(match: Pick<Match, "stage" | "matchday">) {
   if (roundStages.includes(match.stage) && match.matchday)
     return `J${match.matchday}`;
+  if (match.stage === "FRIENDLY") return `Amist. ${match.matchday}`;
   return shortStages[match.stage] || roundLabel(match);
 }
 

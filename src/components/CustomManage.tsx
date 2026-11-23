@@ -12,6 +12,7 @@ import {
   addDays,
   FORMATS,
   localParts,
+  MAX_PARTICIPANT_ICON_CHARS,
   recurringFixtures,
   roundKey,
   timeToMinutes,
@@ -419,7 +420,7 @@ function AddMatchesSheet({
           </p>
         )}
         <button className="button primary full" disabled={busy}>
-          {busy ? "Guardando…" : every ? `Añadir ${count || 0} partidos` : "Añadir partido"}
+          {busy ? "Guardando…" : every ? `Añadir ${count || 0} ${Number(count) === 1 ? "partido" : "partidos"}` : "Añadir partido"}
         </button>
       </form>
     </Modal>
@@ -520,7 +521,18 @@ function MoveRoundSheet({
   );
 }
 
-function IconPicker({ value, onChange, disabled }: { value: string | null; onChange: (v: string | null) => void; disabled?: boolean }) {
+function IconPicker({
+  value,
+  onChange,
+  disabled,
+  max,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+  disabled?: boolean;
+  /** Longest data URL the rules accept for this picture. */
+  max?: number;
+}) {
   const [error, setError] = useState("");
   return (
     <div className="custom-icon-picker">
@@ -538,7 +550,7 @@ function IconPicker({ value, onChange, disabled }: { value: string | null; onCha
             e.target.value = "";
             if (!file) return;
             setError("");
-            shrinkImage(file).then(onChange, (err) => setError(readableError(err)));
+            shrinkImage(file, undefined, max).then(onChange, (err) => setError(readableError(err)));
           }}
         />
       </label>
@@ -619,7 +631,7 @@ function ParticipantSheet({
             Nombre
             <input value={name} maxLength={40} required disabled={busy} onChange={(e) => setName(e.target.value)} />
           </label>
-          <IconPicker value={icon} onChange={setIcon} disabled={busy} />
+          <IconPicker value={icon} onChange={setIcon} disabled={busy} max={MAX_PARTICIPANT_ICON_CHARS} />
           {error && (
             <p className="error" role="alert">
               {error}
@@ -695,7 +707,8 @@ function DeleteSheet({ competition: c, data, onClose }: { competition: Competiti
   return (
     <Modal title="¿Eliminar la competición?" role="alertdialog" busy={busy} onClose={onClose} initialFocus="[data-cancel]">
       <p>
-        Se borrarán «{c.name}», sus {data.matches.length} partidos y {data.participants.length} participantes para todos.
+        Se borrarán «{c.name}», sus {data.matches.length} {data.matches.length === 1 ? "partido" : "partidos"} y{" "}
+        {data.participants.length} {data.participants.length === 1 ? "participante" : "participantes"} para todos.
         No se puede deshacer.
       </p>
       {error && (

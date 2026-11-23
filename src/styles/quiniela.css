@@ -578,6 +578,12 @@
   align-items: center;
   gap: 8px;
 }
+/* Why the board has nothing of yours (a round that closed without your slip). */
+.group-view-note {
+  margin: -4px 0 14px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
 /* The rubber stamp on a sealed slip. */
 .sealed-stamp {
   flex-shrink: 0;
@@ -733,6 +739,10 @@
   background: var(--paper-2);
   transform: scale(0.985);
   transition-duration: 60ms;
+}
+/* Friends' matches open their sheet: same fixture, as a button. */
+button.gm-fixture {
+  width: calc(100% + 16px);
 }
 @media (hover: hover) {
   .gm-fixture:hover {
@@ -943,114 +953,4 @@
   gap: 8px;
   font-size: var(--text-sm);
   color: var(--ink-2);
-}
-
-/* ---------- Finished result strip ---------- */
-.finished-result {
-  display: grid;
-  gap: 8px;
-  padding: 10px 0 12px;
-  border-top: 1px dashed var(--rule);
-}
-.finished-result-main {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
-}
-.finished-result-score {
-  display: grid;
-  gap: 3px;
-}
-.finished-result-score > span,
-.finished-winner > div > span {
-  font-family: var(--font-display);
-  font-stretch: var(--stretch-wide);
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-.finished-result-score strong {
-  font-family: var(--font-display);
-  font-stretch: var(--stretch-tight);
-  font-size: 30px;
-  font-weight: 900;
-  line-height: 0.95;
-}
-.finished-result-score small {
-  justify-self: start;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--ink);
-  color: var(--paper);
-  font-size: 11px;
-  font-weight: 600;
-}
-.finished-winner {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-  padding-left: 14px;
-  border-left: 1px solid var(--rule);
-}
-.finished-winner > svg {
-  margin-top: 14px;
-  color: var(--accent-line);
-}
-.finished-winner > div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-.finished-winner strong {
-  font-size: var(--text-md);
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-.finished-winner small {
-  font-size: var(--text-xs);
-  color: var(--ink-3);
-}
-.result-statistics-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 40px;
-  justify-self: start;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--ink);
-  text-decoration: underline;
-  text-decoration-color: var(--accent);
-  text-decoration-thickness: 3px;
-  text-underline-offset: 4px;
-}
-.result-statistics-toggle svg {
-  transition: transform var(--spring-snappy-ms) var(--spring-snappy);
-}
-.result-statistics-toggle[aria-expanded="true"] svg {
-  transform: rotate(180deg);
-}
-.match-data-note {
-  font-size: var(--text-xs);
-  color: var(--ink-3);
-}
-.result-pending {
-  padding: 0;
-}
-.result-statistics-panel {
-  margin-top: 2px;
-}
-.result-statistics-loading {
-  display: grid;
-  gap: 8px;
-}
-.result-statistics-loading .skeleton {
-  height: 14px;
-}
-.result-statistics-loading .skeleton + .skeleton {
-  width: 70%;
 }

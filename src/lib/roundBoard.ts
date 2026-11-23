@@ -7,6 +7,11 @@ import {
 } from "./domain";
 
 export type PickState = "hit" | "miss" | "live-hit" | "live-miss" | null;
+/**
+ * «own»: friends' competitions score each pick by its own kind (1X2 or exact
+ * score), so changing the competition's mode midway keeps earlier points.
+ */
+export type ScoreMode = Mode | "own";
 export interface RoundPlayer {
   id: string;
   name: string;
@@ -29,17 +34,19 @@ const playing = (m: Match) =>
 
 /** Points of one pick: final with a published 90-minute result, provisional in play. */
 export function pickPoints(
-  mode: Mode,
+  mode: ScoreMode,
   value: PredictionValue | undefined,
   m: Match,
 ) {
   if (!value || m.homeScore === null || m.awayScore === null) return null;
   if (!hasPublishedResult(m) && !playing(m)) return null;
-  return score(mode, value, { home: m.homeScore, away: m.awayScore });
+  const kind =
+    mode === "own" ? (typeof value === "string" ? "classic" : "exact") : mode;
+  return score(kind, value, { home: m.homeScore, away: m.awayScore });
 }
 
 export function pickState(
-  mode: Mode,
+  mode: ScoreMode,
   value: PredictionValue | undefined,
   m: Match,
 ): PickState {
@@ -55,7 +62,7 @@ export function pickState(
  */
 export function roundBoard(
   matches: Match[],
-  mode: Mode,
+  mode: ScoreMode,
   players: RoundPlayer[],
 ): RoundBoardRow[] {
   const rows = players.map((player) => {

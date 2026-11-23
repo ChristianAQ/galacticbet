@@ -105,7 +105,9 @@ const stages: Record<string, string> = {
   LAST_16: "Octavos de final",
   QUARTER_FINALS: "Cuartos de final",
   SEMI_FINALS: "Semifinales",
+  THIRD_PLACE: "Tercer puesto",
   FINAL: "Final",
+  FRIENDLY: "Amistoso",
   QUALIFICATION: "Clasificación",
 };
 export function roundLabel(match: Pick<Match, "stage" | "matchday">) {

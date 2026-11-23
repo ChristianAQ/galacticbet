@@ -1,13 +1,13 @@
 import { Check, ChevronRight, LockKeyhole, Minus, Plus } from "lucide-react";
-import { memo, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { memo, useEffect, useState, type MouseEvent } from "react";
 import type { Match, Mode, Prediction, PredictionValue } from "../lib/domain";
 import { haptic, springTo } from "../lib/motion";
-import MatchResult from "./MatchResult";
 import { MatchRow } from "./ui";
 import { LiveEvents } from "./LiveStatus";
 import "../styles/quiniela.css";
 
-export type PredictionLock = "sealed" | "deadline" | "kickoff" | null;
+/** Sealed or closed rounds show the board instead: only a started match locks a row. */
+export type PredictionLock = "kickoff" | null;
 
 const outcomeLabels = { "1": "Local", X: "Empate", "2": "Visitante" } as const;
 
@@ -23,7 +23,11 @@ function pop(event: MouseEvent<HTMLElement>) {
   });
 }
 
-/** One numbered row of the quiniela slip: the fixture and your 1X2 or score. */
+/**
+ * One numbered row of the quiniela slip: the fixture and your 1X2 or score.
+ * Played matches leave the slip for the board (GroupPredictions), so there is
+ * no result strip here.
+ */
 function PredictionCard({
   number,
   match: m,
@@ -33,12 +37,9 @@ function PredictionCard({
   lock,
   disabled,
   saving,
-  demo,
   onChoose,
   onDetails,
   detailsLabel,
-  lockLabel,
-  footer,
   plainResult = false,
 }: {
   number: number;
@@ -49,15 +50,10 @@ function PredictionCard({
   lock: PredictionLock;
   disabled: boolean;
   saving: boolean;
-  demo: boolean;
   onChoose: (match: Match, value: PredictionValue) => void;
   onDetails: (id: string, from: Element | null) => void;
   /** Friends' competitions have no odds or preview: just the match sheet. */
   detailsLabel?: string;
-  /** Why it is closed, when it isn't one of the quiniela's own reasons. */
-  lockLabel?: string;
-  /** Replaces the finished-match result strip. */
-  footer?: ReactNode;
   /** Friends' matches: no «a 90 minutos» under the score. */
   plainResult?: boolean;
 }) {
@@ -77,12 +73,7 @@ function PredictionCard({
           {lock ? (
             <>
               <LockKeyhole size={13} aria-hidden="true" />
-              {lockLabel ??
-                (lock === "sealed"
-                  ? "Boleto sellado"
-                  : lock === "deadline"
-                    ? "Plazo cerrado"
-                    : "Ya ha empezado")}
+              Ya ha empezado
             </>
           ) : saving ? (
             <>
@@ -144,7 +135,6 @@ function PredictionCard({
             : "Ficha del partido")}
         <ChevronRight size={15} aria-hidden="true" />
       </button>
-      {footer ?? (m.status === "FINISHED" && <MatchResult match={m} demo={demo} />)}
     </article>
   );
 }
