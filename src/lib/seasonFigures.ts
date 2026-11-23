@@ -160,3 +160,17 @@ export function teamBoards(lines: TeamLine[], size = 5) {
       .map((t) => row(t, points(t.away), `${matchesLabel(t.away.played)} · ${record(t.away)}`)),
   };
 }
+
+/** Goals per match in each matchday of the league stage (for the column chart). */
+export function goalsByMatchday(matches: Match[]) {
+  const days = new Map<number, { goals: number; played: number }>();
+  for (const m of matches.filter((m) => hasPublishedResult(m) && m.matchday && ["REGULAR_SEASON", "LEAGUE_STAGE"].includes(m.stage))) {
+    const day = days.get(m.matchday!) || { goals: 0, played: 0 };
+    day.goals += m.homeScore! + m.awayScore!;
+    day.played++;
+    days.set(m.matchday!, day);
+  }
+  return [...days]
+    .sort((a, b) => a[0] - b[0])
+    .map(([day, d]) => ({ day, goals: d.goals, played: d.played, average: d.goals / d.played }));
+}

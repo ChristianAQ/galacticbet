@@ -51,6 +51,29 @@ Las cifras salen de los resultados oficiales de la competición y temporada eleg
 
 El mazo deslizable (`CardDeck.tsx`) es el mismo del cromo: crece desde la fila, se desliza a los equipos de arriba y abajo, y la cabecera se arrastra hacia abajo para cerrar. El resto de la ficha se desplaza por dentro si no cabe, como en un iPhone SE.
 
+### Gráficos
+
+Hay gráficos sencillos (`Charts.tsx`, SVG propio, sin librerías) en la ficha de equipo y en Datos:
+
+- **Ficha de equipo:**
+  - una barra fina con victorias, empates y derrotas;
+  - «Puesto por jornada»: una línea con el 1.º arriba y el puesto actual rotulado al final;
+  - «Goles por partido» de los últimos 10: a favor hacia arriba y en contra hacia abajo, con leyenda;
+  - en casa y fuera, el porcentaje de los puntos que se podían ganar.
+- **Datos:**
+  - «Goles por partido en cada jornada», con la última jornada resaltada;
+  - una barra fina bajo cada goleador, comparada con el primero.
+
+Al tocar un punto o una barra, o con las flechas si el gráfico tiene el foco, sus valores aparecen junto al título. Cada gráfico lleva una tabla oculta con todos los valores para lectores de pantalla.
+
+Colores, comprobados con el validador de dataviz:
+
+- **Resalte:** la tinta en claro y el amarillo en oscuro. En claro, el amarillo sobre papel tiene un contraste de 1,4:1.
+- **En contra:** el rojo de derrota de cada tema. Además va siempre por debajo de la línea, así que no depende solo del color.
+- **Contexto:** gris, a un paso del fondo.
+
+Con movimiento reducido, los gráficos no se animan.
+
 ## Sincronización y consumo
 
 `scripts/syncLeagueStats.ts` se ejecuta desde `scripts/officialSync.ts`, después de los calendarios y con el mismo `FOOTBALL_DATA_TOKEN`. Consulta `/competitions/{code}/scorers?season={año}&limit=20`:

@@ -1,0 +1,252 @@
+/*
+ * Chart tokens (validated with the dataviz checks):
+ * - emphasis: the paper's ink in light, the accent in dark (yellow on paper
+ *   is 1.4:1, too faint for a mark);
+ * - goals against: the loss red of each theme, always below the baseline;
+ * - muted: context marks, one step off the surface.
+ */
+:root {
+  --chart-emph: var(--ink);
+  --chart-muted: #cfc9b9;
+  --chart-against: var(--loss);
+  --chart-grid: #e4dfd2;
+  --chart-surface: var(--card);
+}
+:root[data-theme="dark"] {
+  --chart-emph: var(--accent);
+  --chart-muted: #4a473e;
+  --chart-grid: #2c2a24;
+}
+.chart {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+.chart figcaption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.chart-title {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+.chart-note {
+  flex-shrink: 0;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  text-align: right;
+}
+.chart-note strong {
+  color: var(--ink);
+}
+.chart-legend {
+  display: flex;
+  gap: 14px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.chart-swatch.is-for {
+  background: var(--chart-emph);
+}
+.chart-swatch.is-against {
+  background: var(--chart-against);
+}
+.chart-plot {
+  position: relative;
+  min-width: 0;
+  border-radius: 8px;
+  outline: none;
+  touch-action: pan-y;
+}
+.chart-plot:focus-visible {
+  box-shadow: 0 0 0 2px var(--focus, var(--ink));
+}
+.chart-plot svg {
+  display: block;
+  overflow: visible;
+  cursor: pointer;
+}
+.chart-grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+.chart-base {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+}
+.chart-cross {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+}
+.chart-axis {
+  fill: var(--ink-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.chart-end {
+  fill: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+.chart-line {
+  fill: none;
+  stroke: var(--chart-emph);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1000;
+  animation: chart-draw 900ms var(--spring-smooth) both;
+}
+.chart-dot {
+  fill: var(--chart-emph);
+  stroke: var(--chart-surface);
+  stroke-width: 2;
+}
+.chart-dot.is-picked {
+  fill: var(--chart-surface);
+  stroke: var(--chart-emph);
+}
+.chart-col {
+  transition: opacity 160ms ease, fill 160ms ease;
+  transform-box: fill-box;
+  animation: chart-grow 520ms var(--spring-smooth) both;
+}
+.chart-col.is-for,
+.chart-col.is-emph {
+  fill: var(--chart-emph);
+}
+.chart-col.is-against {
+  fill: var(--chart-against);
+  transform-origin: top;
+}
+.chart-col.is-for,
+.chart-col.is-emph,
+.chart-col.is-muted {
+  transform-origin: bottom;
+}
+.chart-col.is-muted {
+  fill: var(--chart-muted);
+}
+.is-faded .chart-col {
+  opacity: 0.35;
+}
+/* A ratio against its whole: name, bar, figure in one row. */
+.chart-meter {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.chart-meter-label {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.chart-meter-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--paper-3);
+}
+.chart-meter-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--chart-emph);
+  transform-origin: left;
+  animation: chart-grow-x 700ms var(--spring-smooth) both;
+}
+.chart-meter-figure {
+  color: var(--ink);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Wins, draws, losses: thin, rounded, a 2px gap between the parts. */
+.chart-split {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+.chart-split i {
+  flex-basis: 0;
+  min-width: 4px;
+  border-radius: 999px;
+  transform-origin: left;
+  animation: chart-grow-x 700ms var(--spring-smooth) both;
+}
+.chart-split .is-win {
+  background: var(--win);
+}
+.chart-split .is-draw {
+  background: var(--ink-3);
+}
+.chart-split .is-loss {
+  background: var(--loss);
+}
+
+/* Under a ranking row: the value against the board's largest. */
+.chart-rowbar {
+  display: block;
+  height: 3px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+.chart-rowbar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--chart-muted);
+  transform-origin: left;
+  animation: chart-grow-x 600ms var(--spring-smooth) both;
+}
+.is-leader .chart-rowbar i {
+  background: var(--chart-emph);
+}
+@keyframes chart-draw {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes chart-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes chart-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-line,
+  .chart-col,
+  .chart-meter-track i,
+  .chart-split i,
+  .chart-rowbar i {
+    animation: none;
+  }
+  .chart-line {
+    stroke-dasharray: none;
+  }
+}

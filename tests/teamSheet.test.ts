@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Match } from "../src/lib/domain";
 import { leagueTable } from "../src/lib/leagueTable";
-import { currentStreak, standingNotes, streakLabel, teamSheet } from "../src/lib/teamSheet";
+import { currentStreak, positionHistory, standingNotes, streakLabel, teamSheet } from "../src/lib/teamSheet";
+import { goalsByMatchday } from "../src/lib/seasonFigures";
 
 const match = (id: string, day: number, home: string, away: string, h: number | null, a: number | null): Match => ({
   id,
@@ -49,6 +50,23 @@ describe("ficha de equipo", () => {
     expect(sheet.streak).toEqual({ kind: "wins", count: 2 });
     expect(sheet.next).toMatchObject({ opponent: "B", home: true });
     expect(teamSheet(table, 2, matches, [], now).leaderGap).toBe(10 - 1);
+  });
+
+  it("gráficos: puesto tras cada jornada y goles por partido de cada jornada", () => {
+    const key = table.find((r) => r.name === "C")!.key;
+    expect(positionHistory(matches, key).map((p) => [p.day, p.position, p.points])).toEqual([
+      [2, 2, 1],
+      [3, 2, 1],
+      [4, 2, 1],
+      [5, 2, 2],
+    ]);
+    expect(goalsByMatchday(matches).map((d) => [d.day, d.goals, d.played, d.average])).toEqual([
+      [1, 2, 1, 2],
+      [2, 2, 1, 2],
+      [3, 4, 1, 4],
+      [4, 1, 1, 1],
+      [5, 4, 1, 4],
+    ]);
   });
 
   it("goleadores del club por escudo", () => {

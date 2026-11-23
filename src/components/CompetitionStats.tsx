@@ -4,7 +4,15 @@ import type { Match } from "../lib/domain";
 import { seasonLabel } from "../lib/leagueHub";
 import type { Scorer } from "../lib/leagueStats";
 import { haptic } from "../lib/motion";
-import { perMatch, seasonFigures, teamBoards, teamLines, type TeamLine } from "../lib/seasonFigures";
+import {
+  goalsByMatchday,
+  perMatch,
+  seasonFigures,
+  teamBoards,
+  teamLines,
+  type TeamLine,
+} from "../lib/seasonFigures";
+import { ColumnChart, RowBar } from "./Charts";
 import { useLeagueStats } from "../lib/useLeagueStats";
 import PlayerCards, { type CardPlayer } from "./PlayerCard";
 import RankingCard from "./RankingCard";
@@ -21,8 +29,11 @@ function updated(iso: string) {
 }
 
 /** The season so far: how many matches, goals, and how often 1, X or 2. */
+const oneDecimal = new Intl.NumberFormat("es", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
 function SeasonFigures({ matches }: { matches: Match[] }) {
   const f = useMemo(() => seasonFigures(matches), [matches]);
+  const byDay = useMemo(() => goalsByMatchday(matches), [matches]);
   const outcomes = [
     { sign: "1", label: "Local", value: f.home, tone: "home" },
     { sign: "X", label: "Empate", value: f.draws, tone: "draw" },
@@ -107,6 +118,21 @@ function SeasonFigures({ matches }: { matches: Match[] }) {
           ))}
         </ul>
       </div>
+      {byDay.length > 1 && (
+        <div className="season-chart">
+          <ColumnChart
+            title="Goles por partido en cada jornada"
+            note={`media ${perMatch(f.goals, f.played)}`}
+            unit="Goles por partido"
+            columns={byDay.map((d) => ({
+              label: `J${d.day}`,
+              value: d.average,
+              display: oneDecimal.format(d.average),
+              detail: `jornada ${d.day} · ${d.goals} goles en ${d.played} partidos`,
+            }))}
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -116,11 +142,14 @@ function ScorerRow({
   scorer: s,
   position,
   index,
+  top,
   onOpen,
 }: {
   scorer: Scorer;
   position: number;
   index: number;
+  /** The leader's goals: every bar is measured against them. */
+  top: number;
   onOpen: (index: number, row: HTMLElement) => void;
 }) {
   const details = [
@@ -141,6 +170,7 @@ function ScorerRow({
         <span className="scorer-person">
           <strong>{s.name}</strong>
           <small>{[s.team, ...details].join(" · ")}</small>
+          <RowBar value={s.goals} max={top} />
         </span>
         <span className="scorer-goals">
           <b className="numeral">{s.goals}</b>
@@ -216,6 +246,7 @@ function Scorers({
                 scorer={s}
                 position={position(i)}
                 index={i}
+                top={list[0].goals}
                 onOpen={(index, row) => {
                   haptic();
                   setCard({ index, row });

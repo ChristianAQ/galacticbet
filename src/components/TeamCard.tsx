@@ -7,8 +7,16 @@ import { seasonLabel } from "../lib/leagueHub";
 import type { LeagueRow } from "../lib/leagueTable";
 import type { Scorer } from "../lib/leagueStats";
 import { go } from "../lib/navigation";
-import { standingNotes, streakLabel, teamSheet, type SheetGame, type SheetSplit } from "../lib/teamSheet";
+import {
+  positionHistory,
+  standingNotes,
+  streakLabel,
+  teamSheet,
+  type SheetGame,
+  type SheetSplit,
+} from "../lib/teamSheet";
 import CardDeck from "./CardDeck";
+import { GoalsChart, Meter, PositionChart, ResultSplit } from "./Charts";
 import { Crest } from "./ui";
 import "../styles/teamCard.css";
 
@@ -76,6 +84,14 @@ export function TeamSheetCard({
 }) {
   const sheet = teamSheet(rows, index, matches, scorers);
   const { row } = sheet;
+  const history = positionHistory(matches, row.key);
+  const recent = sheet.games.slice(-10).map((g) => ({
+    label: `${g.home ? "contra" : "en casa de"} ${g.opponent} · ${shortDate.format(new Date(g.utcDate))}`,
+    detail: `${g.home ? "Contra" : "En casa de"} ${g.opponent}, ${shortDate.format(new Date(g.utcDate))}`,
+    scored: Number(g.score!.split("-")[0]),
+    conceded: Number(g.score!.split("-")[1]),
+  }));
+  const percent = (s: SheetSplit) => (s.played ? Math.round((s.points / (s.played * 3)) * 100) : 0);
   const notes = standingNotes(rows, index, competition);
   const season = `${competitionName(competition, true)} ${seasonLabel(seasonId)}`;
   const streakIcon =
@@ -133,6 +149,8 @@ export function TeamSheetCard({
             <dd className="numeral">{row.played ? twoDecimals.format(row.points / row.played) : "—"}</dd>
           </div>
         </dl>
+        <ResultSplit wins={row.wins} draws={row.draws} losses={row.losses} />
+        {history.length > 1 && <PositionChart points={history} />}
         {sheet.last.length > 0 && (
           <section className="team-sheet-section">
             <h3>Últimos partidos</h3>
@@ -149,6 +167,7 @@ export function TeamSheetCard({
             )}
           </section>
         )}
+        {recent.length > 1 && <GoalsChart games={recent} />}
         {sheet.next && (
           <section className="team-sheet-section">
             <h3>Próximo partido</h3>
@@ -168,6 +187,11 @@ export function TeamSheetCard({
         {sheet.home.played + sheet.away.played > 0 && (
           <section className="team-sheet-section">
             <h3>En casa y fuera</h3>
+            <div className="team-sheet-meters">
+              <Meter label="Casa" value={sheet.home.points} max={sheet.home.played * 3} figure={`${percent(sheet.home)}%`} />
+              <Meter label="Fuera" value={sheet.away.points} max={sheet.away.played * 3} figure={`${percent(sheet.away)}%`} />
+              <p className="team-sheet-muted">de los puntos que se podían ganar</p>
+            </div>
             <div className="team-sheet-split">
               <Split title="Casa" s={sheet.home} />
               <Split title="Fuera" s={sheet.away} />

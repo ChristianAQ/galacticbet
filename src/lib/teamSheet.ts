@@ -1,5 +1,5 @@
 import { hasPublishedResult, type Match } from "./domain";
-import { teamKey, type LeagueRow } from "./leagueTable";
+import { leagueTable, LEAGUE_STAGES, teamKey, type LeagueRow } from "./leagueTable";
 import type { Scorer } from "./leagueStats";
 import type { FormResult } from "./matchInsights";
 
@@ -38,6 +38,8 @@ export interface TeamSheet {
   /** Points to the leader (0: leads); for the leader, its margin over the second. */
   leaderGap: number;
   lead: number | null;
+  /** Every played match, oldest first. */
+  games: SheetGame[];
   last: SheetGame[];
   next: SheetGame | null;
   home: SheetSplit;
@@ -121,6 +123,7 @@ export function teamSheet(
     size: table.length,
     leaderGap: leader.points - row.points,
     lead: index === 0 && table[1] ? row.points - table[1].points : null,
+    games,
     last: games.slice(-5),
     next: upcoming
       ? {
@@ -179,4 +182,18 @@ export function standingNotes(table: LeagueRow[], index: number, code?: string):
     else notes.push(`A ${pts(at(24) - own)} del playoff`);
   }
   return notes;
+}
+
+/**
+ * The team's place after each matchday of the league stage (for the line
+ * chart): the table of every result up to that matchday.
+ */
+export function positionHistory(matches: Match[], key: string) {
+  const league = matches.filter((m) => LEAGUE_STAGES.includes(m.stage) && m.matchday && hasPublishedResult(m));
+  const days = [...new Set(league.map((m) => m.matchday!))].sort((a, b) => a - b);
+  return days.flatMap((day) => {
+    const table = leagueTable(league.filter((m) => m.matchday! <= day));
+    const at = table.findIndex((r) => r.key === key);
+    return at < 0 ? [] : [{ day, position: at + 1, points: table[at].points, size: table.length }];
+  });
 }
