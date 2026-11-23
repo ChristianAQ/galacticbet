@@ -1,5 +1,4 @@
-import { Plus, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Plus, Search, X } from "lucide-react";
 import type { CompetitionChip } from "../lib/customCompetitionData";
 import { menuTarget } from "./ContextMenu";
 import "../styles/customBadge.css";
@@ -16,6 +15,15 @@ export function CompetitionBadge({ icon, name, small = true }: { icon: string | 
     <span className={`competition-logo competition-badge custom-badge${small ? " small" : ""}`} aria-hidden="true">
       {icon ? <img src={icon} alt="" /> : <span className="competition-fallback">{initials || "★"}</span>}
     </span>
+  );
+}
+
+/** The magnifier on the large title: find public competitions to follow. */
+export function LeagueSearchButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="masthead-search" aria-label="Buscar ligas públicas" onClick={onClick}>
+      <Search size={20} strokeWidth={2.4} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -37,18 +45,13 @@ export function CustomChips({
   /** Long press on one you don't follow: take it off the list (also on its masthead). */
   onRemove?: (id: string) => void;
 }) {
-  // The chosen competition sits after the official ones: bring it into view.
-  const active = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    active.current?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, [current, list.length]);
   return (
     <>
       {list.map((c) => (
         <button
           key={c.id}
+          className="is-custom"
           ref={(element) => {
-            if (current === c.id) active.current = element;
             if (onRemove && c.followed === false)
               menuTarget(() => ({
                 title: c.name,
@@ -71,7 +74,7 @@ export function CustomChips({
         </button>
       ))}
       {onAdd && (
-        <button type="button" className="competition-tabs-new" onClick={onAdd} aria-label="Crear o unirse a una competición">
+        <button type="button" className="competition-tabs-new is-custom" onClick={onAdd} aria-label="Crear o unirse a una competición">
           <span className="competition-tabs-all" aria-hidden="true">
             <Plus size={16} />
           </span>

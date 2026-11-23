@@ -36,6 +36,8 @@ export type Stage =
   | "THIRD_PLACE"
   | "FINAL";
 export type PredictionMode = "exact" | "classic" | "off";
+/** Public: anyone can find it in the search. Private: only with its code or link. */
+export type Visibility = "public" | "private";
 
 export interface Schedule {
   /** Local date of the first round, YYYY-MM-DD. */
@@ -65,14 +67,51 @@ export interface CompetitionSetup {
   thirdPlace: boolean;
   predictionMode: PredictionMode;
   schedule: Schedule;
+  /** Private unless said otherwise. */
+  visibility?: Visibility;
 }
 export interface Competition extends CompetitionSetup {
   id: string;
+  visibility: Visibility;
   ownerId: string;
   adminIds: string[];
   memberIds: string[];
   /** Short invitation code (6 characters). Competitions from before it have none until the owner opens them. */
   code?: string | null;
+}
+
+// ---------- Search ----------
+
+/** Lower case, no accents: «Pádel» and «padel» are the same search. */
+export const searchKey = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+const words = (text: string) => searchKey(text).split(/[^a-z0-9]+/).filter(Boolean);
+const PREFIX = 15;
+export const MAX_SEARCH_TERMS = 120;
+
+/**
+ * What a public competition can be found by: the start of each word of its
+ * name and sport («li», «lig», «liga»…), so typing any word finds it.
+ */
+export function searchTerms(name: string, sport = ""): string[] {
+  const terms = new Set<string>();
+  for (const word of [...words(name), ...words(sport)])
+    for (let n = 1; n <= Math.min(word.length, PREFIX); n++) terms.add(word.slice(0, n));
+  return [...terms].slice(0, MAX_SEARCH_TERMS);
+}
+/** The term the database is asked for: the most telling word typed. */
+export function searchQueryTerm(query: string): string {
+  const typed = words(query).sort((a, b) => b.length - a.length)[0] || "";
+  return typed.slice(0, PREFIX);
+}
+/** Every word typed starts a word of the name or the sport. */
+export function matchesSearch(query: string, name: string, sport = ""): boolean {
+  const typed = words(query);
+  const own = [...words(name), ...words(sport)];
+  return typed.every((t) => own.some((w) => w.startsWith(t)));
 }
 
 // ---------- Invitation codes ----------

@@ -1,0 +1,170 @@
+/* The magnifier's sheet: public competitions to find and follow. */
+.league-search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.league-search-field > svg {
+  position: absolute;
+  left: 14px;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.league-search-field input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px 10px 42px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
+  appearance: none;
+  transition: box-shadow 160ms ease;
+}
+.league-search-field input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.league-search-field input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+.league-search-caption {
+  margin: 18px 0 4px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.league-search-results {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transition: opacity 160ms ease;
+}
+.league-search-results[aria-busy="true"] {
+  opacity: 0.55;
+}
+.league-search-results > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+  animation: league-search-in 260ms var(--press) both;
+}
+.league-search-results > li:last-child {
+  border-bottom: 0;
+}
+.league-search-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  border-radius: 12px;
+  transition: transform 160ms var(--press);
+}
+.league-search-open:active {
+  transform: scale(0.98);
+}
+.league-search-open .competition-logo.competition-badge {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+}
+.league-search-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.league-search-text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.league-search-text strong {
+  color: var(--ink);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+.league-search-text span {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.league-search-text .league-search-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.league-search-follow,
+.league-search-followed {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 88px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.league-search-follow {
+  background: var(--accent);
+  color: var(--accent-ink);
+  transition:
+    transform 160ms var(--press),
+    opacity 160ms ease;
+}
+.league-search-follow:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.league-search-follow:disabled {
+  opacity: 0.6;
+}
+.league-search-followed {
+  background: var(--paper-2);
+  color: var(--ink-2);
+  animation: league-search-pop 360ms var(--spring-bouncy) both;
+}
+.league-search-empty {
+  display: grid;
+  gap: 4px;
+  padding: 28px 8px;
+  text-align: center;
+}
+.league-search-empty strong {
+  font-size: var(--text-md);
+}
+.league-search-guest {
+  display: grid;
+  gap: 16px;
+}
+.league-search-note {
+  margin-top: 16px;
+}
+@keyframes league-search-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+}
+@keyframes league-search-pop {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .league-search-results > li,
+  .league-search-followed {
+    animation: none;
+  }
+}

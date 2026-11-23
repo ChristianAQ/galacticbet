@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "customCompetitions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "visibility", "order": "ASCENDING" },
+        { "fieldPath": "searchTerms", "arrayConfig": "CONTAINS" }
+      ]
+    },
+    {
       "collectionGroup": "matches",
       "queryScope": "COLLECTION",
       "fields": [

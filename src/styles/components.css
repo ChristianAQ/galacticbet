@@ -424,36 +424,81 @@
 .competition-logo.small .competition-fallback {
   font-size: 12px;
 }
+/*
+ * Competition chips: a row that scrolls sideways, with one highlight that
+ * slides and stretches from chip to chip on a spring (see CompetitionTabs).
+ */
 .competition-tabs {
+  position: relative;
   display: flex;
   gap: 8px;
   margin: 0 calc(-1 * var(--pad-r)) 0 calc(-1 * var(--pad-l));
-  padding: 2px var(--pad-r) 2px var(--pad-l);
+  padding: 4px var(--pad-r) 6px var(--pad-l);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
   scroll-padding-inline: var(--pad-l) var(--pad-r);
   scrollbar-width: none;
+  isolation: isolate;
+  /* The row fades out under the edges instead of being cut. */
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    #000 calc(var(--pad-l) - 4px),
+    #000 calc(100% - var(--pad-r) + 4px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    #000 calc(var(--pad-l) - 4px),
+    #000 calc(100% - var(--pad-r) + 4px),
+    transparent 100%
+  );
 }
 .competition-tabs::-webkit-scrollbar {
   display: none;
 }
+.competition-tabs-thumb {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  pointer-events: none;
+  will-change: transform;
+  transition: opacity 200ms ease;
+}
+.competition-tabs-thumb[data-ready] {
+  transition:
+    transform var(--spring-snappy-ms) var(--spring-snappy),
+    width var(--spring-snappy-ms) var(--spring-snappy),
+    opacity 200ms ease;
+}
+.competition-tabs-thumb[data-hidden] {
+  opacity: 0;
+}
 .competition-tabs > button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-  min-height: 44px;
-  padding: 0 14px 0 6px;
+  min-height: 42px;
+  padding: 0 15px 0 5px;
   border-radius: 999px;
   background: var(--paper-2);
   color: var(--ink-2);
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: 560;
+  letter-spacing: -0.005em;
   scroll-snap-align: start;
   transition:
-    background-color 200ms ease,
-    color 200ms ease,
-    transform 160ms var(--press);
+    background-color 220ms ease,
+    color 220ms ease,
+    box-shadow 220ms ease,
+    transform 180ms var(--press);
 }
 /* Friends' competitions can have long names: the chip stays a chip. */
 .competition-tabs > button > span:last-child {
@@ -466,14 +511,22 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
+  transition:
+    transform 320ms var(--spring-bouncy),
+    box-shadow 220ms ease;
 }
+/* The chosen chip lets the highlight show through. */
 .competition-tabs > button[aria-pressed="true"] {
-  background: var(--ink);
+  background: transparent;
   color: var(--paper);
-  font-weight: 650;
+  font-weight: 700;
+}
+.competition-tabs > button[aria-pressed="true"] .competition-logo.small {
+  transform: scale(1.04);
 }
 .competition-tabs > button:active:not(:disabled) {
-  transform: scale(0.95);
+  transform: scale(0.94);
+  transition-duration: 90ms;
 }
 .competition-tabs > button:disabled {
   opacity: 0.35;
@@ -487,14 +540,80 @@
   background: var(--card);
   color: var(--ink);
 }
+/* Create or join: an empty chip, waiting to be filled. */
+.competition-tabs > .competition-tabs-new {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--rule);
+  border: 0;
+}
+.competition-tabs > .competition-tabs-new .competition-tabs-all {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+/* A competition that joins the row arrives instead of popping in. */
+.competition-tabs > .is-custom {
+  animation: competition-chip-in 360ms var(--spring-snappy);
+}
+@keyframes competition-chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+}
+.masthead .competition-tabs-thumb {
+  background: var(--accent);
+  box-shadow:
+    0 6px 18px -8px color-mix(in srgb, var(--accent) 70%, transparent),
+    inset 0 1px 0 #ffffff59;
+}
 .masthead .competition-tabs > button {
-  background: #ffffff12;
+  background: #ffffff0f;
+  box-shadow: inset 0 0 0 1px #ffffff0d;
   color: var(--masthead-ink-2);
 }
 .masthead .competition-tabs > button[aria-pressed="true"] {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: transparent;
   box-shadow: none;
+  color: var(--accent-ink);
+}
+.masthead .competition-tabs > button[aria-pressed="true"] .competition-logo.small {
+  box-shadow: 0 0 0 2px #15140f1f;
+}
+.masthead .competition-tabs > .competition-tabs-new {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #ffffff2e;
+  color: var(--masthead-ink);
+}
+.masthead .competition-tabs > .competition-tabs-new .competition-tabs-all {
+  color: var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .competition-tabs-thumb[data-ready] {
+    transition: opacity 200ms ease;
+  }
+  .competition-tabs > .is-custom {
+    animation: none;
+  }
+}
+
+/* The magnifier on Ligas and Quiniela: search public competitions. */
+.masthead-search {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #ffffff14;
+  box-shadow: inset 0 0 0 1px #ffffff10;
+  color: var(--masthead-ink);
+  transition:
+    transform 180ms var(--press),
+    background-color 160ms ease;
+}
+.masthead-search:active {
+  transform: scale(0.88);
+  background: #ffffff26;
+  transition-duration: 80ms;
 }
 
 /* ---------- Teams & fixtures ---------- */

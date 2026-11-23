@@ -7,10 +7,13 @@ import {
   groupPlans,
   leagueQualifierOptions,
   localParts,
+  matchesSearch,
   recommendedFormat,
   recurringFixtures,
   resolveCompetition,
   roundRobin,
+  searchQueryTerm,
+  searchTerms,
   seedOrder,
   splitGroups,
   toAppMatch,
@@ -347,4 +350,23 @@ it("en un torneo personalizado la tabla sale de sus propios partidos", () => {
     ["Equipo 2", 3],
     ["Equipo 1", 0],
   ]);
+});
+
+describe("búsqueda de ligas públicas", () => {
+  it("se encuentran por el principio de cualquier palabra, sin tildes ni mayúsculas", () => {
+    const terms = searchTerms("Liga de Pádel", "Pádel");
+    for (const t of ["l", "lig", "liga", "de", "pa", "padel"]) expect(terms).toContain(t);
+    expect(terms).not.toContain("adel");
+    expect(new Set(terms).size).toBe(terms.length);
+    expect(searchTerms("Supercalifragilisticoespialidoso")).toHaveLength(15);
+    expect(searchTerms("a ".repeat(50) + "b".repeat(200)).length).toBeLessThanOrEqual(120);
+  });
+  it("pide a la base la palabra más larga y filtra por todas", () => {
+    expect(searchQueryTerm("  liga PÁDEL ")).toBe("padel");
+    expect(searchQueryTerm("")).toBe("");
+    expect(matchesSearch("pad lig", "Liga de Pádel")).toBe(true);
+    expect(matchesSearch("tenis", "Liga de Pádel", "Pádel")).toBe(false);
+    expect(matchesSearch("fut", "Los sábados", "Fútbol 7")).toBe(true);
+    expect(matchesSearch("", "Cualquiera")).toBe(true);
+  });
 });

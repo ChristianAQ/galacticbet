@@ -138,6 +138,54 @@ describe.skipIf(!enabled)("Competiciones entre amigos: permisos en Firestore", (
     );
   });
 
+  it("visibilidad: solo las públicas se buscan; la privada solo con su código o enlace", async () => {
+    const alice = as("alice");
+    const dave = as("dave");
+    const search = (db: Firestore, term?: string) =>
+      getDocs(
+        query(
+          collection(db, "customCompetitions"),
+          where("visibility", "==", "public"),
+          ...(term ? [where("searchTerms", "array-contains", term)] : []),
+        ),
+      );
+    // Private (or from before visibility): nobody can search it.
+    await assertFails(getDocs(query(collection(dave, "customCompetitions"), where("visibility", "==", "private"))));
+    await assertSucceeds(
+      setDoc(doc(alice, "customCompetitions/pub"), {
+        ...competition(),
+        visibility: "public",
+        searchTerms: ["l", "li", "lig", "liga"],
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(alice, "customCompetitions/priv"), { ...competition(), visibility: "private", searchTerms: [] }),
+    );
+    await assertFails(setDoc(doc(alice, "customCompetitions/bad"), { ...competition(), visibility: "secret" }));
+    await assertFails(
+      setDoc(doc(alice, "customCompetitions/bad2"), {
+        ...competition(),
+        searchTerms: Array.from({ length: 121 }, (_, i) => `t${i}`),
+      }),
+    );
+    // Signed in, anyone finds the public ones; without an account, nobody.
+    const found = await assertSucceeds(search(dave, "liga"));
+    if (found.docs.map((d) => d.id).join() !== "pub") throw new Error("Solo debía encontrar la pública");
+    await assertSucceeds(search(dave));
+    await assertFails(search(as(null)));
+    // Still opens by link, and following it is only adding yourself.
+    await assertSucceeds(getDoc(doc(dave, "customCompetitions/priv")));
+    await assertSucceeds(updateDoc(doc(dave, "customCompetitions/pub"), { memberIds: arrayUnion("dave") }));
+    // Only the owner changes it.
+    await assertSucceeds(
+      updateDoc(doc(alice, C), { visibility: "public", searchTerms: ["l"], updatedAt: serverTimestamp() }),
+    );
+    await assertFails(
+      updateDoc(doc(as("bob"), C), { visibility: "private", searchTerms: [], updatedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(doc(dave, C), { visibility: "private" }));
+  });
+
   it("seguir y dejar de seguir: cada uno solo a sí mismo", async () => {
     await assertSucceeds(updateDoc(doc(as("dave"), C), { memberIds: arrayUnion("dave") }));
     await assertFails(updateDoc(doc(as("erin"), C), { memberIds: arrayUnion("erin", "frank") }));

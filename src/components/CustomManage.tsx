@@ -21,6 +21,7 @@ import {
   type CompetitionView,
   type Participant,
   type PredictionMode,
+  type Visibility,
   type ResolvedMatch,
 } from "../lib/customCompetition";
 import {
@@ -260,8 +261,8 @@ export default function CustomManage({
           <ul className="more-list">
             <Row
               icon={<Settings2 size={20} aria-hidden="true" />}
-              label="Nombre, deporte e icono"
-              detail={`Pronósticos: ${PREDICTION_LABELS[c.predictionMode]}`}
+              label="Nombre, icono y visibilidad"
+              detail={`${c.visibility === "public" ? "Pública" : "Privada"} · Pronósticos: ${PREDICTION_LABELS[c.predictionMode]}`}
               onClick={() => setSheet({ kind: "settings" })}
             />
             <Row
@@ -678,13 +679,14 @@ function SettingsSheet({ competition: c, onClose }: { competition: Competition; 
   const [sport, setSport] = useState(c.sport);
   const [icon, setIcon] = useState<string | null>(c.icon);
   const [mode, setMode] = useState<PredictionMode>(c.predictionMode);
+  const [visibility, setVisibility] = useState<Visibility>(c.visibility);
   const { busy, error, setError, run } = useBusy();
   function submit(e: FormEvent) {
     e.preventDefault();
     if (name.trim().length < 3 || name.trim().length > 60) return setError("El nombre va de 3 a 60 caracteres.");
     if (sport.trim().length > 40) return setError("El deporte admite hasta 40 caracteres.");
     void run(async () => {
-      await updateCompetition(c.id, { name: name.trim(), sport: sport.trim(), icon, predictionMode: mode });
+      await updateCompetition(c.id, { name: name.trim(), sport: sport.trim(), icon, predictionMode: mode, visibility });
       onClose();
     });
   }
@@ -708,6 +710,13 @@ function SettingsSheet({ competition: c, onClose }: { competition: Competition; 
                 {PREDICTION_LABELS[m]}
               </option>
             ))}
+          </select>
+        </label>
+        <label>
+          Visibilidad
+          <select value={visibility} disabled={busy} onChange={(e) => setVisibility(e.target.value as Visibility)}>
+            <option value="private">Privada: solo con el código o el enlace</option>
+            <option value="public">Pública: cualquiera la encuentra con la lupa</option>
           </select>
         </label>
         {error && (

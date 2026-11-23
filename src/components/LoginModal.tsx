@@ -16,7 +16,14 @@ function GoogleMark() {
   );
 }
 
-export default function LoginModal({ close }: { close: () => void }) {
+export default function LoginModal({
+  close,
+  onSignedIn,
+}: {
+  close: () => void;
+  /** Signed in from here (not a session restored at launch). */
+  onSignedIn?: () => void;
+}) {
   const [register, setRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,6 +37,7 @@ export default function LoginModal({ close }: { close: () => void }) {
       await fn();
       haptic("success");
       close();
+      onSignedIn?.();
     } catch (e) {
       haptic("warning");
       setError(readableError(e));

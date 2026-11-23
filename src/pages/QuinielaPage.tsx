@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import CompetitionTabs from "../components/CompetitionTabs";
-import { CustomChips } from "../components/CustomChips";
+import { CustomChips, LeagueSearchButton } from "../components/CustomChips";
 import LeagueNavigation from "../components/LeagueNavigation";
 import { PageTitle, PrivateGate } from "../components/ui";
 import { COMPETITION_CODES, type CompetitionCode } from "../lib/competitions";
@@ -9,6 +9,7 @@ import { loadGameSeasons, SEASONS_CHANGED, type Group } from "../lib/data";
 import type { Match, Mode } from "../lib/domain";
 import { useFollowedCompetitions } from "../lib/followedCompetitions";
 import { haptic, prefersReducedMotion, springEasing } from "../lib/motion";
+import { go } from "../lib/navigation";
 import type { AppUser } from "../lib/session";
 import { preferenceStore } from "../lib/preferences";
 import { useGroupSelection } from "../lib/useGroupSelection";
@@ -17,6 +18,8 @@ import PredictionsPage from "./PredictionsPage";
 import StandingsPage from "./StandingsPage";
 import "../styles/leagues.css";
 import "../styles/quiniela.css";
+
+const CompetitionSearch = lazy(() => import("../components/CompetitionSearch"));
 
 export type QuinielaView = "boleto" | "clasificacion";
 export const quinielaView = (value: string | null): QuinielaView =>
@@ -93,6 +96,7 @@ export default function QuinielaPage({
   const ligaInfo = followed.find((c) => c.id === liga);
   const { seasons, ready: seasonsReady } = useGroupSeasons(demo || !user ? "" : groupId);
   const [demoCompetition, setDemoCompetition] = useState<CompetitionCode>("PD");
+  const [search, setSearch] = useState(false);
   const competition = demo ? demoCompetition : preferences.competition;
   const period = params.get("period") === "all" ? "all" : "round";
   const combined = view === "clasificacion" && period === "all" && params.get("todas") === "1";
@@ -157,6 +161,16 @@ export default function QuinielaPage({
             }
           : undefined
       }
+      titleControl={
+        !demo && (
+          <LeagueSearchButton
+            onClick={() => {
+              haptic();
+              setSearch(true);
+            }}
+          />
+        )
+      }
     >
       {(user || demo) && (
         <div className="league-selection">
@@ -220,6 +234,20 @@ export default function QuinielaPage({
   return (
     <div className="quiniela-page leagues-page">
       {header}
+      {search && (
+        <Suspense fallback={null}>
+          <CompetitionSearch
+            user={user}
+            onLogin={onLogin}
+            // Yours with a quiniela opens here; any other in Ligas.
+            onOpen={(id) => {
+              if (followed.some((c) => c.id === id)) choice.chooseLiga(id, (next) => next.delete("todas"));
+              else go(`/ligas?liga=${encodeURIComponent(id)}`);
+            }}
+            onClose={() => setSearch(false)}
+          />
+        </Suspense>
+      )}
       {/* Pinned under the bar like Ligas' sections: switch from anywhere in the slip. */}
       <LeagueNavigation<QuinielaView>
         tab={view}

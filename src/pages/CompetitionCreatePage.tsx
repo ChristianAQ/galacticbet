@@ -16,6 +16,7 @@ import {
   type Format,
   type ParticipantKind,
   type PredictionMode,
+  type Visibility,
 } from "../lib/customCompetition";
 import {
   createCompetition,
@@ -74,6 +75,7 @@ export default function CompetitionCreatePage({
   const [slotMinutes, setSlotMinutes] = useState(0);
   const [location, setLocation] = useState("");
   const [prediction, setPrediction] = useState<PredictionMode>("exact");
+  const [visibility, setVisibility] = useState<Visibility>("private");
   const [touchedFormat, setTouchedFormat] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -136,6 +138,7 @@ export default function CompetitionCreatePage({
     groups: format === "groups_knockout" ? plan?.groups || 0 : 0,
     thirdPlace: bracket >= 4 && thirdPlace,
     predictionMode: prediction,
+    visibility,
     schedule: {
       start,
       time,
@@ -522,6 +525,27 @@ export default function CompetitionCreatePage({
               : prediction === "classic"
                 ? "Aparece en Quiniela y Clasificación junto a LaLiga, Champions y Premier: los seguidores eligen 1, X o 2 antes de cada partido (1 punto por acierto)."
                 : "Solo resultados y tabla en Ligas, sin quiniela."}{" "}
+            Puedes cambiarlo en Ajustes.
+          </p>
+        </section>
+
+        <section aria-labelledby="cc-visibility">
+          <div className="section-heading">
+            <h2 id="cc-visibility">Visibilidad</h2>
+          </div>
+          <Segmented<Visibility>
+            label="Visibilidad"
+            value={visibility}
+            options={[
+              { value: "private", label: "Privada" },
+              { value: "public", label: "Pública" },
+            ]}
+            onChange={setVisibility}
+          />
+          <p className="footnote">
+            {visibility === "public"
+              ? "Cualquiera puede encontrarla con la lupa de Ligas y Quiniela y seguirla."
+              : "No sale en la búsqueda: solo entra quien tenga su código, su enlace o el QR."}{" "}
             Puedes cambiarlo en Ajustes.
           </p>
         </section>

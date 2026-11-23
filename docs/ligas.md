@@ -63,7 +63,38 @@ Igual que la de LaLiga: los signos son un borrador privado hasta pulsar **Sellar
 
 La liga elegida en Ligas o en Quiniela (boleto o clasificación), ya sea oficial o propia, es una sola elección. Se guarda en las preferencias de la cuenta en el dispositivo (`competition` y `liga`). Un enlace (`?liga=` o `?competition=`) la cambia. Una pestaña que vuelve a mostrarse con una URL anterior sigue la elección más reciente en vez de deshacerla. En Quiniela y Clasificación solo se muestran las ligas propias que sigues y que tienen quiniela. Sin grupo, abren la primera, porque las oficiales necesitan un grupo.
 
-Una liga abierta desde un enlace que no sigues se quita con «Quitar de la lista», en su cabecera, o manteniendo pulsado su escudo. Dejar de seguir una liga también la quita de la lista.
+En la fila de escudos solo aparecen LaLiga, Champions, Premier y las ligas que sigues. Las ligas creadas por otros no aparecen hasta que las sigues. Ya no se guardan ligas «recientes» en el dispositivo. Una liga abierta desde un enlace sin seguirla se muestra mientras la estás viendo. La próxima vez que abras Ligas ya no está. También se quita con «Quitar de la lista», en su cabecera, o manteniendo pulsado su escudo. Dejar de seguir una liga también la quita de la lista.
+
+Al iniciar sesión desde la ventana de acceso, la app abre Inicio. Una sesión que se recupera al abrir la app no cambia de pantalla.
+
+## Visibilidad y búsqueda de ligas
+
+Cada liga propia es privada o pública (`visibility`; sin el campo, privada):
+
+- **Privada**: no sale en la búsqueda; solo se entra con el código, el enlace o el QR.
+- **Pública**: cualquiera con cuenta la encuentra y la sigue.
+
+Se elige al crearla («Visibilidad») y el propietario la cambia en Gestión › Ajustes.
+
+La lupa a la derecha del título grande, en Ligas y en Quiniela, abre «Buscar ligas»:
+
+- Sin texto, lista ligas públicas, primero las más seguidas.
+- Al escribir, busca por el principio de cualquier palabra del nombre o del deporte, sin tildes ni mayúsculas.
+- «Seguir» añade la liga a tu lista sin cerrar la hoja; tocar el resto de la fila la abre.
+
+Para buscar, cada liga guarda `searchTerms`: los prefijos de las palabras de su nombre y deporte, como máximo 15 letras por palabra y 120 términos. La consulta es `visibility == "public"` más `searchTerms array-contains <palabra más larga>`, con su índice en `firestore.indexes.json`. El resto de palabras se filtra en el cliente. Las reglas solo dejan listar las ligas que sigues o las públicas, nunca las privadas de otros.
+
+## Fila de escudos
+
+Los escudos (`CompetitionTabs`) son píldoras sobre la cabecera oscura, con los bordes que se desvanecen al desplazar la fila. Un único resaltado amarillo marca la elegida:
+
+- El resaltado se desliza y estira de un escudo a otro con un muelle.
+- La fila se desplaza suavemente para centrar la elegida.
+- Al volver a mostrarse (otra pestaña, atrás), se coloca sin animar.
+- Las ligas propias que entran en la fila aparecen con una pequeña escala.
+- «＋ Nueva» es una píldora vacía con borde.
+
+Con movimiento reducido no hay deslizamiento.
 
 ## Quiniela: boleto y clasificación en una pestaña
 

@@ -66,17 +66,21 @@ service cloud.firestore {
       && text(d.schedule.location, 0, 120) && text(d.schedule.timeZone, 1, 60)
       && d.adminIds is list && d.adminIds.size() <= 20 && d.memberIds is list && d.memberIds.size() <= 500
       && d.adminIds.toSet().difference(d.memberIds.toSet()).size() == 0
-      && d.ownerId in d.memberIds;
+      && d.ownerId in d.memberIds
+      // Private unless the owner makes it public; the words it is searched by.
+      && d.get('visibility', 'private') in ['public','private']
+      && d.get('searchTerms', []) is list && d.get('searchTerms', []).size() <= 120;
    }
+   // Anyone with the link or the code opens it; only public ones can be searched.
    allow get: if true;
-   allow list: if signed() && request.auth.uid in resource.data.memberIds;
+   allow list: if signed() && (request.auth.uid in resource.data.memberIds || resource.data.visibility == 'public');
    // The short code is written in the same batch: competitionCodes/{code} -> this id.
    function codeFor(code) {
     return code is string && code.matches('[A-HJKMNP-Z2-9]{6}')
       && getAfter(/databases/$(database)/documents/competitionCodes/$(code)).data.competitionId == cid;
    }
    allow create: if signed()
-     && request.resource.data.keys().hasOnly(['name','sport','icon','participantType','format','legs','knockoutLegs','qualifiers','groups','thirdPlace','predictionMode','schedule','ownerId','adminIds','memberIds','formatVersion','createdAt','updatedAt','code'])
+     && request.resource.data.keys().hasOnly(['name','sport','icon','participantType','format','legs','knockoutLegs','qualifiers','groups','thirdPlace','predictionMode','schedule','ownerId','adminIds','memberIds','formatVersion','createdAt','updatedAt','code','visibility','searchTerms'])
      && (!('code' in request.resource.data) || codeFor(request.resource.data.code))
      && request.resource.data.ownerId == request.auth.uid
      && request.resource.data.memberIds == [request.auth.uid] && request.resource.data.adminIds == []
@@ -84,8 +88,8 @@ service cloud.firestore {
      && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
      && validCompetition(request.resource.data);
    allow update: if signed() && (
-     // Owner: name, sport, icon, prediction mode and who administers.
-     (owns(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','sport','icon','adminIds','predictionMode','updatedAt'])
+     // Owner: name, sport, icon, prediction mode, visibility and who administers.
+     (owns(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','sport','icon','adminIds','predictionMode','visibility','searchTerms','updatedAt'])
        && request.resource.data.updatedAt == request.time && validCompetition(request.resource.data))
      // Owner: give a competition from before short codes its code, once.
      || (owns(resource.data) && !('code' in resource.data)

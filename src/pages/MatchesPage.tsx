@@ -33,6 +33,7 @@ import { useCompetition, useMyCompetitions } from "../lib/customCompetitionData"
 import type { AppUser } from "../lib/session";
 import { knockoutContext } from "../lib/matchInsights";
 import CompetitionTabs from "../components/CompetitionTabs";
+import { LeagueSearchButton } from "../components/CustomChips";
 import RoundSelector from "../components/RoundSelector";
 import SwipeRow from "../components/SwipeRow";
 import { menuTarget } from "../components/ContextMenu";
@@ -48,6 +49,7 @@ import { roundOptions } from "../lib/roundOptions";
 import { useLeagueChoice } from "../lib/useLeagueChoice";
 
 const CompetitionStats = lazy(() => import("../components/CompetitionStats"));
+const CompetitionSearch = lazy(() => import("../components/CompetitionSearch"));
 const dayTitle = new Intl.DateTimeFormat("es", {
   weekday: "long",
   day: "numeric",
@@ -182,14 +184,18 @@ export default function MatchesPage({
   const choice = useLeagueChoice(userId, { officialParam: true });
   const liga = choice.liga;
   const custom = useCompetition(liga);
-  const { competitions: mine, remove } = useMyCompetitions(userId);
+  const { competitions: mine, ready: mineReady } = useMyCompetitions(userId);
   // Off the list: back to the official league in the three views.
-  const removeCustom = (id: string) => {
-    choice.forgetLiga(id);
-    // After its live view has stopped (a last snapshot would remember it again).
-    window.setTimeout(() => remove(id), 400);
-  };
+  const removeCustom = (id: string) => choice.forgetLiga(id);
+  // Only yours show up: one you looked at without following doesn't come back
+  // the next time you open Ligas (a link still opens it, and it shows then).
+  const linked = params.get("liga") || "";
+  useEffect(() => {
+    if (!userId || !mineReady || !liga || linked) return;
+    if (!mine.some((c) => c.id === liga)) choice.forgetLiga(liga);
+  }, [userId, mineReady, liga, linked, mine]);
   const [entry, setEntry] = useState(false);
+  const [search, setSearch] = useState(false);
   const chips = useMemo(() => {
     if (!liga || mine.some((c) => c.id === liga) || !custom.competition) return mine;
     const c = custom.competition;
@@ -284,6 +290,14 @@ export default function MatchesPage({
               ? `Temporada ${seasonLabel(seasonId)}`
               : "Calendario y resultados"
         }
+        titleControl={
+          <LeagueSearchButton
+            onClick={() => {
+              haptic();
+              setSearch(true);
+            }}
+          />
+        }
       >
         <div className="league-selection">
           <CompetitionTabs
@@ -311,6 +325,11 @@ export default function MatchesPage({
       </PageTitle>
       {entry && (
         <CompetitionEntrySheet user={user} onLogin={onLogin} onCode={openCustom} onClose={() => setEntry(false)} />
+      )}
+      {search && (
+        <Suspense fallback={null}>
+          <CompetitionSearch user={user} onLogin={onLogin} onOpen={openCustom} onClose={() => setSearch(false)} />
+        </Suspense>
       )}
       {liga ? (
         <CustomCompetitionView

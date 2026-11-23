@@ -7,6 +7,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   query,
   runTransaction,
@@ -28,9 +29,12 @@ import { readEntry, roundChanges, roundPlans, type RoundDocs } from "./customRou
 import {
   generateFixtures,
   isCode,
+  matchesSearch,
   MAX_ICON_CHARS,
   randomCode,
   resolveCompetition,
+  searchQueryTerm,
+  searchTerms,
   toAppMatch,
   type Competition,
   type CompetitionSetup,
@@ -42,6 +46,7 @@ import {
   type MatchStatus,
   type Participant,
   type ParticipantKind,
+  type Visibility,
 } from "./customCompetition";
 import { decodeEvents, decodeLineups, decodeSquad } from "./matchReport";
 
@@ -51,7 +56,13 @@ import { decodeEvents, decodeLineups, decodeSquad } from "./matchReport";
  */
 export const COMPETITIONS_COLLECTION = "customCompetitions";
 export const CODES_COLLECTION = "competitionCodes";
+// Chips used to include competitions opened on this device: now only yours.
 const RECENT_KEY = "galacticbet:competitions:recent";
+try {
+  localStorage.removeItem(RECENT_KEY);
+} catch {
+  /* Nothing to tidy. */
+}
 const BATCH = 400;
 
 function store(): Firestore {
@@ -86,6 +97,7 @@ export function decodeCompetition(id: string, d: DocumentData): Competition | nu
     adminIds: list(d.adminIds),
     memberIds: list(d.memberIds),
     code: typeof d.code === "string" && isCode(d.code) ? d.code : null,
+    visibility: d.visibility === "public" ? "public" : "private",
   };
 }
 function decodeParticipant(id: string, d: DocumentData): Participant {
@@ -176,7 +188,6 @@ export function useCompetition(cid: string): CompetitionData {
           const competition = decodeCompetition(snap.id, snap.data());
           seen.competition = true;
           setState((s) => ({ ...s, competition, loading: !seen.matches && Boolean(competition), missing: !competition }));
-          if (competition) rememberCompetition(competition);
         },
         fail,
       ),
@@ -249,71 +260,76 @@ export interface CompetitionChip {
   id: string;
   name: string;
   icon: string | null;
-  /** Followed with your account (false: only opened on this device). */
+  /** Followed with your account (false: the one you are looking at, from a link). */
   followed?: boolean;
 }
-function readRecent(): CompetitionChip[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
-    return Array.isArray(raw)
-      ? raw.filter((c) => c && typeof c.id === "string" && typeof c.name === "string").slice(0, 12)
-      : [];
-  } catch {
-    return [];
-  }
-}
-/** Opened on this device: even without an account it stays one tap away. */
-export function rememberCompetition(c: Pick<Competition, "id" | "name" | "icon">) {
-  try {
-    const next = [{ id: c.id, name: c.name, icon: c.icon }, ...readRecent().filter((r) => r.id !== c.id)].slice(0, 12);
-    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
-  } catch {
-    /* Only a shortcut. */
-  }
-}
-export function forgetCompetition(cid: string) {
-  try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(readRecent().filter((r) => r.id !== cid)));
-  } catch {
-    /* Only a shortcut. */
-  }
-}
 
-/** Competitions you follow (and those opened on this device), for the Ligas chips. */
+/**
+ * The competitions you follow, for the chips after LaLiga, Champions and
+ * Premier. Nobody else's appears there until you follow it (with its code,
+ * its link or from the search, if it is public).
+ */
 export function useMyCompetitions(uid: string) {
-  const [followed, setFollowed] = useState<CompetitionChip[]>([]);
-  const [, setVersion] = useState(0);
+  const [state, setState] = useState<{ uid: string; list: CompetitionChip[] } | null>(null);
   useEffect(() => {
-    if (!uid || !db) {
-      setFollowed([]);
-      return;
-    }
+    if (!uid || !db) return;
     return onSnapshot(
       query(collection(store(), COMPETITIONS_COLLECTION), where("memberIds", "array-contains", uid)),
       (snap) =>
-        setFollowed(
-          snap.docs
+        setState({
+          uid,
+          list: snap.docs
             .map((d) => decodeCompetition(d.id, d.data()))
             .filter((c): c is Competition => Boolean(c))
-            .map((c) => ({ id: c.id, name: c.name, icon: c.icon })),
-        ),
-      () => setFollowed([]),
+            .sort((a, b) => a.name.localeCompare(b.name, "es"))
+            .map((c) => ({ id: c.id, name: c.name, icon: c.icon, followed: true })),
+        }),
+      () => setState({ uid, list: [] }),
     );
   }, [uid]);
-  const recent = readRecent();
-  const ids = new Set(followed.map((c) => c.id));
-  return {
-    competitions: [
-      ...followed.map((c) => ({ ...c, followed: true })),
-      ...recent.filter((r) => !ids.has(r.id)).map((r) => ({ ...r, followed: false })),
-    ],
-    refresh: () => setVersion((v) => v + 1),
-    /** Takes a competition you don't follow off your list on this device. */
-    remove: (cid: string) => {
-      forgetCompetition(cid);
-      setVersion((v) => v + 1);
-    },
-  };
+  if (!uid || !db) return { competitions: [] as CompetitionChip[], ready: true };
+  return state?.uid === uid
+    ? { competitions: state.list, ready: true }
+    : { competitions: [] as CompetitionChip[], ready: false };
+}
+
+/** A public competition found in the search. */
+export interface PublicCompetition {
+  id: string;
+  name: string;
+  sport: string;
+  icon: string | null;
+  followers: number;
+  memberIds: string[];
+  predictionMode: Competition["predictionMode"];
+}
+const SEARCH_LIMIT = 30;
+/**
+ * Public competitions whose name or sport has a word starting with each word
+ * typed; with nothing typed, a few to discover (most followed first).
+ */
+export async function searchPublicCompetitions(text: string): Promise<PublicCompetition[]> {
+  const term = searchQueryTerm(text);
+  const constraints = [
+    where("visibility", "==", "public"),
+    ...(term ? [where("searchTerms", "array-contains", term)] : []),
+    limit(SEARCH_LIMIT),
+  ];
+  const snap = await getDocs(query(collection(store(), COMPETITIONS_COLLECTION), ...constraints));
+  return snap.docs
+    .map((d) => decodeCompetition(d.id, d.data()))
+    .filter((c): c is Competition => Boolean(c) && c!.visibility === "public")
+    .filter((c) => matchesSearch(text, c.name, c.sport))
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      sport: c.sport,
+      icon: c.icon,
+      followers: c.memberIds.length,
+      memberIds: c.memberIds,
+      predictionMode: c.predictionMode,
+    }))
+    .sort((a, b) => b.followers - a.followers || a.name.localeCompare(b.name, "es"));
 }
 
 // ---------- Writing ----------
@@ -379,6 +395,8 @@ export async function createCompetition(
     groups: setup.groups,
     thirdPlace: setup.thirdPlace,
     predictionMode: setup.predictionMode,
+    visibility: setup.visibility === "public" ? "public" : "private",
+    searchTerms: searchTerms(setup.name, setup.sport),
     schedule: { ...setup.schedule, location: setup.schedule.location.trim() },
     ownerId: uid,
     adminIds: [],
@@ -403,7 +421,6 @@ export async function createCompetition(
       fixtureData(f, uid),
     ]),
   ]);
-  rememberCompetition({ id: ref.id, name: setup.name.trim(), icon: setup.icon });
   return ref.id;
 }
 
@@ -451,12 +468,17 @@ export async function unfollowCompetition(uid: string, cid: string) {
   });
 }
 
-/** Owner only: name, sport, icon, prediction mode and administrators. */
+/** Owner only: name, sport, icon, prediction mode, visibility and administrators. */
 export async function updateCompetition(
   cid: string,
-  patch: Partial<Pick<Competition, "name" | "sport" | "icon" | "adminIds" | "predictionMode">>,
+  patch:
+    | Pick<Competition, "adminIds">
+    | (Pick<Competition, "name" | "sport"> &
+        Partial<Pick<Competition, "icon" | "predictionMode">> & { visibility?: Visibility }),
 ) {
-  await updateDoc(competitionRef(cid), { ...patch, updatedAt: serverTimestamp() });
+  // The search looks words up: they follow the name and the sport.
+  const terms = "name" in patch ? { searchTerms: searchTerms(patch.name, patch.sport) } : {};
+  await updateDoc(competitionRef(cid), { ...patch, ...terms, updatedAt: serverTimestamp() });
 }
 
 /** Admins: a whole match document (date, place, state, result, lock, report). */
@@ -551,7 +573,6 @@ export async function deleteCompetition(
   last.delete(competitionRef(cid));
   if (code) last.delete(doc(store(), CODES_COLLECTION, code));
   await last.commit();
-  forgetCompetition(cid);
   forgetEntries(cid);
 }
 

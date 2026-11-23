@@ -51,6 +51,7 @@ const comp = (mode: Competition["predictionMode"] = "exact") =>
   ({
     id: "c1",
     name: "Liga",
+    visibility: "private",
     sport: "",
     icon: null,
     participantType: "team",

@@ -439,7 +439,13 @@ export default function App() {
             )
           )}
           <ContextMenuHost />
-          {login && <LoginModal close={() => setLogin(false)} />}
+          {login && (
+            <LoginModal
+              close={() => setLogin(false)}
+              // Just signed in: start from Inicio, like opening the app.
+              onSignedIn={() => go("/", { reset: true })}
+            />
+          )}
         </div>
       </RefreshContext.Provider>
     </LiveContext.Provider>
