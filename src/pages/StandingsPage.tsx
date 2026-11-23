@@ -23,7 +23,7 @@ import {
 import PotCard from "../components/PotCard";
 import RoundRecap from "../components/RoundRecap";
 import { roundRecap } from "../lib/roundRecap";
-import { groupPotCents, potText, roundPot } from "../lib/pot";
+import { groupPotCents, roundPot } from "../lib/pot";
 import { useRoundAttendance } from "../lib/useRoundAttendance";
 import PageFilters, { Segmented } from "../components/PageFilters";
 import RoundSelector from "../components/RoundSelector";
@@ -222,6 +222,8 @@ function GroupStandings({
     });
   }, [potRound, data, matches, potCents, rows, attendance.ids]);
   const hasPoints = rows.some((r) => r.points > 0);
+  // Shared with the round: what the pot is worth, who collects it, who pays.
+  const sharedPot = pot && attendance.ready && !attendance.error ? pot : null;
   // A finished round tells its story: winner, your round, the highlights.
   const roundFixtures = useMemo(
     () => matches.filter((m) => m.roundId === selectedRound),
@@ -278,7 +280,7 @@ function GroupStandings({
               title,
               rows,
               showHits,
-              pot: pot ? potText(pot) : "",
+              pot: sharedPot,
             })}
             render={() =>
               import("../lib/shareImage").then((m) =>
@@ -287,6 +289,7 @@ function GroupStandings({
                   title,
                   rows,
                   showHits,
+                  pot: sharedPot,
                 }),
               )
             }
@@ -371,6 +374,7 @@ function GroupStandings({
                 fixtures={roundFixtures}
                 showHits={showHits}
                 userId={user.uid}
+                pot={sharedPot}
               />
             ) : (
               <MyRankCard rows={rows} userId={user.uid} showHits={showHits} />

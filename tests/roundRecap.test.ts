@@ -115,7 +115,7 @@ describe("Resumen de la jornada", () => {
     });
     expect(text).toContain("🏆 LaLiga · Jornada 4 · Los del barrio");
     expect(text).toContain("Ganó Bruno con 5 puntos.");
-    expect(text).toContain("1. Carla · 12 pts");
+    expect(text).toContain("📊 La jornada\n1. Bruno · 5 pts");
     // Nobody alone: no rare hit.
     expect(rarestHit("classic", [fixture("1", 1, 0)], entries, names)).toBeNull();
   });

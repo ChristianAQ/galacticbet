@@ -22,6 +22,7 @@ import {
   type RoundRecap as Recap,
 } from "../lib/roundRecap";
 import { shareFileName } from "../lib/shareSummary";
+import type { PotSummary } from "../lib/pot";
 import { RankAvatar } from "./RankingWidgets";
 import "../styles/recap.css";
 
@@ -89,6 +90,7 @@ export default function RoundRecap({
   fixtures,
   showHits,
   userId,
+  pot,
 }: {
   recap: Recap;
   /** «LaLiga · Jornada 13» */
@@ -102,6 +104,8 @@ export default function RoundRecap({
   fixtures: Match[];
   showHits: boolean;
   userId: string;
+  /** The round's pot, shared with the round: who collects it and who pays. */
+  pot: PotSummary | null;
 }) {
   const [sharing, setSharing] = useState(false);
   const entries = useRoundEntries(groupId, recap.roundId, members);
@@ -205,14 +209,15 @@ export default function RoundRecap({
           <ShareDialog
             title={`Resumen · ${groupName}`}
             filename={shareFileName("resumen", groupName, title)}
-            text={recapText({ groupName, title, recap, highlights: shared })}
+            text={recapText({ groupName, title, recap, highlights: shared, pot })}
             render={() =>
               import("../lib/shareImage").then((m) =>
                 m.standingsImage({
                   groupName,
-                  title: `${title} · Así queda la general`,
-                  rows: recap.season,
+                  title,
+                  rows: recap.rows,
                   showHits,
+                  pot,
                 }),
               )
             }

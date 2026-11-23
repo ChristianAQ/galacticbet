@@ -1,5 +1,6 @@
 import { predictionSummary, type Match, type Mode } from "./domain";
 import type { RankingRow } from "./rankings";
+import { potLines, type PotSummary } from "./pot";
 import { pickState, roundBoard, type RoundPlayer } from "./roundBoard";
 
 export interface QuinielaShare {
@@ -16,8 +17,8 @@ export interface StandingsShare {
   rows: RankingRow[];
   showHits: boolean;
   demo?: boolean;
-  /** Informational pot line, already formatted. */
-  pot?: string;
+  /** The round's informational pot: who collects it and who pays. */
+  pot?: PotSummary | null;
 }
 
 const marks = { hit: " ✅", miss: " ❌", "live-hit": " 🟢", "live-miss": "" };
@@ -79,7 +80,8 @@ export function standingsText(s: StandingsShare) {
     lines.push(
       `${r.position}. ${r.name} · ${points(r.points)}${s.showHits ? ` · ${r.hits} ${r.hits === 1 ? "acierto" : "aciertos"}` : ""}`,
     );
-  if (s.pot) lines.push("", `💰 ${s.pot}`);
+  const pot = potLines(s.pot);
+  if (pot.length) lines.push("", ...pot);
   return lines.join("\n");
 }
 

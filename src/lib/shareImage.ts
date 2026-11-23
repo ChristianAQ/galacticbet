@@ -1,4 +1,6 @@
 import { competitionName } from "./competitions";
+import { euro } from "./porra";
+import { euroShort, potNames, potPayout } from "./pot";
 import { predictionSummary } from "./domain";
 import { pickState, roundBoard, type PickState } from "./roundBoard";
 import {
@@ -371,10 +373,90 @@ export async function quinielaImage(q: QuinielaShare): Promise<Blob> {
   return toPng(canvas);
 }
 
+/** Height of the pot ticket for a given pot (0 without one). */
+function potHeight(pot: StandingsShare["pot"]) {
+  if (!pot || pot.state === "off") return 0;
+  if (pot.state === "settled" && pot.leaders.length)
+    return 300 + (potPayout(pot).payers.length ? 0 : -44) + (pot.remainderCents ? 34 : 0);
+  return 250;
+}
+
+/**
+ * The round's pot as an ink ticket under the table: total, who collects it
+ * and who pays. Informational: no money moves through the app.
+ */
+function potTicket(ctx: Ctx, pot: NonNullable<StandingsShare["pot"]>, top: number) {
+  const height = potHeight(pot) - 40;
+  const left = PAD + 32;
+  const right = WIDTH - PAD - 32;
+  box(ctx, PAD, top, WIDTH - PAD * 2, height, colors.ink, 22);
+  label(ctx, "Bote de la jornada", left, top + 42, colors.accent);
+  write(
+    ctx,
+    `${pot.players.length} ${pot.players.length === 1 ? "jugador" : "jugadores"} × ${euroShort(pot.contributionCents)}`,
+    left,
+    top + 76,
+    21,
+    colors.mastMuted,
+    550,
+  );
+  write(ctx, euro(pot.totalCents), right, top + 62, 60, colors.accent, 900, "right", Infinity, "display");
+  // Perforation between the stub and the payout.
+  ctx.strokeStyle = "#48453d";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  ctx.moveTo(left, top + 112);
+  ctx.lineTo(right, top + 112);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const { winners, payers } = potPayout(pot);
+  const each = winners.length > 1 ? " c/u" : "";
+  if (pot.state === "settled" && winners.length) {
+    label(ctx, winners.length > 1 ? "Se lo reparten" : "Se lo lleva", left, top + 146, colors.mastMuted);
+    write(ctx, potNames(winners), left, top + 186, 36, colors.mastInk, 850, "left", right - left - 260, "display");
+    write(ctx, `${euro(pot.shareCents)}${each}`, right, top + 186, 36, colors.accent, 900, "right", 250, "display");
+    let y = top + 186;
+    if (payers.length) {
+      y += 44;
+      write(
+        ctx,
+        `${payers.length === 1 ? "Paga" : "Pagan"} ${euroShort(pot.contributionCents)}${payers.length > 1 ? " cada uno" : ""}: ${potNames(payers)}`,
+        left,
+        y,
+        21,
+        colors.mastMuted,
+        550,
+        "left",
+        right - left,
+      );
+    }
+    if (pot.remainderCents)
+      write(ctx, `Sobran ${euro(pot.remainderCents)} al repartir.`, left, y + 34, 19, colors.mastMuted, 500);
+  } else {
+    const live = pot.state === "live" && winners.length;
+    label(ctx, live ? "Va ganando" : "Cuándo se reparte", left, top + 146, colors.mastMuted);
+    write(
+      ctx,
+      live
+        ? `${potNames(winners)} · ${euro(pot.shareCents)}${each} si acaba así`
+        : "Al cerrar la jornada, para quien más puntos sume.",
+      left,
+      top + 180,
+      24,
+      colors.mastInk,
+      650,
+      "left",
+      right - left,
+    );
+  }
+}
+
 export async function standingsImage(s: StandingsShare): Promise<Blob> {
   await loadShareFonts();
   const rowH = 64;
-  const height = 236 + 50 + s.rows.length * (rowH + 8) + 120;
+  const ticket = potHeight(s.pot);
+  const height = 236 + 50 + s.rows.length * (rowH + 8) + 120 + ticket;
   const { canvas, ctx } = canvasFor(height);
   header(ctx, `Clasificación${s.demo ? " · demo" : ""}`, s.groupName, s.title);
   let y = 240;
@@ -432,10 +514,16 @@ export async function standingsImage(s: StandingsShare): Promise<Blob> {
     y += rowH + 8;
   }
   rule(ctx, y);
+  if (ticket && s.pot) {
+    potTicket(ctx, s.pot, y + 30);
+    y += ticket;
+  }
   footer(
     ctx,
     y + 48,
-    "Puntos calculados por el servidor con resultados a 90 minutos.",
+    ticket
+      ? "Bote informativo: GalacticBet no cobra ni paga. Puntos a 90 minutos."
+      : "Puntos calculados por el servidor con resultados a 90 minutos.",
   );
   return toPng(canvas);
 }

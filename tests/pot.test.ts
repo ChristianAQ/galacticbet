@@ -3,9 +3,11 @@ import {
   groupPotCents,
   parsePotInput,
   potInputValue,
+  potLines,
   potText,
   roundPot,
 } from "../src/lib/pot";
+import { standingsText } from "../src/lib/shareSummary";
 import type { RankingRow } from "../src/lib/rankings";
 
 const plain = (text: string) => text.replace(/\u00a0/g, " ");
@@ -120,5 +122,43 @@ describe("bote informativo por jornada", () => {
     expect(potInputValue(500)).toBe("5");
     expect(potInputValue(250)).toBe("2,50");
     expect(potInputValue(0)).toBe("");
+  });
+});
+
+describe("bote al compartir la jornada", () => {
+  const rows = [row("ana", 7, 1), row("beto", 5, 2), row("carla", 3, 3), row("dani", 0, 4)];
+  const settle = (ids: string[], r = rows) =>
+    roundPot({ contributionCents: 500, rows: r, participantIds: ids, started: true, complete: true });
+
+  it("dice para quién es el bote y quién paga cuánto", () => {
+    const lines = potLines(settle(["ana", "beto", "carla"])).map(plain);
+    expect(lines).toEqual([
+      "💰 Bote de la jornada: 15,00 € (3 × 5 €)",
+      "🏆 Para Ana: 15,00 €",
+      "💸 Pagan 5 € cada uno: Beto y Carla",
+    ]);
+    // Dani did not seal: neither pays nor collects.
+    const text = plain(
+      standingsText({
+        groupName: "Oficina",
+        title: "LaLiga · Jornada 13",
+        showHits: false,
+        rows,
+        pot: settle(["ana", "beto", "carla"]),
+      }),
+    );
+    expect(text).toContain("\n\n💰 Bote de la jornada: 15,00 € (3 × 5 €)\n🏆 Para Ana: 15,00 €");
+  });
+
+  it("empates, jornada en juego, sin bote", () => {
+    const tie = settle(["ana", "beto"], [row("ana", 4), row("beto", 4)]);
+    expect(potLines(tie).map(plain)).toEqual([
+      "💰 Bote de la jornada: 10,00 € (2 × 5 €)",
+      "🏆 Para Ana y Beto: 5,00 € cada uno",
+    ]);
+    const live = roundPot({ contributionCents: 500, rows, participantIds: ["ana", "beto"], started: true, complete: false });
+    expect(potLines(live).map(plain)[1]).toBe("⏳ Va ganando Ana: 10,00 € si acaba así");
+    expect(potLines(null)).toEqual([]);
+    expect(potLines(roundPot({ contributionCents: 0, rows, participantIds: ["ana"], started: true, complete: true }))).toEqual([]);
   });
 });

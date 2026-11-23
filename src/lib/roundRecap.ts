@@ -1,6 +1,7 @@
 import { predictionSummary, score, type Match, type Mode, type PredictionValue } from "./domain";
 import type { Participant } from "./data";
 import { buildRanking, type RankingRow, type SeasonRanking } from "./rankings";
+import { potLines, type PotSummary } from "./pot";
 
 /**
  * The story of a finished round in a group: who won it, how you did, and the
@@ -223,30 +224,37 @@ export function recapHighlights(
   return lines;
 }
 
-/** Chat text: «🏆 LaLiga · Jornada 13 en Los del barrio» and the highlights. */
+/**
+ * Chat text: the round, its winner, the highlights, the pot (who collects it
+ * and who pays) and the round table.
+ */
 export function recapText({
   groupName,
   title,
   recap,
   highlights,
+  pot,
 }: {
   groupName: string;
   title: string;
   recap: RoundRecap;
   highlights: ReturnType<typeof recapHighlights>;
+  pot?: PotSummary | null;
 }) {
   const icons = { rare: "⚡", perfect: "🎯", streak: "🔥", climb: "📈", blank: "🥶" };
   const winner =
     recap.winners.length === 1
       ? `Ganó ${recap.winners[0].name} con ${pts(recap.best)}.`
       : `Empate arriba: ${list(recap.winners.map((w) => w.name))}, con ${pts(recap.best)}.`;
+  const money = potLines(pot);
   return [
     `🏆 ${title} · ${groupName}`,
     winner,
     ...highlights.map((h) => `${icons[h.kind]} ${h.text}`),
+    ...(money.length ? ["", ...money] : []),
     "",
-    "📊 La general",
-    ...recap.season.slice(0, 5).map((r) => `${r.position}. ${r.name} · ${r.points} pts`),
+    "📊 La jornada",
+    ...recap.rows.map((r) => `${r.position}. ${r.name} · ${r.points} ${r.points === 1 ? "pt" : "pts"}`),
     "",
     "Juega la próxima en GalacticBet.",
   ].join("\n");

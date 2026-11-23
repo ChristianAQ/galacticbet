@@ -43,50 +43,40 @@ function useKeyboardOpen() {
   return open;
 }
 
-/** Pixels of scroll that take the bar from full size to compact. */
-const SHRINK_RANGE = 72;
+/** Scroll down this far (in one direction) to compact the bar… */
+const COMPACT_AFTER = 28;
+/** …and up this far to bring it back. Near the top it is always full. */
+const EXPAND_AFTER = 14;
+const TOP_ZONE = 48;
 
 /**
- * Scroll-linked compact bar: scrolling down shrinks it pixel by pixel, scrolling
- * up grows it back, and when the scroll comes to rest it settles to the nearest
- * state in the direction you were going. Writes one CSS variable (--nav-shrink,
- * 0 → 1) straight to the element, so React never re-renders while you scroll.
+ * Compact bar while reading: a deliberate scroll down tucks it in, any scroll
+ * up brings it back. The change itself is a CSS transition of transform and
+ * opacity only, which iOS animates off the main thread: smooth even mid-scroll
+ * (following the finger pixel by pixel stuttered on the iPhone).
  */
-function useScrollShrink(nav: RefObject<HTMLElement | null>) {
+function useCompactOnScroll(nav: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const el = nav.current;
     if (!el) return;
-    let progress = 0;
+    let compact = false;
     let lastY: number | null = null;
+    let travel = 0;
     let page = chrome.stack[chrome.stack.length - 1];
-    let direction = 0;
-    let touching = false;
-    let settling = false;
-    let timer = 0;
-
-    const paint = () => el.style.setProperty("--nav-shrink", progress.toFixed(4));
-    const animateTo = (target: number) => {
-      if (progress === target) return;
-      settling = true;
-      el.classList.add("is-settling");
-      progress = target;
-      paint();
+    const set = (next: boolean) => {
+      if (next === compact) return;
+      compact = next;
+      // A data attribute React does not manage: re-renders never reset it.
+      el.toggleAttribute("data-compact", next);
     };
-    const settleSoon = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        if (touching || progress === 0 || progress === 1) return;
-        animateTo(progress > (direction > 0 ? 0.3 : 0.7) ? 1 : 0);
-      }, 120);
-    };
-    // Another page: full size again, and its scroll position is a new baseline.
+    // Another page: full size again, its scroll position is a new baseline.
     const onPage = () => {
       const top = chrome.stack[chrome.stack.length - 1];
       if (top === page) return;
       page = top;
       lastY = null;
-      window.clearTimeout(timer);
-      animateTo(0);
+      travel = 0;
+      set(false);
     };
     const onScroll = () => {
       onPage();
@@ -103,49 +93,19 @@ function useScrollShrink(nav: RefObject<HTMLElement | null>) {
         return;
       }
       const dy = y - lastY;
-      const previousY = lastY;
       lastY = y;
-      if (dy === 0) return;
-      if (settling) {
-        // Pick up from wherever the settle animation is right now.
-        const shown = parseFloat(getComputedStyle(el).getPropertyValue("--nav-shrink"));
-        if (Number.isFinite(shown)) progress = shown;
-        settling = false;
-        el.classList.remove("is-settling");
-      }
-      direction = Math.sign(dy);
-      let next = progress + dy / SHRINK_RANGE;
-      // Near the top, growing back keeps pace so it is full exactly at 0.
-      if (dy < 0 && y < SHRINK_RANGE && previousY > 0)
-        next = Math.min(next, progress * (y / previousY));
-      next = Math.min(1, Math.max(0, next));
-      if (next !== progress) {
-        progress = next;
-        paint();
-      }
-      settleSoon();
+      if (!dy) return;
+      if (Math.sign(dy) !== Math.sign(travel)) travel = 0;
+      travel += dy;
+      if (y < TOP_ZONE) set(false);
+      else if (travel >= COMPACT_AFTER) set(true);
+      else if (travel <= -EXPAND_AFTER) set(false);
     };
-    const onTouchStart = () => {
-      touching = true;
-      window.clearTimeout(timer);
-    };
-    const onTouchEnd = () => {
-      touching = false;
-      settleSoon();
-    };
-    paint();
     const unsubscribe = chrome.subscribe(onPage);
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchend", onTouchEnd, { passive: true });
-    window.addEventListener("touchcancel", onTouchEnd, { passive: true });
     return () => {
-      window.clearTimeout(timer);
       unsubscribe();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("touchcancel", onTouchEnd);
     };
   }, [nav]);
 }
@@ -169,7 +129,7 @@ export default function BottomNavigation({
   const index = tabIndex(rootPath);
   const hidden = inactive || keyboardOpen;
   const ref = useRef<HTMLElement>(null);
-  useScrollShrink(ref);
+  useCompactOnScroll(ref);
   return (
     <nav
       ref={ref}

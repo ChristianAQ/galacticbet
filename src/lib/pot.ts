@@ -103,6 +103,41 @@ export function potText(pot: PotSummary) {
   return total;
 }
 
+/** Who collects the pot and who pays it, once the round is settled. */
+export function potPayout(pot: PotSummary) {
+  const winners = new Set(pot.leaders.map((r) => r.id));
+  return {
+    winners: pot.leaders,
+    /** Players who put money in and did not win: each pays their part. */
+    payers: pot.players.filter((r) => !winners.has(r.id)),
+  };
+}
+
+/**
+ * Lines for the group chat: the pot, who it goes to and who pays whom.
+ * Empty when the group plays without a pot.
+ */
+export function potLines(pot: PotSummary | null | undefined): string[] {
+  if (!pot || pot.state === "off") return [];
+  const lines = [
+    `💰 Bote de la jornada: ${euro(pot.totalCents)} (${pot.players.length} × ${euroShort(pot.contributionCents)})`,
+  ];
+  const { winners, payers } = potPayout(pot);
+  const each = winners.length > 1 ? " cada uno" : "";
+  if (pot.state === "settled" && winners.length) {
+    lines.push(`🏆 Para ${names(winners)}: ${euro(pot.shareCents)}${each}`);
+    if (payers.length)
+      lines.push(
+        `💸 ${payers.length === 1 ? "Paga" : "Pagan"} ${euroShort(pot.contributionCents)}${payers.length > 1 ? " cada uno" : ""}: ${names(payers)}`,
+      );
+    if (pot.remainderCents)
+      lines.push(`Sobran ${euro(pot.remainderCents)} al repartir: decidid entre vosotros.`);
+  } else if (pot.state === "live" && winners.length)
+    lines.push(`⏳ Va ganando ${names(winners)}: ${euro(pot.shareCents)}${each} si acaba así`);
+  else lines.push("Se reparte al cerrar la jornada.");
+  return lines;
+}
+
 export function parsePotInput(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return 0;
