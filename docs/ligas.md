@@ -106,3 +106,19 @@ La barra inferior tiene tres opciones: Inicio, Ligas y Quiniela. La cabecera de 
 - El antetítulo indica el modo («Quiniela · 1X2», «Liga propia · Marcador exacto»).
 
 Debajo, «Mi boleto | Clasificación» es el mismo control fijo de Ligas: se queda bajo la barra al bajar, y el panel de «Sellar boleto» se fija justo debajo. Al cambiar de vista, el contenido se desliza hacia el lado de la pestaña elegida; si estabas muy abajo, la nueva vista empieza bajo el control. La vista va en `?vista=clasificacion`, la jornada en `?round=` (común a las dos vistas) y «Jornada/Total» en `?period=all` (con `?todas=1` para todas las competiciones). Los enlaces antiguos a `#/clasificacion` (avisos, accesos directos) redirigen a la vista de clasificación con sus parámetros.
+
+## Jornada actual y avisos
+
+**Jornada actual** (`preferredRound`). Es la misma en Ligas, Quiniela (boleto y clasificación) y en las ligas propias:
+
+- Una jornada empezada y sin todos sus resultados es la actual.
+- Cuando termina, sigue siendo la actual dos días después de su último partido, para ver resultados, tablero y clasificación. Después pasa a la siguiente.
+- Si la siguiente empieza antes, cambia un día antes de su primer partido, para que dé tiempo a sellar el boleto. Si empieza en menos de un día, cambia en cuanto termina la anterior.
+
+**Avisos.** Solo hay uno: el de fin de jornada (`scripts/notifications.ts`).
+
+- Lo recibe quien selló el boleto de esa jornada en ese grupo. En jornadas anteriores al sellado, quien hizo pronósticos.
+- Dice su puesto entre quienes sellaron: «Has quedado 2.º de 5 en Los del barrio con 7 puntos», «¡Has ganado la jornada…! 1.º de 5». Los empates comparten puesto.
+- Se envía una sola vez por grupo y jornada, y no para jornadas de hace más de 48 horas.
+- La etiqueta lleva el grupo: quien juega en dos grupos recibe los dos avisos.
+- Ya no hay recordatorios de cierre.

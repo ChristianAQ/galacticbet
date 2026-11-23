@@ -75,7 +75,7 @@ export async function recompute(
       if (!changedRounds.length && !membershipChanged) continue;
       const previous = await season.ref.collection("standings").get();
       const totals = new Map<string, Standing>();
-      const finishedRounds: { rid: string; lastKickoff: number }[] = [];
+      const finishedRounds: { rid: string; lastKickoff: number; sealed: string[] }[] = [];
       for (const uid of members) {
         const row = previous.docs.find((d) => d.id === uid);
         totals.set(uid, sumRounds(row?.data().rounds || {}));
@@ -90,6 +90,8 @@ export async function recompute(
             m.awayScore !== null,
         );
         let predictions: StoredPrediction[] = [];
+        // Who sealed (or, in rounds from before sealing, forecast) this round.
+        let sealed: string[] = [];
         if (finished.length) {
           if (requiresDelivery(games, policies.get(config.seasonId))) {
             const entries = await season.ref
@@ -103,6 +105,7 @@ export async function recompute(
                   ({ userId: entry.id, matchId, value }) as StoredPrediction,
               ),
             );
+            sealed = entries.docs.map((entry) => entry.id);
           } else {
             // Existing, already-started rounds retain their previous scoring contract.
             const legacy = await season.ref
@@ -112,6 +115,7 @@ export async function recompute(
             predictions = legacy.docs.map(
               (doc) => doc.data() as StoredPrediction,
             );
+            sealed = [...new Set(predictions.map((p) => p.userId))];
           }
         }
         const roundTotals = scoreRound(mode, games, predictions, members);
@@ -123,6 +127,7 @@ export async function recompute(
           finishedRounds.push({
             rid,
             lastKickoff: Math.max(...games.map((m) => Date.parse(m.utcDate) || 0)),
+            sealed: sealed.filter((uid) => members.includes(uid)),
           });
       }
       const batch = db.batch();
@@ -151,7 +156,7 @@ export async function recompute(
       const standings = new Map(
         [...totals].map(([uid, total]) => [uid, sumRounds(total.rounds)]),
       );
-      for (const { rid, lastKickoff } of finishedRounds)
+      for (const { rid, lastKickoff, sealed } of finishedRounds)
         completed.push({
           groupId: group.id,
           groupName: group.data().name || "tu grupo",
@@ -160,6 +165,7 @@ export async function recompute(
           lastKickoff,
           standings,
           names: new Map(members.map((uid) => [uid, profiles.get(uid) || "Jugador"])),
+          sealed,
         });
     }
   }

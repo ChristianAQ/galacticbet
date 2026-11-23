@@ -1,11 +1,7 @@
 import { deleteApp, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, Timestamp, type Firestore } from "firebase-admin/firestore";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  announceRoundResults,
-  remindPendingRounds,
-  type CompletedRound,
-} from "../scripts/notifications";
+import { announceRoundResults, type CompletedRound } from "../scripts/notifications";
 import { ensureVapidKeys, type PushSend } from "../scripts/push";
 import type { Standing } from "../scripts/standings";
 
@@ -18,7 +14,7 @@ const device = (endpoint: string) => ({
   createdAt: Timestamp.now(),
 });
 
-describe.skipIf(!enabled)("Avisos en Firestore: claves, recordatorios y resultados", () => {
+describe.skipIf(!enabled)("Avisos en Firestore: claves y resultados de jornada", () => {
   let app: App;
   let db: Firestore;
   const now = Date.parse("2026-11-21T18:00:00Z");
@@ -66,30 +62,7 @@ describe.skipIf(!enabled)("Avisos en Firestore: claves, recordatorios y resultad
     expect((await db.doc("private/push").get()).data()?.privateKey).toBe(first.privateKey);
   });
 
-  it("recuerda la jornada a quien no ha sellado, una sola vez, y olvida móviles dados de baja", async () => {
-    const keys = await ensureVapidKeys(db);
-    const send = vi.fn<PushSend>(async (subscription) => {
-      if (subscription.endpoint.includes("gone"))
-        throw Object.assign(new Error("Gone"), { statusCode: 410 });
-      return {};
-    });
-    expect(await remindPendingRounds(db, keys, { now, send })).toEqual({ reminded: 1 });
-    // Ana sealed; Dani has no device; Carla's device is gone; Bruno gets one for both groups.
-    expect(send).toHaveBeenCalledTimes(2);
-    const [subscription, payload] = send.mock.calls.find(([s]) => s.endpoint.endsWith("bruno"))!;
-    expect(subscription.keys.auth).toBe("c".repeat(22));
-    expect(JSON.parse(payload)).toMatchObject({
-      title: "LaLiga · Jornada 13",
-      body: expect.stringContaining("en 2 grupos"),
-    });
-    expect((await db.collection("users/carla/push").get()).empty).toBe(true);
-    expect((await db.doc(`pushLog/remind_${RID}_bruno`).get()).exists).toBe(true);
-    send.mockClear();
-    expect(await remindPendingRounds(db, keys, { now: now + 600_000, send })).toEqual({ reminded: 0 });
-    expect(send).not.toHaveBeenCalled();
-  });
-
-  it("anuncia cada jornada cerrada una vez y calla las antiguas", async () => {
+  it("anuncia cada jornada terminada una vez, solo a quien selló, y calla las antiguas", async () => {
     const keys = await ensureVapidKeys(db);
     const send = vi.fn<PushSend>(async () => ({}));
     const round: CompletedRound = {
@@ -104,11 +77,16 @@ describe.skipIf(!enabled)("Avisos en Firestore: claves, recordatorios y resultad
         ["carla", { points: 0, hits: 0, rounds: {} }],
       ]),
       names: new Map([["ana", "Ana"], ["bruno", "Bruno"], ["carla", "Carla"]]),
+      sealed: ["ana", "bruno"],
     };
-    // Ana, Bruno and Carla each have a device.
-    expect(await announceRoundResults(db, keys, [round], { now, send })).toEqual({ announced: 3 });
+    // Ana, Bruno and Carla each have a device, but Carla didn't seal.
+    expect(await announceRoundResults(db, keys, [round], { now, send })).toEqual({ announced: 2 });
     const bodies = send.mock.calls.map(([, payload]) => JSON.parse(payload).body);
-    expect(bodies).toContain("¡Has ganado la jornada en Los del barrio con 9 puntos! Vas 1.º en la general.");
+    expect(bodies.sort()).toEqual([
+      "Has quedado 2.º de 2 en Los del barrio con 4 puntos.",
+      "¡Has ganado la jornada en Los del barrio con 9 puntos! 1.º de 2.",
+    ]);
+    expect(send.mock.calls.some(([s]) => s.endpoint.includes("carla"))).toBe(false);
     send.mockClear();
     expect(await announceRoundResults(db, keys, [round], { now, send })).toEqual({ announced: 0 });
     const old = { ...round, groupId: "g2", lastKickoff: now - 5 * 86400_000 };

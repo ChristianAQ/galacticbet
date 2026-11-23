@@ -167,6 +167,11 @@ export function roundCore<T extends Pick<Match, "utcDate">>(list: T[]): { core: 
   return outliers.length * 4 <= list.length ? { core, outliers } : { core: list, outliers: [] };
 }
 
+/** A finished round stays the current one this long, to see how it went. */
+export const ROUND_AFTERGLOW_MS = 2 * 86_400_000;
+/** …but never closer than this to the next round's first kick-off: there is a slip to seal. */
+export const NEXT_ROUND_NOTICE_MS = 86_400_000;
+
 export function preferredRound(matches: Match[], now = Date.now()) {
   const valid = matches.filter((m) => Number.isFinite(Date.parse(m.utcDate)));
   // An incomplete archived season must not become the current round of a new season.
@@ -206,6 +211,15 @@ export function preferredRound(matches: Match[], now = Date.now()) {
   // between Champions match days. A passing kick-off time never closes a round.
   const current = rounds.find((r) => r.started && !isRoundComplete(r.list));
   if (current) return current.id;
+  // Just finished: it stays for a couple of days (results, table, who won),
+  // then the next one takes over — earlier if the next one is about to start.
+  const finished = rounds.filter((r) => r.started && isRoundComplete(r.list)).at(-1);
+  if (finished) {
+    const end = Math.max(...finished.list.map((m) => Date.parse(m.utcDate)));
+    const next = rounds.find((r) => r.start > finished.start && !r.started);
+    const until = Math.min(end + ROUND_AFTERGLOW_MS, next ? next.start - NEXT_ROUND_NOTICE_MS : Infinity);
+    if (now < until) return finished.id;
+  }
   const upcoming = rounds.find(
     (r) =>
       !r.started && r.list.some((m) => canPredict(m.utcDate, now, m.status)),

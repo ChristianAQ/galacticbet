@@ -6,7 +6,7 @@ import type { Match } from "../src/lib/domain";
 import { type ApiMatch } from "./normalize";
 import { syncCalendars } from "./calendarSync";
 import { recompute } from "./recompute";
-import { notifyCompletedRounds, notifyPendingRounds } from "./notifications";
+import { notifyCompletedRounds } from "./notifications";
 import { syncMatchInsights } from "./syncMatchInsights";
 import { syncNews } from "./syncNews";
 import { syncOdds } from "./syncOdds";
@@ -99,7 +99,6 @@ export async function officialSync(db: Firestore, token: string) {
   const completed = await recompute(db, cache, policies);
   // Avisos never hold up or break the official results.
   await notifyCompletedRounds(db, completed);
-  await notifyPendingRounds(db);
   // Top scorers from the same provider as the results (one request per run).
   try {
     await syncLeagueStats(db, api, [...cache.values()].flat());

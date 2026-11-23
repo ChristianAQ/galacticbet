@@ -49,7 +49,7 @@ function calendar(competition: "PD" | "CL" | "PL") {
 describe.each(["PD", "CL", "PL"] as const)(
   "jornada actual de %s",
   (competition) => {
-    it("conserva J4 con todos los horarios ya iniciados y avanza solo al publicar el último marcador", () => {
+    it("conserva J4 con todos los horarios ya iniciados; acabada, sigue dos días y luego avanza", () => {
       const matches = calendar(competition);
       const current = matches[1].roundId;
       const next = matches[0].roundId;
@@ -63,11 +63,28 @@ describe.each(["PD", "CL", "PL"] as const)(
           ? { ...m, status: "FINISHED", homeScore: 0, awayScore: 0 }
           : m,
       );
-      expect(preferredRound(finished, now)).toBe(next);
-      expect(currentRankingRound(finished, [current, next], now)).toBe(next);
+      // Just finished: still the current one, to see results and the table.
+      expect(preferredRound(finished, now)).toBe(current);
+      expect(currentRankingRound(finished, [current, next], now)).toBe(current);
       expect(
         roundOptions(finished, now).find((r) => r.id === current)?.state,
       ).toBe("finished");
+      // Two days after its last kick-off, the next round takes over.
+      const later = Date.parse("2026-11-06T20:01:00Z");
+      expect(preferredRound(finished, Date.parse("2026-11-06T19:59:00Z"))).toBe(current);
+      expect(preferredRound(finished, later)).toBe(next);
+      expect(currentRankingRound(finished, [current, next], later)).toBe(next);
+      // A next round starting within a day takes over at once: there is a slip to seal.
+      const soon = finished.map((m) =>
+        m.id === "next" ? { ...m, utcDate: "2026-11-05T19:00:00Z" } : m,
+      );
+      expect(preferredRound(soon, now)).toBe(next);
+      // …and one starting in 36 hours, a day before it.
+      const midweek = finished.map((m) =>
+        m.id === "next" ? { ...m, utcDate: "2026-11-06T08:30:00Z" } : m,
+      );
+      expect(preferredRound(midweek, now)).toBe(current);
+      expect(preferredRound(midweek, Date.parse("2026-11-05T08:30:00Z"))).toBe(next);
     });
     it("mantiene J4 entre el martes y el miércoles, aunque no haya encuentros en directo", () => {
       const matches = calendar(competition).map((m) =>
