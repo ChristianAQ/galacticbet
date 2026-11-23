@@ -31,16 +31,16 @@ const eventNames: Record<LiveEvent["kind"], string> = {
   "red-card": "Tarjeta roja",
 };
 
-/** Goals and cards from the live board, newest last, without substitutions. */
+/**
+ * Goals and cards from the live board, newest last, without substitutions.
+ * Only while the match is being played: once it ends the final score says it all.
+ */
 export function LiveEvents({ match }: { match: Match }) {
   const live = useLiveMatch(match.id);
   const events = live?.events || [];
-  if (
-    !events.length ||
-    match.status === "TIMED" ||
-    match.status === "SCHEDULED"
-  )
-    return null;
+  const playing =
+    ["IN_PLAY", "PAUSED"].includes(match.status) && live?.status !== "FINISHED";
+  if (!events.length || !playing) return null;
   return (
     <ul className="live-events" aria-label="Goles y tarjetas">
       {events.map((event, i) => (
