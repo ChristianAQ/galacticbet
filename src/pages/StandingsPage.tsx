@@ -1,4 +1,4 @@
-import { competitionName, isCompetition } from "../lib/competitions";
+import { competitionName, isCompetition, type CompetitionCode } from "../lib/competitions";
 import type { AppUser as User } from "../lib/session";
 import { ChevronDown, ChevronUp, Crown } from "lucide-react";
 import {
@@ -11,6 +11,9 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
+import { CustomChips } from "../components/CustomChips";
+import { useFollowedCompetitions } from "../lib/followedCompetitions";
+import { haptic } from "../lib/motion";
 import { Empty, PageTitle, PrivateGate } from "../components/ui";
 import { SkeletonRows } from "../components/Skeleton";
 import { type Group } from "../lib/data";
@@ -52,6 +55,7 @@ import {
 import "../styles/standings.css";
 
 const ShareDialog = lazy(() => import("../components/ShareDialog"));
+const CustomStandings = lazy(() => import("../components/CustomStandings"));
 
 /** The group ranking only: competition tables live in each match page. */
 export default function StandingsPage({
@@ -66,23 +70,136 @@ export default function StandingsPage({
   user: User | null;
   onLogin: () => void;
 }) {
+  // Your friends' competitions sit next to LaLiga, Champions and Premier.
+  const [params, setParams] = useSearchParams();
+  const followed = useFollowedCompetitions(user?.uid || "");
+  // Without a group there is no official table: open your league.
+  const liga = user
+    ? params.get("liga") || (!groups.length ? followed[0]?.id || "" : "")
+    : "";
+  const setLiga = (id: string) =>
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (id) next.set("liga", id);
+        else next.delete("liga");
+        next.delete("round");
+        return next;
+      },
+      { replace: true },
+    );
+  const chips = followed.length > 0 && (
+    <CustomChips
+      list={followed}
+      current={liga}
+      onSelect={(id) => {
+        if (id !== liga) haptic();
+        setLiga(id);
+      }}
+    />
+  );
+  if (user && liga)
+    return (
+      <CustomStandingsPage
+        cid={liga}
+        user={user}
+        chips={chips}
+        hasGroups={groups.length > 0}
+        onOfficial={(code) => {
+          preferenceStore.update(user.uid, { competition: code });
+          setLiga("");
+        }}
+      />
+    );
   if (user && groups.length)
-    return <GroupStandings groups={groups} matches={matches} user={user} />;
+    return (
+      <GroupStandings
+        groups={groups}
+        matches={matches}
+        user={user}
+        chips={chips}
+      />
+    );
   return (
     <>
       <StandingsTitle />
       {!user ? (
         <PrivateGate onLogin={onLogin} />
       ) : (
-        <Empty
-          art="podium"
-          title="Un podio sin nadie encima"
-          action={<GroupActions />}
-        >
-          La tabla cobra vida con un grupo. Crea el tuyo o únete con el código
-          de un amigo y que empiece el pique.
-        </Empty>
+        <>
+          {chips && (
+            <PageFilters
+              groups={[]}
+              groupId=""
+              onGroup={() => undefined}
+              competition="none"
+              available={[]}
+              onCompetition={() => undefined}
+              chips={chips}
+            />
+          )}
+          <Empty
+            art="podium"
+            title="Un podio sin nadie encima"
+            action={<GroupActions />}
+          >
+            {chips
+              ? "Toca tu liga arriba para ver su tabla. Para LaLiga, Champions y Premier hace falta un grupo: crea el tuyo o únete con el código de un amigo."
+              : "La tabla cobra vida con un grupo. Crea el tuyo o únete con el código de un amigo y que empiece el pique."}
+          </Empty>
+        </>
       )}
+    </>
+  );
+}
+
+/** One of your friends' competitions: its followers' table, by round or in total. */
+function CustomStandingsPage({
+  cid,
+  user,
+  chips,
+  hasGroups,
+  onOfficial,
+}: {
+  cid: string;
+  user: User;
+  chips: ReactNode;
+  /** Without a group the official tables don't exist: their chips stay off. */
+  hasGroups: boolean;
+  onOfficial: (code: CompetitionCode) => void;
+}) {
+  const [period, setPeriod] = useState<Period>("round");
+  return (
+    <>
+      <StandingsTitle />
+      <PageFilters
+        groups={[]}
+        groupId=""
+        groupLabel="Seguidores"
+        onGroup={() => undefined}
+        competition="none"
+        available={hasGroups ? undefined : []}
+        onCompetition={onOfficial}
+        chips={chips}
+        aside={
+          <Segmented<Period>
+            label="Periodo de clasificación"
+            value={period}
+            options={[
+              { value: "round", label: "Jornada" },
+              { value: "all", label: "Total" },
+            ]}
+            onChange={setPeriod}
+          />
+        }
+      />
+      <Suspense
+        fallback={
+          <SkeletonRows rows={6} variant="line" label="Cargando clasificación" />
+        }
+      >
+        <CustomStandings key={cid} cid={cid} user={user} period={period} />
+      </Suspense>
     </>
   );
 }
@@ -103,10 +220,12 @@ function GroupStandings({
   groups,
   matches,
   user,
+  chips,
 }: {
   groups: Group[];
   matches: Match[];
   user: User;
+  chips?: ReactNode;
 }) {
   const { groupId, selectGroup, preferences } = useGroupSelection(
     user.uid,
@@ -311,6 +430,7 @@ function GroupStandings({
           setRound("");
         }}
         onAll={period === "all" ? () => setCombined(true) : undefined}
+        chips={chips}
         aside={
           <Segmented<Period>
             label="Periodo de clasificación"

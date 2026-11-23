@@ -2,6 +2,7 @@ import { CalendarClock, Lock, LockOpen, MapPin, NotebookPen, Trash2 } from "luci
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   localParts,
+  roundKey,
   STATUS_LABELS,
   timeToMinutes,
   toAppMatch,
@@ -86,6 +87,7 @@ export default function CustomMatchSheet({
   participants,
   user,
   onClose,
+  inQuiniela = false,
 }: {
   competition: Competition;
   view: CompetitionView;
@@ -93,6 +95,8 @@ export default function CustomMatchSheet({
   participants: Participant[];
   user: AppUser | null;
   onClose: () => void;
+  /** Opened from the Quiniela itself: no link back to it. */
+  inQuiniela?: boolean;
 }) {
   const uid = user?.uid || "";
   const owner = uid === competition.ownerId;
@@ -400,7 +404,7 @@ export default function CustomMatchSheet({
         </div>
       )}
       {confirm === null && user && (competition.predictionMode !== "off" || match.startAt <= Date.now()) && (
-        <MatchPicks competition={competition} match={match} uid={uid} />
+        <MatchPicks competition={competition} match={match} uid={uid} onClose={inQuiniela ? null : onClose} />
       )}
     </Modal>
   );
@@ -410,7 +414,18 @@ export default function CustomMatchSheet({
  * Before kick-off: only your pick (the others stay hidden). Once it starts:
  * everyone's, with the points when the result is in.
  */
-function MatchPicks({ competition, match, uid }: { competition: Competition; match: ResolvedMatch; uid: string }) {
+function MatchPicks({
+  competition,
+  match,
+  uid,
+  onClose,
+}: {
+  competition: Competition;
+  match: ResolvedMatch;
+  uid: string;
+  /** Null when there is no need to go to the Quiniela (already there). */
+  onClose: (() => void) | null;
+}) {
   const started = match.startAt <= Date.now();
   const [picks, setPicks] = useState<Record<string, string> | null>(null);
   useEffect(() => {
@@ -453,6 +468,23 @@ function MatchPicks({ competition, match, uid }: { competition: Competition; mat
             "Aún no has pronosticado este partido. "
           )}
           Los de los demás se verán cuando empiece.
+          {onClose && competition.predictionMode !== "off" && competition.memberIds.includes(uid) && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  onClose();
+                  go(
+                    `/quiniela?liga=${encodeURIComponent(competition.id)}&round=${encodeURIComponent(`${competition.id}:${roundKey(match)}`)}`,
+                  );
+                }}
+              >
+                {picks[uid] ? "Cambiarlo en la Quiniela" : "Pronosticar en la Quiniela"}
+              </button>
+            </>
+          )}
         </p>
       ) : rows.length ? (
         <ul className="custom-match-picks">

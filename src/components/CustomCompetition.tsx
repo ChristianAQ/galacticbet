@@ -1,5 +1,5 @@
 import { Check, Lock, MapPin, Plus, QrCode, Trophy } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, useId, type ReactNode } from "react";
+import { lazy, Suspense, useMemo, useRef, useState, useId } from "react";
 import {
   FORMATS,
   parseInvite,
@@ -16,7 +16,6 @@ import {
   followCompetition,
   resolveCompetitionCode,
   unfollowCompetition,
-  type CompetitionChip,
   type CompetitionData,
 } from "../lib/customCompetitionData";
 import { preferredRound } from "../lib/domain";
@@ -25,6 +24,7 @@ import { haptic } from "../lib/motion";
 import { go } from "../lib/navigation";
 import type { AppUser } from "../lib/session";
 import InviteCard from "./CompetitionInvite";
+export { CompetitionBadge, CustomChips } from "./CustomChips";
 import DayTitle from "./DayTitle";
 import LeagueNavigation from "./LeagueNavigation";
 import LeagueTable, { type Zone } from "./LeagueTable";
@@ -37,69 +37,12 @@ import "../styles/customCompetition.css";
 
 const MatchSheet = lazy(() => import("./CustomMatchSheet"));
 const ManagePanel = lazy(() => import("./CustomManage"));
-const PicksPanel = lazy(() => import("./CustomPicks"));
 
 const dayLabel = new Intl.DateTimeFormat("es", {
   weekday: "long",
   day: "numeric",
   month: "long",
 });
-
-/** The competition's picture, or its initials, in the same badge as official ones. */
-export function CompetitionBadge({ icon, name, small = true }: { icon: string | null; name: string; small?: boolean }) {
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join("");
-  return (
-    <span className={`competition-logo competition-badge custom-badge${small ? " small" : ""}`} aria-hidden="true">
-      {icon ? <img src={icon} alt="" /> : <span className="competition-fallback">{initials || "★"}</span>}
-    </span>
-  );
-}
-
-/** Your competitions after LaLiga, Champions and Premier, and the «＋» to add one. */
-export function CustomChips({
-  list,
-  current,
-  onSelect,
-  onAdd,
-}: {
-  list: CompetitionChip[];
-  current: string;
-  onSelect: (id: string) => void;
-  onAdd: () => void;
-}) {
-  // The chosen competition sits after the official ones: bring it into view.
-  const active = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    active.current?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, [current, list.length]);
-  return (
-    <>
-      {list.map((c) => (
-        <button
-          key={c.id}
-          ref={current === c.id ? active : undefined}
-          type="button"
-          aria-pressed={current === c.id}
-          onClick={() => onSelect(c.id)}
-        >
-          <CompetitionBadge icon={c.icon} name={c.name} />
-          <span>{c.name}</span>
-        </button>
-      ))}
-      <button type="button" className="competition-tabs-new" onClick={onAdd} aria-label="Crear o unirse a una competición">
-        <span className="competition-tabs-all" aria-hidden="true">
-          <Plus size={16} />
-        </span>
-        <span>{list.length ? "Nueva" : "Tu competición"}</span>
-      </button>
-    </>
-  );
-}
 
 export function competitionEyebrow(c: Competition | null) {
   if (!c) return "Competición entre amigos";
@@ -195,19 +138,17 @@ export function CustomSummary({
   );
 }
 
-export type CustomTab = "partidos" | "clasificacion" | "cuadro" | "pronosticos" | "gestion";
+export type CustomTab = "partidos" | "clasificacion" | "cuadro" | "gestion";
 
 /** A match row that opens its sheet: same row as any league fixture. */
-export function FixtureButton({
+function FixtureButton({
   match,
   competition,
   onOpen,
-  extra,
 }: {
   match: ResolvedMatch;
   competition: Competition;
   onOpen: (id: string) => void;
-  extra?: ReactNode;
 }) {
   const app = toAppMatch(competition.id, match);
   return (
@@ -231,7 +172,6 @@ export function FixtureButton({
             )}
           </span>
         )}
-        {extra}
       </button>
     </li>
   );
@@ -464,7 +404,6 @@ export default function CustomCompetitionView({
     { id: "partidos", label: "Partidos" },
     ...(view.tables.length ? [{ id: "clasificacion" as const, label: "Tabla" }] : []),
     ...(view.matches.some((m) => m.phase === "knockout") ? [{ id: "cuadro" as const, label: "Cuadro" }] : []),
-    ...(c.predictionMode !== "off" ? [{ id: "pronosticos" as const, label: "Pronósticos" }] : []),
     ...(canRun ? [{ id: "gestion" as const, label: "Gestión" }] : []),
   ];
   const active = tabs.find((t) => t.id === tab)?.id || "partidos";
@@ -497,10 +436,6 @@ export default function CustomCompetitionView({
           <TablePanel competition={c} view={view} />
         ) : active === "cuadro" ? (
           <BracketPanel competition={c} view={view} onOpen={setOpen} />
-        ) : active === "pronosticos" ? (
-          <Suspense fallback={<SkeletonRows rows={4} variant="card" label="Cargando pronósticos" />}>
-            <PicksPanel competition={c} view={view} user={user} onOpen={setOpen} onLogin={onLogin} />
-          </Suspense>
         ) : active === "gestion" ? (
           <Suspense fallback={<SkeletonRows rows={5} variant="line" label="Cargando gestión" />}>
             <ManagePanel competition={c} data={data} view={view} user={user!} onOpenMatch={setOpen} />
@@ -516,7 +451,7 @@ export default function CustomCompetitionView({
             onManage={() => onTab("gestion")}
           />
         )}
-        {!user && active !== "pronosticos" && (
+        {!user && (
           <p className="league-more">
             <button type="button" className="text-button" onClick={onLogin}>
               Entra para seguir esta competición

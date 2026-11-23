@@ -1,0 +1,15 @@
+/* The competition's picture inside the usual competition badge. */
+.custom-badge {
+  overflow: hidden;
+}
+.custom-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.custom-badge .competition-fallback {
+  font-size: 12px;
+}
+.custom-badge:not(.small) .competition-fallback {
+  font-size: 17px;
+}

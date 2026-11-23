@@ -2,22 +2,6 @@
    Built from the app's own pieces (competition chips, fixture rows, league
    tables, more-lists, sheets); only what is new is styled here. */
 
-/* The competition's picture inside the usual competition badge. */
-.custom-badge {
-  overflow: hidden;
-}
-.custom-badge img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.custom-badge .competition-fallback {
-  font-size: 12px;
-}
-.custom-badge:not(.small) .competition-fallback {
-  font-size: 17px;
-}
-
 /* Masthead: followers, follow and share. */
 .custom-summary {
   display: grid;
@@ -524,20 +508,13 @@
   margin-bottom: 16px;
 }
 
-/* ---------- Predictions ---------- */
-.custom-picks {
-  display: grid;
-  gap: 22px;
-}
-.custom-picks > .custom-manage-section,
-.custom-picks > .standings-card {
-  margin: 0;
-}
+/* ---------- Predictions (Quiniela and match sheet) ---------- */
 .custom-picks-join {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 14px;
   padding: 14px 16px;
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
@@ -548,36 +525,6 @@
   flex: none;
   min-height: 40px;
   padding: 0 16px;
-}
-.custom-picks-empty {
-  font-size: var(--text-sm);
-}
-.custom-picks .prediction-list {
-  margin-top: 4px;
-}
-/* «Tu pronóstico 2 – 1 · +3 puntos» under a played match. */
-.custom-pick-line {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-top: -6px;
-  padding-bottom: 12px;
-  color: var(--ink-2);
-  font-size: var(--text-xs);
-}
-.custom-pick-line strong {
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-.custom-pick-line em {
-  margin-left: auto;
-  color: var(--ink-3);
-  font-style: normal;
-  font-weight: 600;
-}
-.custom-pick-line.is-exact em,
-.custom-pick-line.is-outcome em {
-  color: var(--win);
 }
 /* Everyone's picks inside the match sheet. */
 .custom-match-picks {
@@ -633,4 +580,29 @@
   align-items: center;
   gap: 6px;
   margin-top: 12px;
+}
+/* Quiniela of a friends' competition: what a played match scored. */
+.custom-slip-result {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.custom-slip-result strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.custom-slip-result.is-exact,
+.custom-slip-result.is-outcome {
+  background: var(--win-soft);
+}
+.custom-slip-result.is-exact strong,
+.custom-slip-result.is-outcome strong {
+  color: var(--win);
 }

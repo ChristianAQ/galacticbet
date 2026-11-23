@@ -19,6 +19,7 @@ export default function PageFilters({
   onCompetition,
   onAll,
   aside,
+  chips,
   children,
 }: {
   groups: { id: string; name: string }[];
@@ -27,11 +28,14 @@ export default function PageFilters({
   groupLabel?: string;
   onGroup: (id: string) => void;
   disabled?: boolean;
-  competition: CompetitionCode | "global";
+  /** "none": one of your own competitions (in `chips`) is selected. */
+  competition: CompetitionCode | "global" | "none";
   available?: readonly CompetitionCode[];
   onCompetition: (code: CompetitionCode) => void;
   onAll?: () => void;
   aside?: ReactNode;
+  /** Your friends' competitions, after the official ones. */
+  chips?: ReactNode;
   children?: ReactNode;
 }) {
   const current = groups.find((g) => g.id === groupId);
@@ -73,7 +77,9 @@ export default function PageFilters({
           onCompetition(code);
         }}
         onAll={onAll && !disabled ? onAll : undefined}
-      />
+      >
+        {chips}
+      </CompetitionTabs>
       {children}
     </section>
   );

@@ -516,10 +516,10 @@ export default function CompetitionCreatePage({
           />
           <p className="footnote">
             {prediction === "exact"
-              ? "Los seguidores aciertan el marcador antes de que empiece cada partido: 3 puntos el exacto, 1 quién gana o el empate."
+              ? "Aparece en Quiniela y Clasificación junto a LaLiga, Champions y Premier: los seguidores aciertan el marcador antes de cada partido (3 puntos el exacto, 1 quién gana o el empate)."
               : prediction === "classic"
-                ? "Los seguidores eligen 1, X o 2 antes de que empiece cada partido: 1 punto por acierto."
-                : "Solo resultados y clasificación, sin pronósticos."}{" "}
+                ? "Aparece en Quiniela y Clasificación junto a LaLiga, Champions y Premier: los seguidores eligen 1, X o 2 antes de cada partido (1 punto por acierto)."
+                : "Solo resultados y tabla en Ligas, sin quiniela."}{" "}
             Puedes cambiarlo en Ajustes.
           </p>
         </section>

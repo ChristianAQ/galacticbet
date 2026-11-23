@@ -9,9 +9,10 @@ import {
   Coins,
   Stamp,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
+import { CustomChips } from "../components/CustomChips";
 import PageFilters from "../components/PageFilters";
 import ConfirmQuiniela from "../components/ConfirmQuiniela";
 import RoundDeliveryStatus from "../components/RoundDeliveryStatus";
@@ -38,6 +39,7 @@ import {
   type PredictionValue,
 } from "../lib/domain";
 import { db } from "../lib/firebase";
+import { useFollowedCompetitions } from "../lib/followedCompetitions";
 import { preferenceStore } from "../lib/preferences";
 import { roundOptions } from "../lib/roundOptions";
 import { useGroupSelection } from "../lib/useGroupSelection";
@@ -49,6 +51,8 @@ import { euro } from "../lib/porra";
 import { go } from "../lib/navigation";
 import { haptic } from "../lib/motion";
 import "../styles/quiniela.css";
+
+const CustomQuiniela = lazy(() => import("../components/CustomQuiniela"));
 
 const sameValue = (a?: PredictionValue, b?: PredictionValue) =>
   JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -135,6 +139,34 @@ export default function PredictionsPage({
   // The progress panel pins under the app bar and slims down while scrolling.
   const { sentinel: saveSentinel, stuck: saveStuck } = useStuck();
   const requestedRound = searchParams.get("round") || "";
+  // Your friends' competitions sit next to LaLiga, Champions and Premier.
+  const followed = useFollowedCompetitions(demo ? "" : user?.uid || "");
+  // Without a group the official competitions have no slip: open your league.
+  const liga =
+    demo || !user
+      ? ""
+      : searchParams.get("liga") || (!groups.length ? followed[0]?.id || "" : "");
+  const ligaInfo = followed.find((c) => c.id === liga);
+  const openLiga = (id: string) =>
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.set("liga", id);
+        next.delete("round");
+        return next;
+      },
+      { replace: true },
+    );
+  const closeLiga = () =>
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("liga");
+        next.delete("round");
+        return next;
+      },
+      { replace: true },
+    );
   // Arriving from a reminder while the page is open: switch to its season.
   useEffect(() => {
     const target = seasons.find((s) => requestedRound.startsWith(`${s.id}-`));
@@ -499,19 +531,43 @@ export default function PredictionsPage({
   return (
     <>
       <PageTitle
-        eyebrow={`Quiniela${list[0] ? ` · ${competitionName(list[0].competition, true)}` : ""}`}
+        eyebrow={
+          liga
+            ? `Quiniela · ${ligaInfo?.name || "Tu liga"}`
+            : `Quiniela${list[0] ? ` · ${competitionName(list[0].competition, true)}` : ""}`
+        }
         title="Mi quiniela"
-        description={status}
+        description={
+          liga
+            ? "Tu liga entre amigos: pronostica cada partido antes de que empiece."
+            : status
+        }
       />
       <PageFilters
-        groups={demo ? [] : groups}
+        groups={demo || liga ? [] : groups}
         groupId={group}
-        groupLabel={demo ? "Grupo de demostración" : undefined}
+        groupLabel={
+          demo ? "Grupo de demostración" : liga ? "Seguidores" : undefined
+        }
         onGroup={setGroup}
         disabled={selectorsDisabled}
-        competition={competitionCode(
-          demo ? demoCompetition : active?.competition,
-        )}
+        competition={
+          liga
+            ? "none"
+            : competitionCode(demo ? demoCompetition : active?.competition)
+        }
+        chips={
+          followed.length > 0 && (
+            <CustomChips
+              list={followed}
+              current={liga}
+              onSelect={(id) => {
+                if (id !== liga) haptic();
+                openLiga(id);
+              }}
+            />
+          )
+        }
         available={
           demo
             ? COMPETITION_CODES
@@ -520,6 +576,7 @@ export default function PredictionsPage({
               )
         }
         onCompetition={(code) => {
+          if (liga) closeLiga();
           if (demo) setDemoCompetition(code);
           else {
             if (user) preferenceStore.update(user.uid, { competition: code });
@@ -529,11 +586,14 @@ export default function PredictionsPage({
         }}
         aside={
           <span className="page-filters-chip">
-            {mode === "classic" ? "1X2" : "Marcador exacto"}
+            {(liga ? ligaInfo?.predictionMode || mode : mode) === "classic"
+              ? "1X2"
+              : "Marcador exacto"}
           </span>
         }
       >
         {!demo &&
+          !liga &&
           seasons.filter((s) => s.competition === active?.competition).length >
             1 && (
             <label className="group-picker page-filters-season">
@@ -562,6 +622,12 @@ export default function PredictionsPage({
             </label>
           )}
       </PageFilters>
+      {liga && user ? (
+        <Suspense fallback={<SkeletonRows rows={5} label="Preparando tu boleto" />}>
+          <CustomQuiniela key={liga} cid={liga} user={user} />
+        </Suspense>
+      ) : (
+      <>
       {(demo || active) && (
         <RoundSelector
           rounds={rounds}
@@ -766,8 +832,12 @@ export default function PredictionsPage({
               ? "Los partidos aparecerán en cuanto se sincronice el calendario de esta competición."
               : groups.length
                 ? "Toca el escudo de una competición y aparecerá tu boleto."
-                : "Para rellenar boletos hace falta un grupo. Crea el tuyo o únete con el código de un amigo."}
+                : followed.length
+                  ? "Toca tu liga arriba y aparecerá su boleto. Para LaLiga, Champions y Premier hace falta un grupo: crea el tuyo o únete con el código de un amigo."
+                  : "Para rellenar boletos hace falta un grupo. Crea el tuyo o únete con el código de un amigo."}
         </Empty>
+      )}
+      </>
       )}
       {confirm && (
         <ConfirmQuiniela

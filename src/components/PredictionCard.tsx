@@ -1,5 +1,5 @@
 import { Check, ChevronRight, LockKeyhole, Minus, Plus } from "lucide-react";
-import { memo, useEffect, useState, type MouseEvent } from "react";
+import { memo, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import type { Match, Mode, Prediction, PredictionValue } from "../lib/domain";
 import { haptic, springTo } from "../lib/motion";
 import MatchResult from "./MatchResult";
@@ -37,6 +37,9 @@ function PredictionCard({
   onChoose,
   onDetails,
   detailsLabel,
+  lockLabel,
+  footer,
+  plainResult = false,
 }: {
   number: number;
   match: Match;
@@ -51,6 +54,12 @@ function PredictionCard({
   onDetails: (id: string, from: Element | null) => void;
   /** Friends' competitions have no odds or preview: just the match sheet. */
   detailsLabel?: string;
+  /** Why it is closed, when it isn't one of the quiniela's own reasons. */
+  lockLabel?: string;
+  /** Replaces the finished-match result strip. */
+  footer?: ReactNode;
+  /** Friends' matches: no «a 90 minutos» under the score. */
+  plainResult?: boolean;
 }) {
   const locked = lock !== null;
   return (
@@ -61,18 +70,19 @@ function PredictionCard({
       <span className="slip-number" aria-hidden="true">
         {String(number).padStart(2, "0")}
       </span>
-      <MatchRow match={m} history={history} />
+      <MatchRow match={m} history={history} plainResult={plainResult} />
       <LiveEvents match={m} />
       <div className="prediction-actions">
         <span className="prediction-state" aria-live="polite">
           {lock ? (
             <>
               <LockKeyhole size={13} aria-hidden="true" />
-              {lock === "sealed"
-                ? "Boleto sellado"
-                : lock === "deadline"
-                  ? "Plazo cerrado"
-                  : "Ya ha empezado"}
+              {lockLabel ??
+                (lock === "sealed"
+                  ? "Boleto sellado"
+                  : lock === "deadline"
+                    ? "Plazo cerrado"
+                    : "Ya ha empezado")}
             </>
           ) : saving ? (
             <>
@@ -134,7 +144,7 @@ function PredictionCard({
             : "Ficha del partido")}
         <ChevronRight size={15} aria-hidden="true" />
       </button>
-      {m.status === "FINISHED" && <MatchResult match={m} demo={demo} />}
+      {footer ?? (m.status === "FINISHED" && <MatchResult match={m} demo={demo} />)}
     </article>
   );
 }
