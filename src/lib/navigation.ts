@@ -167,9 +167,13 @@ export interface GoOptions {
 /** In-app navigation with view transitions. Falls back to a plain navigate. */
 export function go(to: string, options: GoOptions = {}) {
   if (!navigator) return;
-  const { replace = false, reset = false } = options;
-  const direction = options.direction || resolveDirection(to, reset);
   const target = to.split(/[?#]/)[0];
+  const { replace = false } = options;
+  // Any link or redirect to one of the four sections switches to its tab
+  // instead of stacking it on top of another one: the tab bar then lights the
+  // section on screen. A new query on the page you are on stays a plain update.
+  const reset = Boolean(options.reset) || (isTabRoot(target) && target !== currentPath);
+  const direction = options.direction || resolveDirection(to, reset);
   const ready = preloadPage(target);
   const matchId = target.startsWith("/partido/")
     ? decodeURIComponent(target.slice("/partido/".length))
