@@ -276,3 +276,52 @@ export default function TeamCards({
     />
   );
 }
+
+/** One team's sheet on its own (from a match page's crest): no swiping to others. */
+export function SingleTeamSheet({
+  rows,
+  index,
+  origin,
+  matches,
+  scorers,
+  competition,
+  seasonId,
+  onClose,
+}: {
+  rows: LeagueRow[];
+  index: number;
+  origin?: HTMLElement | null;
+  matches: Match[];
+  scorers: Scorer[];
+  competition: CompetitionCode;
+  seasonId: string;
+  onClose: () => void;
+}) {
+  const openMatch = (id: string) => {
+    onClose();
+    go(`/partido/${encodeURIComponent(id)}`);
+  };
+  return (
+    <CardDeck
+      count={1}
+      start={0}
+      origin={origin}
+      onClose={onClose}
+      className="is-team"
+      label="Equipo"
+      itemLabel={() => rows[index].name}
+      render={(_, titleId) => (
+        <TeamSheetCard
+          rows={rows}
+          index={index}
+          matches={matches}
+          scorers={scorers}
+          competition={competition}
+          seasonId={seasonId}
+          titleId={titleId}
+          onMatch={openMatch}
+        />
+      )}
+    />
+  );
+}

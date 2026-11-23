@@ -6,7 +6,7 @@ import {
   NotebookPen,
   Tv,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import CompetitionLogo from "../components/CompetitionLogo";
 import LeagueTable from "../components/LeagueTable";
@@ -30,14 +30,16 @@ import {
   useMatchTab,
 } from "../components/MatchPageParts";
 import { Empty, PageTitle, useCollapsingTitle } from "../components/ui";
-import { competitionName } from "../lib/competitions";
+import { competitionCode, competitionName, isCompetition } from "../lib/competitions";
 import {
   canPredict,
   matchStatusLabel,
   roundLabel,
   type Match,
 } from "../lib/domain";
-import { LEAGUE_STAGES, leagueTable, teamKey } from "../lib/leagueTable";
+import { LEAGUE_STAGES, leagueTable, seasonLeagueTable, teamKey } from "../lib/leagueTable";
+import { haptic } from "../lib/motion";
+import { useLeagueStats } from "../lib/useLeagueStats";
 import { matchPageTabLabels, matchPageTabs } from "../lib/matchDetailTabs";
 import { headToHead, knockoutContext } from "../lib/matchInsights";
 import {
@@ -65,6 +67,10 @@ const kickoffDay = new Intl.DateTimeFormat("es", {
   day: "numeric",
   month: "long",
 });
+
+const SingleTeamSheet = lazy(() =>
+  import("../components/TeamCard").then((m) => ({ default: m.SingleTeamSheet })),
+);
 
 export default function MatchPage({
   matches,
@@ -187,6 +193,24 @@ function MatchView({
     now,
   );
   const [tab, selectTab] = useMatchTab(tabs);
+  // Tap a crest: that team's sheet in this competition and season.
+  const season = useMemo(
+    () => (isCompetition(match.competition) ? seasonLeagueTable(matches, match.competition, match.seasonId) : []),
+    [matches, match.competition, match.seasonId],
+  );
+  const seasonMatches = useMemo(
+    () => matches.filter((m) => m.competition === match.competition && m.seasonId === match.seasonId),
+    [matches, match.competition, match.seasonId],
+  );
+  const sheetIndex = (side: "home" | "away") => season.findIndex((r) => r.key === teamKey(match, side));
+  const [sheet, setSheet] = useState<{ index: number; origin: HTMLElement } | null>(null);
+  const sheetStats = useLeagueStats(sheet ? match.seasonId : "", demo);
+  const openSheet = (side: "home" | "away", origin: HTMLElement) => {
+    const index = sheetIndex(side);
+    if (index < 0) return;
+    haptic();
+    setSheet({ index, origin });
+  };
   const scorers = useScorers(match, demo ? null : insight);
   const tie = knockoutContext(match, matches);
   const links = matchExternalLinks(match, insight);
@@ -238,8 +262,22 @@ function MatchView({
         </p>
         <div className="match-hero-board" ref={board}>
           <div className="match-hero-team is-home">
-            <HeroCrest src={match.homeCrest} part="home-crest" />
-            <strong className="match-hero-name">{match.home}</strong>
+            {sheetIndex("home") >= 0 ? (
+              <button
+                type="button"
+                className="match-hero-team-open"
+                aria-label={`${match.home}: ver su ficha`}
+                onClick={(event) => openSheet("home", event.currentTarget)}
+              >
+                <HeroCrest src={match.homeCrest} part="home-crest" />
+                <strong className="match-hero-name">{match.home}</strong>
+              </button>
+            ) : (
+              <>
+                <HeroCrest src={match.homeCrest} part="home-crest" />
+                <strong className="match-hero-name">{match.home}</strong>
+              </>
+            )}
             <TeamForm match={match} side="home" matches={matches} />
           </div>
           <div className="match-hero-center">
@@ -268,8 +306,22 @@ function MatchView({
             )}
           </div>
           <div className="match-hero-team is-away">
-            <HeroCrest src={match.awayCrest} part="away-crest" />
-            <strong className="match-hero-name">{match.away}</strong>
+            {sheetIndex("away") >= 0 ? (
+              <button
+                type="button"
+                className="match-hero-team-open"
+                aria-label={`${match.away}: ver su ficha`}
+                onClick={(event) => openSheet("away", event.currentTarget)}
+              >
+                <HeroCrest src={match.awayCrest} part="away-crest" />
+                <strong className="match-hero-name">{match.away}</strong>
+              </button>
+            ) : (
+              <>
+                <HeroCrest src={match.awayCrest} part="away-crest" />
+                <strong className="match-hero-name">{match.away}</strong>
+              </>
+            )}
             <TeamForm match={match} side="away" matches={matches} />
           </div>
         </div>
@@ -319,6 +371,20 @@ function MatchView({
           </Link>
         )}
       </header>
+      {sheet && (
+        <Suspense fallback={null}>
+          <SingleTeamSheet
+            rows={season}
+            index={sheet.index}
+            origin={sheet.origin}
+            matches={seasonMatches}
+            scorers={sheetStats.data?.scorers || []}
+            competition={competitionCode(match.competition)}
+            seasonId={match.seasonId}
+            onClose={() => setSheet(null)}
+          />
+        </Suspense>
+      )}
 
       <MatchTabs
         tabs={tabs}

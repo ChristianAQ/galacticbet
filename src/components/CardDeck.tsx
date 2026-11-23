@@ -5,7 +5,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
 } from "react";
@@ -235,7 +234,12 @@ export default function CardDeck({
       { transform: "translate3d(0, 0, 0) rotate(0deg) scale(1)" },
     ], { response: 0.36, damping: 0.78 });
   }
-  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+  // Keys work wherever focus is while the deck is open (a drag on the card
+  // can leave focus on the page behind it).
+  const dialog = useRef<HTMLDivElement>(null);
+  const keys = useRef<(event: globalThis.KeyboardEvent) => void>(() => {});
+  keys.current = (event) => {
+    if (event.defaultPrevented) return;
     if (event.key === "Escape") {
       event.preventDefault();
       close();
@@ -247,13 +251,18 @@ export default function CardDeck({
       step(-1);
     } else if (event.key === "Tab") {
       // Focus stays on the card's controls.
-      const controls = [...(event.currentTarget.querySelectorAll<HTMLElement>("button:not(:disabled)"))];
+      const controls = [...(dialog.current?.querySelectorAll<HTMLElement>("button:not(:disabled)") || [])];
       const at = controls.indexOf(document.activeElement as HTMLElement);
       const next = event.shiftKey ? at - 1 : at + 1;
       event.preventDefault();
       controls[(next + controls.length) % controls.length]?.focus();
     }
-  }
+  };
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => keys.current(event);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   useEffect(() => {
     // Announce the card that is showing for screen readers.
     stage.current?.setAttribute("aria-label", `${itemLabel(index)}, ${index + 1} de ${count}`);
@@ -262,11 +271,11 @@ export default function CardDeck({
   if (index < 0 || index >= count) return null;
   return createPortal(
     <div
+      ref={dialog}
       className={`card-deck ${className}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      onKeyDown={onKeyDown}
     >
       <div ref={backdrop} className="card-deck-backdrop" onClick={close} />
       <button ref={closeButton} type="button" className="card-deck-close" aria-label="Cerrar" onClick={close}>

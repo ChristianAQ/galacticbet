@@ -42,11 +42,13 @@ function usePick(count: number, xOf: (i: number) => number) {
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (!count) return;
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      // Handled here: the deck around it must not turn the page too.
       event.preventDefault();
       event.stopPropagation();
       const step = event.key === "ArrowRight" ? 1 : -1;
       setPicked((current) => Math.min(count - 1, Math.max(0, (current ?? (step > 0 ? -1 : count)) + step)));
     } else if (event.key === "Escape" && picked !== null) {
+      event.preventDefault();
       event.stopPropagation();
       setPicked(null);
     }

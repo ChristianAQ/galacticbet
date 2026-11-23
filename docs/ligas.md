@@ -37,7 +37,7 @@ En Equipos, los goles se buscan por el identificador del jugador entre los 20 m�
 
 ### La ficha de cada equipo
 
-En Ligas › Tabla, al pulsar un equipo se abre su ficha (`TeamCard.tsx`, datos en `teamSheet.ts`). Es más sobria que el cromo: escudo, puesto y puntos sobre la tinta de la cabecera y, debajo, sobre papel:
+En Ligas › Tabla, al pulsar un equipo se abre su ficha. En la ficha de un partido, al pulsar el escudo o el nombre de un equipo, se abre la misma ficha, solo de ese equipo y sin pasar a otros (`TeamCard.tsx`, datos en `teamSheet.ts`). Es más sobria que el cromo: escudo, puesto y puntos sobre la tinta de la cabecera y, debajo, sobre papel:
 
 - **Distancias:** puntos al líder, o ventaja si es líder. En LaLiga y Premier, también a la Champions (o sobre el 5.º) y al descenso (o sobre él). En la Champions, a los octavos directos o al playoff. Solo con la tabla completa, como las zonas.
 - **Cifras:** partidos, V·E·D, goles y puntos por partido.
