@@ -1,4 +1,5 @@
 import {
+  roundCore,
   validPrediction,
   type Match,
   type Mode,
@@ -8,10 +9,15 @@ import {
 export const MAX_ROUND_MATCHES = 64;
 export const DELIVERY_VERSION = 2;
 
+/**
+ * The slip of a round: its matches still on, minus any moved far from the rest
+ * (a game brought forward two months must not close the whole round early or
+ * ask for February picks in November). The deadline is the first kick-off.
+ */
 export function roundRequirements(matches: Match[]) {
-  const required = matches.filter(
-    (m) => !["POSTPONED", "CANCELLED"].includes(m.status),
-  );
+  const required = roundCore(
+    matches.filter((m) => !["POSTPONED", "CANCELLED"].includes(m.status)),
+  ).core;
   const starts = required
     .map((m) => Date.parse(m.utcDate))
     .filter(Number.isFinite);
@@ -53,7 +59,13 @@ export function validDeliveredPicks(
 }
 
 export function requiresDelivery(matches: Match[], policyFrom?: string) {
-  const { deadline } = roundRequirements(matches);
+  // Which scoring contract a round follows never moves: it is decided by its
+  // first kick-off of all, as when the round was first published.
+  const starts = matches
+    .filter((m) => !["POSTPONED", "CANCELLED"].includes(m.status))
+    .map((m) => Date.parse(m.utcDate))
+    .filter(Number.isFinite);
+  const deadline = starts.length ? Math.min(...starts) : null;
   return (
     deadline !== null &&
     Boolean(policyFrom) &&

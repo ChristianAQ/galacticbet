@@ -1,6 +1,7 @@
 import {
   hasMatchStarted,
   isRoundComplete,
+  roundCore,
   roundLabel,
   type Match,
 } from "./domain";
@@ -54,7 +55,16 @@ export function roundOptions(matches: Match[], now = Date.now()) {
     if (list) list.push(match);
     else byRound.set(match.roundId, [match]);
   }
-  return [...byRound.entries()].map(([id, list]): RoundOption => {
+  // Dates of a round are those of its bulk: J23 with one match brought
+  // forward to December still reads «7 feb», not «2 dic – 7 feb».
+  const order = new Map<string, { phase: string; matchday: number }>();
+  const options = [...byRound.entries()].map(([id, all]): RoundOption => {
+    const list = roundCore(all).core;
+    const first = all[0];
+    order.set(id, {
+      phase: `${first.seasonId}|${first.stage}`,
+      matchday: roundStages.includes(first.stage) || first.stage === "FRIENDLY" ? first.matchday || 0 : 0,
+    });
     const dates = list.map((m) => m.utcDate).sort();
     const started = list.some(
       (m) =>
@@ -77,8 +87,16 @@ export function roundOptions(matches: Match[], now = Date.now()) {
       start: dates[0],
       end: dates.at(-1)!,
       state,
-      matches: list.length,
+      matches: all.length,
     };
+  });
+  // Matchdays of the same phase in their own order (J14, J15 … J23), whatever
+  // their dates; different phases (league, then knockouts) by date.
+  return options.sort((a, b) => {
+    const x = order.get(a.id)!;
+    const y = order.get(b.id)!;
+    if (x.phase === y.phase && x.matchday && y.matchday) return x.matchday - y.matchday;
+    return a.start.localeCompare(b.start) || a.id.localeCompare(b.id, "es", { numeric: true });
   });
 }
 

@@ -182,3 +182,30 @@ describe("Alineación sobre el campo", () => {
     ]);
   });
 });
+
+describe("Jornadas con un partido movido", () => {
+  const md = (id: string, matchday: number, utcDate: string, status = "TIMED") =>
+    fixture(id, { roundId: `PD-2026-REGULAR_SEASON-${matchday}`, matchday, utcDate, status });
+  const games = [
+    ...["a", "b", "c", "d"].map((id, i) => md(`14${id}`, 14, `2026-11-2${7 + (i % 3)}T20:00:00Z`)),
+    md("23early", 23, "2026-12-02T19:00:00Z"),
+    ...["a", "b", "c", "d"].map((id, i) => md(`15${id}`, 15, `2026-12-0${4 + (i % 3)}T20:00:00Z`)),
+    ...["a", "b", "c", "d"].map((id, i) => md(`23${id}`, 23, `2027-02-0${7 + (i % 2)}T20:00:00Z`)),
+  ];
+  it("la J23 va después de la J15 y con sus fechas, aunque un partido se adelante a diciembre", () => {
+    const rounds = roundOptions(games, Date.parse("2026-11-25T00:00:00Z"));
+    expect(rounds.map((r) => r.short)).toEqual(["J14", "J15", "J23"]);
+    const j23 = rounds.find((r) => r.short === "J23")!;
+    expect(j23.start.slice(0, 10)).toBe("2027-02-07");
+    expect(j23.matches).toBe(5);
+  });
+  it("jugado el partido adelantado, la jornada actual sigue siendo la que toca", async () => {
+    const { preferredRound } = await import("../src/lib/domain");
+    const played = games.map((m) =>
+      m.id === "23early" || m.id.startsWith("14")
+        ? { ...m, status: "FINISHED", homeScore: 1, awayScore: 0 }
+        : m,
+    );
+    expect(preferredRound(played, Date.parse("2026-12-03T12:00:00Z"))).toBe("PD-2026-REGULAR_SEASON-15");
+  });
+});

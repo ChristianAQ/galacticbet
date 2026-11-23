@@ -142,6 +142,31 @@ export function isRoundComplete(matches: Match[]) {
   );
 }
 
+/** A match more than this far from the bulk of its round was moved (adelantado o aplazado). */
+export const ROUND_SPREAD_MS = 5 * 86_400_000;
+
+/**
+ * The bulk of a round and the odd matches moved far from it (a LaLiga
+ * matchday with one game brought forward two months for the Supercopa, a
+ * Premier match postponed to the spring). Only a small minority counts as
+ * moved: two legs of a knockout tie, half and half, stay one round.
+ */
+export function roundCore<T extends Pick<Match, "utcDate">>(list: T[]): { core: T[]; outliers: T[] } {
+  const times = list
+    .map((m) => Date.parse(m.utcDate))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+  if (times.length < 3) return { core: list, outliers: [] };
+  const median = times[Math.floor((times.length - 1) / 2)];
+  const core: T[] = [];
+  const outliers: T[] = [];
+  for (const m of list) {
+    const t = Date.parse(m.utcDate);
+    (Number.isFinite(t) && Math.abs(t - median) > ROUND_SPREAD_MS ? outliers : core).push(m);
+  }
+  return outliers.length * 4 <= list.length ? { core, outliers } : { core: list, outliers: [] };
+}
+
 export function preferredRound(matches: Match[], now = Date.now()) {
   const valid = matches.filter((m) => Number.isFinite(Date.parse(m.utcDate)));
   // An incomplete archived season must not become the current round of a new season.
@@ -161,13 +186,18 @@ export function preferredRound(matches: Match[], now = Date.now()) {
     if (list) list.push(match);
     else byRound.set(match.roundId, [match]);
   }
+  // A round is placed, started and finished by its bulk: a single match
+  // played weeks earlier or later doesn't make it the current one.
   const rounds = [...byRound]
-    .map(([id, list]) => ({
-      id,
-      list,
-      start: Math.min(...list.map((m) => Date.parse(m.utcDate))),
-      started: list.some((m) => hasMatchStarted(m, now)),
-    }))
+    .map(([id, all]) => {
+      const list = roundCore(all).core;
+      return {
+        id,
+        list,
+        start: Math.min(...list.map((m) => Date.parse(m.utcDate))),
+        started: list.some((m) => hasMatchStarted(m, now)),
+      };
+    })
     .sort(
       (a, b) =>
         a.start - b.start || a.id.localeCompare(b.id, "es", { numeric: true }),

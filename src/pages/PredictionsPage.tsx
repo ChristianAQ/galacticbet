@@ -30,6 +30,7 @@ import {
 import {
   canPredict,
   preferredRound,
+  roundCore,
   roundLabel,
   type Match,
   type Mode,
@@ -51,6 +52,8 @@ const CustomQuiniela = lazy(() => import("../components/CustomQuiniela"));
 
 const sameValue = (a?: PredictionValue, b?: PredictionValue) =>
   JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+const movedDay = new Intl.DateTimeFormat("es", { day: "numeric", month: "short" });
 
 /** A slip that was never sealed doesn't count: the board shows none of it. */
 const NO_PICKS: Record<string, PredictionValue> = {};
@@ -191,11 +194,18 @@ export default function PredictionsPage({
   });
   const deadlineClosed =
     delivery.deadline !== null && clock >= delivery.deadline;
+  // A match moved far from the rest of its round (brought forward two months,
+  // postponed to the spring) is not in the slip, unless the round still asks for it.
+  const slip = useMemo(() => {
+    const moved = roundCore(list).outliers;
+    return list.filter((m) => !moved.includes(m) || delivery.requiredIds.includes(m.id));
+  }, [list, delivery.requiredIds]);
+  const movedOut = list.filter((m) => !slip.includes(m));
   // Nothing left to fill in: the round is shown as the group board, sealed or not.
   const roundClosed =
     deadlineClosed ||
-    (list.length > 0 &&
-      !list.some((m) => canPredict(m.utcDate, clock, m.status)));
+    (slip.length > 0 &&
+      !slip.some((m) => canPredict(m.utcDate, clock, m.status)));
   const sealKnown = demo || (sealed.key === sealKey && !loadingSeal);
   const showBoard = isSealed || roundClosed;
   const missed = roundClosed && sealKnown && !isSealed;
@@ -670,7 +680,7 @@ export default function PredictionsPage({
               aria-busy={pending}
               className="prediction-list slip"
             >
-              {list.map((m, index) => (
+              {slip.map((m, index) => (
                 <PredictionCard
                   key={m.id}
                   number={index + 1}
@@ -697,7 +707,8 @@ export default function PredictionsPage({
               )}
               <GroupPredictions
                 key={`${uid}:${group}:${season}:${selected}`}
-                matches={list}
+                matches={slip}
+                deadlineClosed={deadlineClosed || roundClosed}
                 history={matches}
                 participants={demo ? demoPlayers : participants}
                 userId={uid}
@@ -721,6 +732,19 @@ export default function PredictionsPage({
                 roundTitle={`${competitionName(list[0].competition)} · ${roundLabel(list[0])}`}
               />
             </div>
+          )}
+          {movedOut.length > 0 && (
+            <p className="setup-notice round-moved-note">
+              {movedOut
+                .map(
+                  (m) =>
+                    `${m.home} – ${m.away} (${movedDay.format(new Date(m.utcDate))})`,
+                )
+                .join(", ")}{" "}
+              {movedOut.length === 1 ? "se juega" : "se juegan"} lejos del resto
+              de la jornada: no {movedOut.length === 1 ? "entra" : "entran"} en
+              esta quiniela.
+            </p>
           )}
         </>
       ) : !demo && user && groups.length > 0 && seasonsLoading ? (

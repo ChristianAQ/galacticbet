@@ -84,3 +84,25 @@ it("rechaza entradas codificadas truncadas, duplicadas o con resultados inválid
   ])
     expect(() => decodeDelivery(data)).toThrow();
 });
+it("un partido adelantado semanas no cierra la jornada ni entra en su boleto", () => {
+  // LaLiga J23: nine games on 7–8 Feb, one brought forward to 2 Dec.
+  const games = [
+    match("early", "2026-12-02T19:00:00Z"),
+    ...Array.from({ length: 9 }, (_, i) => match(`g${i}`, `2027-02-0${7 + (i % 2)}T1${i}:00:00Z`)),
+  ];
+  const { matchIds, deadline } = roundRequirements(games);
+  expect(matchIds).not.toContain("early");
+  expect(matchIds).toHaveLength(9);
+  expect(deadline).toBe(Date.parse("2027-02-07T10:00:00Z"));
+  // Which scoring contract applies is still decided by the very first kick-off.
+  expect(requiresDelivery(games, "2026-12-01T00:00:00Z")).toBe(true);
+  expect(requiresDelivery(games, "2026-12-03T00:00:00Z")).toBe(false);
+});
+it("ida y vuelta de una eliminatoria (mitad y mitad) siguen siendo una sola jornada", () => {
+  const legs = [
+    ...Array.from({ length: 4 }, (_, i) => match(`ida${i}`, `2027-02-1${7 + (i % 2)}T20:00:00Z`)),
+    ...Array.from({ length: 4 }, (_, i) => match(`vuelta${i}`, `2027-03-1${0 + (i % 2)}T20:00:00Z`)),
+  ];
+  expect(roundRequirements(legs).matchIds).toHaveLength(8);
+  expect(roundRequirements(legs).deadline).toBe(Date.parse("2027-02-17T20:00:00Z"));
+});

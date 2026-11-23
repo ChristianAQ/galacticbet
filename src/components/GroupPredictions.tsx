@@ -60,6 +60,7 @@ export default function GroupPredictions({
   ownValues,
   sealed = false,
   missed = false,
+  deadlineClosed = false,
   loadingOwn = false,
   canShare,
   completedIds,
@@ -80,6 +81,8 @@ export default function GroupPredictions({
   sealed?: boolean;
   /** The round closed without your slip: same board, nothing of yours. */
   missed?: boolean;
+  /** Nobody can seal any more: «only you sealed», not «nobody yet». */
+  deadlineClosed?: boolean;
   loadingOwn?: boolean;
   canShare: boolean;
   completedIds: string[];
@@ -210,6 +213,9 @@ export default function GroupPredictions({
     [matches, mode, players],
   );
   const shareReady = players.length > 0 && !loadingOwn && !pending;
+  const othersSealed = participants.filter(
+    (p) => p.id !== userId && completedIds.includes(p.id),
+  ).length;
   const share = { groupName, title: roundTitle, mode, matches, players, demo };
   return (
     <section className="group-predictions" aria-label="Pronósticos del grupo">
@@ -239,6 +245,14 @@ export default function GroupPredictions({
         <p className="group-view-note">
           No sellaste esta jornada: no suma puntos y los boletos del grupo solo
           se ven entre quienes sellan.
+        </p>
+      )}
+      {/* Said once for the whole round, not under every match. */}
+      {canShare && ready && !pending && !error && !othersSealed && (
+        <p className="group-view-note">
+          {deadlineClosed
+            ? "Solo tú sellaste esta jornada en el grupo."
+            : "Nadie más del grupo ha sellado todavía: sus signos aparecerán aquí en cuanto lo hagan."}
         </p>
       )}
       {shareReady && roundHasStarted(matches) && (
@@ -512,13 +526,7 @@ function RivalsCard({
                 Volver a intentar
               </button>
             </div>
-          ) : (
-            !visible.length && (
-              <p className="gm-picks-note">
-                Nadie más ha sellado todavía. Sus signos saldrán aquí.
-              </p>
-            )
-          ))}
+          ) : null)}
       </section>
     </GroupMatchCard>
   );
