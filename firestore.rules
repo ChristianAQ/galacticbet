@@ -157,8 +157,8 @@ service cloud.firestore {
       && (resource.data.locked != true || owns(competition()));
     allow delete: if runs(competition())
       && (owns(competition()) || (resource.data.locked != true && resource.data.status != 'finished'));
-    // Followers' predictions: only your own, only before kick-off, and nobody
-    // sees anyone else's until the match has started.
+    // Followers' drafts: only your own, only before kick-off. Drafts never
+    // leak, not even after kick-off: only sealed slips (rounds/…/entries) count.
     match /picks/{uid} {
      function fixture() { return get(/databases/$(database)/documents/customCompetitions/$(cid)/matches/$(mid)).data; }
      function league() { return get(/databases/$(database)/documents/customCompetitions/$(cid)).data; }
@@ -168,12 +168,55 @@ service cloud.firestore {
         && ((league().predictionMode == 'classic' && d.value in ['1','X','2'])
           || (league().predictionMode == 'exact' && d.value.matches('[0-9]{1,2}-[0-9]{1,2}')));
      }
-     allow get: if signed() && (request.auth.uid == uid || fixture().startAt <= request.time);
-     allow list: if signed() && fixture().startAt <= request.time;
+     allow get: if signed() && request.auth.uid == uid;
      allow create, update: if signed() && request.auth.uid == uid && request.auth.uid in league().memberIds
        && open() && validPick(request.resource.data);
      allow delete: if signed() && request.auth.uid == uid && open();
     }
+   }
+   // The quiniela's rounds, as in LaLiga: closing time (first kick-off) and the
+   // matches a slip must cover. The organisers' app keeps them in step.
+   match /rounds/{rk} {
+    allow read: if true;
+    allow create, update: if runs(competition()) && rk.matches('[A-Za-z0-9_]{1,20}')
+      && request.resource.data.keys().hasOnly(['deadline','matchIds','updatedAt'])
+      && request.resource.data.deadline is timestamp
+      && request.resource.data.matchIds is list && request.resource.data.matchIds.size() >= 1
+      && request.resource.data.matchIds.size() <= 64
+      && request.resource.data.updatedAt == request.time;
+    allow delete: if runs(competition());
+    // A sealed slip: complete, before the deadline, never changed. Readable by
+    // whoever has sealed theirs, and by everyone once the round has closed.
+    match /entries/{uid} {
+     function round() { return get(/databases/$(database)/documents/customCompetitions/$(cid)/rounds/$(rk)).data; }
+     function sealed(u) { return exists(/databases/$(database)/documents/customCompetitions/$(cid)/rounds/$(rk)/entries/$(u)); }
+     function selectionsOk(selections, ids, mode) {
+      return selections is string && ids is list && ids.size() > 0 && ids.size() <= 64 && selections.size() <= 383
+        && ((mode == 'classic' && selections.matches('^[1X2]{' + string(ids.size()) + '}$'))
+        || (mode == 'exact' && selections.matches('^[0-9]{1,2}:[0-9]{1,2}(,[0-9]{1,2}:[0-9]{1,2}){' + string(ids.size()-1) + '}$')));
+     }
+     allow get: if signed() && (request.auth.uid == uid || sealed(request.auth.uid) || request.time >= round().deadline);
+     allow list: if signed() && (sealed(request.auth.uid) || request.time >= round().deadline);
+     allow create: if signed() && request.auth.uid == uid && request.auth.uid in competition().memberIds
+       && request.resource.data.keys().hasOnly(['userId','matchIds','selections','mode','submittedAt'])
+       && request.resource.data.userId == uid && request.resource.data.submittedAt == request.time
+       && request.time < round().deadline
+       && request.resource.data.matchIds == round().matchIds
+       && request.resource.data.mode == competition().predictionMode
+       && selectionsOk(request.resource.data.selections, request.resource.data.matchIds, request.resource.data.mode)
+       && getAfter(/databases/$(database)/documents/customCompetitions/$(cid)/roundAttendance/$(rk)).data.members[uid] == request.time;
+    }
+   }
+   // Who has sealed each round (never what), for «faltan por sellar».
+   match /roundAttendance/{rk} {
+    allow read: if true;
+    function validAttendance() {
+     return signed() && request.resource.data.keys().hasOnly(['members']) && request.resource.data.members is map
+       && request.resource.data.members[request.auth.uid] == request.time
+       && getAfter(/databases/$(database)/documents/customCompetitions/$(cid)/rounds/$(rk)/entries/$(request.auth.uid)).data.submittedAt == request.time;
+    }
+    allow create: if validAttendance() && request.resource.data.members.keys().hasOnly([request.auth.uid]);
+    allow update: if validAttendance() && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid]);
    }
   }
   // Short invitation codes. Readable one by one (never listed); only the owner

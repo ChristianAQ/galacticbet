@@ -37,7 +37,12 @@ import {
   type Participant,
   type ResolvedMatch,
 } from "../lib/customCompetition";
-import { customFixtureId, useCompetition } from "../lib/customCompetitionData";
+import {
+  customFixtureId,
+  useCompetition,
+  useCompetitionRounds,
+  useRoundsSync,
+} from "../lib/customCompetitionData";
 import { canPick } from "../lib/customPicks";
 import { matchPageTabLabels } from "../lib/matchDetailTabs";
 import { headToHead } from "../lib/matchInsights";
@@ -138,6 +143,9 @@ function CustomMatchView({
   const uid = user?.uid || "";
   const owner = uid === c.ownerId;
   const runs = owner || c.adminIds.includes(uid);
+  // A date, a result or a knockout side changed here also changes the quiniela's rounds.
+  const roundDocs = useCompetitionRounds(runs ? c.id : "");
+  useRoundsSync(c, view, roundDocs, uid);
   const canEdit = runs && (!match.locked || owner);
   const following = c.memberIds.includes(uid);
   const teams = c.participantType === "team";
@@ -207,7 +215,7 @@ function CustomMatchView({
         </p>
         <div className="match-hero-board" ref={board}>
           <div className="match-hero-team is-home">
-            <HeroCrest src={app.homeCrest} part="home-crest" />
+            <HeroCrest src={app.homeCrest} part="home-crest" name={match.home.name} />
             <strong className="match-hero-name">{match.home.name}</strong>
             <TeamForm match={app} side="home" matches={history} />
           </div>
@@ -235,7 +243,7 @@ function CustomMatchView({
             )}
           </div>
           <div className="match-hero-team is-away">
-            <HeroCrest src={app.awayCrest} part="away-crest" />
+            <HeroCrest src={app.awayCrest} part="away-crest" name={match.away.name} />
             <strong className="match-hero-name">{match.away.name}</strong>
             <TeamForm match={app} side="away" matches={history} />
           </div>

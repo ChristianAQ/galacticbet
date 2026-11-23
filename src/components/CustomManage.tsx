@@ -533,17 +533,20 @@ function IconPicker({
   onChange,
   disabled,
   max,
+  name = "",
 }: {
   value: string | null;
   onChange: (v: string | null) => void;
   disabled?: boolean;
   /** Longest data URL the rules accept for this picture. */
   max?: number;
+  /** Without a picture the badge shows these initials (as everywhere else). */
+  name?: string;
 }) {
   const [error, setError] = useState("");
   return (
     <div className="custom-icon-picker">
-      <CompetitionBadge icon={value} name="?" small={false} />
+      <CompetitionBadge icon={value} name={name.trim() || "?"} small={false} />
       <label className="button secondary custom-icon-button">
         <ImagePlus size={17} aria-hidden="true" />
         {value ? "Cambiar imagen" : "Subir imagen"}
@@ -648,7 +651,7 @@ function ParticipantSheet({
             Nombre
             <input value={name} maxLength={40} required disabled={busy} onChange={(e) => setName(e.target.value)} />
           </label>
-          <IconPicker value={icon} onChange={setIcon} disabled={busy} max={MAX_PARTICIPANT_ICON_CHARS} />
+          <IconPicker value={icon} onChange={setIcon} disabled={busy} max={MAX_PARTICIPANT_ICON_CHARS} name={name} />
           {team && <SquadEditor players={players} onChange={setPlayers} disabled={busy} />}
           {error && (
             <p className="error" role="alert">
@@ -696,7 +699,7 @@ function SettingsSheet({ competition: c, onClose }: { competition: Competition; 
           Deporte o actividad
           <input value={sport} maxLength={40} disabled={busy} onChange={(e) => setSport(e.target.value)} />
         </label>
-        <IconPicker value={icon} onChange={setIcon} disabled={busy} />
+        <IconPicker value={icon} onChange={setIcon} disabled={busy} name={name} />
         <label>
           Pronósticos
           <select value={mode} disabled={busy} onChange={(e) => setMode(e.target.value as PredictionMode)}>

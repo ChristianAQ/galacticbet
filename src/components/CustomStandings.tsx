@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { resolveCompetition, roundKey, toAppMatch } from "../lib/customCompetition";
-import { useCompetition, usePeople } from "../lib/customCompetitionData";
+import { useCompetition, useCompetitionRounds, usePeople } from "../lib/customCompetitionData";
+import { entriesAsPicks } from "../lib/customRounds";
 import { pickRanking } from "../lib/customPicks";
 import { preferredRound } from "../lib/domain";
 import { roundOptions } from "../lib/roundOptions";
 import type { AppUser } from "../lib/session";
-import { useClock, useStartedPicks } from "../lib/useCompetitionPicks";
+import { useClock, useClosedEntries } from "../lib/useCompetitionPicks";
 import PicksTable from "./PicksTable";
 import { MyRankCard } from "./RankingWidgets";
 import RoundSelector from "./RoundSelector";
@@ -16,8 +17,8 @@ import "../styles/standings.css";
 
 /**
  * Clasificación of a friends' competition: its followers ordered by the points
- * of their picks, for one round or the whole competition. Always derived from
- * the results, so a corrected result never counts twice.
+ * of their sealed slips, for one round or the whole competition. Always
+ * derived from the results, so a corrected result never counts twice.
  */
 export default function CustomStandings({
   cid,
@@ -41,11 +42,18 @@ export default function CustomStandings({
   const current = useMemo(() => preferredRound(app), [app]);
   const requested = params.get("round") || "";
   const selected = rounds.some((r) => r.id === requested) ? requested : current;
-  const started = useMemo(
-    () => (view?.matches || []).filter((m) => m.startAt <= now && m.status !== "cancelled"),
-    [view, now],
+  // Only sealed slips count, and everyone's can be read once their round closes.
+  const roundDocs = useCompetitionRounds(cid);
+  const closed = useMemo(
+    () =>
+      Object.entries(roundDocs || {})
+        .filter(([, r]) => r.deadline <= now)
+        .map(([id, r]) => ({ id, deadline: r.deadline }))
+        .sort((a, b) => a.deadline - b.deadline),
+    [roundDocs, now],
   );
-  const revealed = useStartedPicks(cid, started, user.uid, { enabled: Boolean(view), prune: true });
+  const entries = useClosedEntries(cid, closed, user.uid, roundDocs !== null);
+  const revealed = useMemo(() => (entries ? entriesAsPicks(entries) : null), [entries]);
   const predictors = useMemo(
     () => [...new Set([...(c?.memberIds || []), ...Object.values(revealed || {}).flatMap((p) => Object.keys(p))])],
     [c, revealed],

@@ -734,8 +734,10 @@ export function LineupSheet({
           onChange={setSide}
         />
         <p className="lineup-count" role="status">
-          <strong>{starters}</strong> {starters === 1 ? "titular" : "titulares"} · <strong>{bench}</strong>{" "}
-          {bench === 1 ? "suplente" : "suplentes"}
+          <span>
+            <strong>{starters}</strong> {starters === 1 ? "titular" : "titulares"} · <strong>{bench}</strong>{" "}
+            {bench === 1 ? "suplente" : "suplentes"}
+          </span>
           {previous && (
             <button
               type="button"

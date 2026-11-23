@@ -345,19 +345,87 @@ describe.skipIf(!enabled)("Competiciones entre amigos: permisos en Firestore", (
     await assertFails(pick("carol", "open", "1-0"));
   });
 
-  it("los pronósticos ajenos no se ven hasta que empieza el partido", async () => {
+  it("los borradores no se ven nunca, ni después de empezar el partido", async () => {
     await fixture("open", { startAt: future() });
     await assertSucceeds(pick("carol", "open", "2-1"));
     await assertSucceeds(getDoc(doc(as("carol"), `${C}/matches/open/picks/carol`)));
     await assertFails(getDoc(doc(as("bob"), `${C}/matches/open/picks/carol`)));
     await assertFails(getDocs(collection(as("bob"), `${C}/matches/open/picks`)));
-    await assertFails(getDocs(collection(as("carol"), `${C}/matches/open/picks`)));
-    // Kick-off (the organiser moves it to the past): everyone signed in sees them, nobody changes them.
     await fixture("open", { startAt: past() });
-    await assertSucceeds(getDocs(collection(as("bob"), `${C}/matches/open/picks`)));
-    await assertSucceeds(getDoc(doc(as("dave"), `${C}/matches/open/picks/carol`)));
-    await assertFails(getDocs(collection(as(null), `${C}/matches/open/picks`)));
+    await assertFails(getDocs(collection(as("bob"), `${C}/matches/open/picks`)));
+    await assertFails(getDoc(doc(as("alice"), `${C}/matches/open/picks/carol`)));
     await assertFails(pick("carol", "open", "3-0"));
     await assertFails(deleteDoc(doc(as("carol"), `${C}/matches/open/picks/carol`)));
+  });
+
+  // ---------- Rounds and sealed slips ----------
+  const R = `${C}/rounds/J1`;
+  const round = (deadline: Timestamp, matchIds = ["m1", "m2"]) => ({ deadline, matchIds, updatedAt: serverTimestamp() });
+  const openRound = (deadline = future(), matchIds = ["m1", "m2"], mode = "exact") =>
+    env.withSecurityRulesDisabled(async (c) => {
+      const db = c.firestore();
+      await updateDoc(doc(db, C), { predictionMode: mode });
+      await setDoc(doc(db, R), { deadline, matchIds, updatedAt: Timestamp.now() });
+    });
+  const seal = (uid: string, over: Record<string, unknown> = {}, as_ = uid, attend = true) => {
+    const db = as(as_);
+    const batch = writeBatch(db);
+    batch.set(doc(db, `${R}/entries/${uid}`), {
+      userId: uid,
+      matchIds: ["m1", "m2"],
+      selections: "2:1,0:0",
+      mode: "exact",
+      submittedAt: serverTimestamp(),
+      ...over,
+    });
+    if (attend) batch.set(doc(db, `${C}/roundAttendance/J1`), { members: { [uid]: serverTimestamp() } }, { merge: true });
+    return batch.commit();
+  };
+
+  it("jornadas: solo la organización las abre o cambia, y todos las ven", async () => {
+    await assertSucceeds(setDoc(doc(as("bob"), R), round(future())));
+    await assertSucceeds(setDoc(doc(as("alice"), `${C}/rounds/QUARTER_FINALS`), round(future(), ["q1"])));
+    await assertFails(setDoc(doc(as("carol"), `${C}/rounds/J2`), round(future())));
+    await assertFails(setDoc(doc(as("bob"), `${C}/rounds/J3`), { ...round(future()), extra: true }));
+    await assertFails(setDoc(doc(as("bob"), `${C}/rounds/J4`), round(future(), [])));
+    await assertFails(setDoc(doc(as("bob"), `${C}/rounds/J 5`), round(future())));
+    await assertSucceeds(getDoc(doc(as(null), R)));
+  });
+
+  it("sellar: un boleto completo, antes del plazo, una sola vez y sin tocarlo después", async () => {
+    await openRound();
+    await assertFails(seal("dave")); // not a follower
+    await assertFails(seal("carol", {}, "bob")); // someone else's slip
+    await assertFails(seal("carol", { selections: "2:1" })); // incomplete
+    await assertFails(seal("carol", { matchIds: ["m1"], selections: "2:1" })); // not the round's matches
+    await assertFails(seal("carol", { mode: "classic", selections: "1X" })); // not the competition's mode
+    await assertFails(seal("carol", {}, "carol", false)); // without saying who has sealed
+    await assertSucceeds(seal("carol"));
+    await assertFails(seal("carol", { selections: "3:0,0:0" })); // never again
+    await assertFails(
+      updateDoc(doc(as("carol"), `${R}/entries/carol`), { selections: "3:0,0:0", submittedAt: serverTimestamp() }),
+    );
+    await assertFails(deleteDoc(doc(as("carol"), `${R}/entries/carol`)));
+    // Attendance: only yourself, and only together with your slip.
+    await assertFails(
+      setDoc(doc(as("bob"), `${C}/roundAttendance/J1`), { members: { bob: serverTimestamp() } }, { merge: true }),
+    );
+    await openRound(past());
+    await assertFails(seal("bob")); // the round closed at its first kick-off
+  });
+
+  it("los boletos ajenos se ven al sellar el tuyo o al cerrarse la jornada", async () => {
+    await openRound();
+    await assertSucceeds(seal("carol"));
+    await assertSucceeds(getDoc(doc(as("carol"), `${R}/entries/carol`)));
+    await assertFails(getDoc(doc(as("bob"), `${R}/entries/carol`)));
+    await assertFails(getDocs(collection(as("bob"), `${R}/entries`)));
+    await assertSucceeds(seal("bob"));
+    await assertSucceeds(getDocs(collection(as("bob"), `${R}/entries`)));
+    await assertSucceeds(getDoc(doc(as(null), `${C}/roundAttendance/J1`)));
+    await openRound(past());
+    await assertSucceeds(getDocs(collection(as("alice"), `${R}/entries`)));
+    await assertSucceeds(getDoc(doc(as("dave"), `${R}/entries/carol`)));
+    await assertFails(getDocs(collection(as(null), `${R}/entries`)));
   });
 });

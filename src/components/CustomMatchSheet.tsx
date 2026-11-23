@@ -16,12 +16,14 @@ import {
 import {
   deleteMatch,
   loadMyPicks,
-  loadStartedPicks,
   saveMatch,
   settled,
+  useCompetitionRounds,
+  useMyEntry,
   usePeople,
+  useRoundEntries,
 } from "../lib/customCompetitionData";
-import { pickHit, pickLabel, pickPoints } from "../lib/customPicks";
+import { encodePick, pickHit, pickLabel, pickPoints } from "../lib/customPicks";
 import { haptic } from "../lib/motion";
 import { go } from "../lib/navigation";
 import Modal from "./Modal";
@@ -398,8 +400,8 @@ export default function MatchEditSheet({
 }
 
 /**
- * Before kick-off: only your pick (the others stay hidden). Once it starts:
- * everyone's, with the points when the result is in.
+ * As in LaLiga's quiniela: until you seal your slip (or the round closes)
+ * only your own pick shows; then every sealed slip, with its points.
  */
 export function MatchPicks({
   competition,
@@ -410,25 +412,35 @@ export function MatchPicks({
   match: ResolvedMatch;
   uid: string;
 }) {
-  const started = match.startAt <= Date.now();
-  const [picks, setPicks] = useState<Record<string, string> | null>(null);
+  const rk = roundKey(match);
+  const rounds = useCompetitionRounds(competition.id);
+  const round = rounds?.[rk];
+  const mine = useMyEntry(competition.id, rk, uid);
+  const closed = Boolean(round && round.deadline <= Date.now());
+  const readable = closed || Boolean(mine.picks);
+  const entries = useRoundEntries(competition.id, rk, readable);
+  const [draft, setDraft] = useState<string | null | undefined>(undefined);
   useEffect(() => {
+    if (readable) return;
     let live = true;
-    const load = started
-      ? loadStartedPicks(competition.id, [{ id: match.id, startAt: match.startAt }], { prune: false }).then(
-          (r) => r[match.id] || {},
-        )
-      : loadMyPicks(competition.id, [match.id], uid).then((r) => (r[match.id] ? { [uid]: r[match.id] } : {}));
-    load.then(
-      (r) => live && setPicks(r),
-      () => live && setPicks({}),
+    loadMyPicks(competition.id, [match.id], uid).then(
+      (r) => live && setDraft(r[match.id] ?? null),
+      () => live && setDraft(null),
     );
     return () => {
       live = false;
     };
-  }, [competition.id, match.id, match.startAt, uid, started]);
-  const people = usePeople(picks ? Object.keys(picks) : []);
-  if (!picks)
+  }, [competition.id, match.id, uid, readable]);
+  const picks = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(entries || {}).flatMap(([id, p]) => (p[match.id] ? [[id, encodePick(p[match.id])]] : [])),
+      ) as Record<string, string>,
+    [entries, match.id],
+  );
+  const people = usePeople(Object.keys(picks));
+  const loading = rounds === null || mine.loading || (readable ? entries === null : draft === undefined);
+  if (loading)
     return (
       <p className="gm-picks-loading" role="status">
         <span className="sr-only">Cargando pronósticos</span>
@@ -442,34 +454,33 @@ export function MatchPicks({
         (b.points ?? -1) - (a.points ?? -1) ||
         (people[a.id]?.name || "").localeCompare(people[b.id]?.name || "", "es"),
     );
+  const canSeal = Boolean(round && !closed && round.matchIds.includes(match.id)) && competition.memberIds.includes(uid);
   return (
     <section className="match-block custom-match-picks-section" aria-labelledby="match-picks-title">
       <h3 id="match-picks-title" className="match-block-title">
-        Pronósticos{started && rows.length > 0 ? ` · ${rows.length}` : ""}
+        Pronósticos{readable && rows.length > 0 ? ` · ${rows.length}` : ""}
       </h3>
-      {!started ? (
+      {!readable ? (
         <p className="muted">
-          {picks[uid] ? (
+          {draft ? (
             <>
-              Tu pronóstico: <strong>{pickLabel(picks[uid])}</strong>.{" "}
+              Tu pronóstico: <strong>{pickLabel(draft)}</strong>, aún sin sellar.{" "}
             </>
           ) : (
             "Aún no has pronosticado este partido. "
           )}
-          Los de los demás se verán cuando empiece.
-          {competition.predictionMode !== "off" && competition.memberIds.includes(uid) && (
+          Los boletos de los demás se ven al sellar el tuyo o cuando se cierra la jornada.
+          {canSeal && (
             <>
               {" "}
               <button
                 type="button"
                 className="text-button"
                 onClick={() =>
-                  go(
-                    `/quiniela?liga=${encodeURIComponent(competition.id)}&round=${encodeURIComponent(`${competition.id}:${roundKey(match)}`)}`,
-                  )
+                  go(`/quiniela?liga=${encodeURIComponent(competition.id)}&round=${encodeURIComponent(`${competition.id}:${rk}`)}`)
                 }
               >
-                {picks[uid] ? "Cambiarlo en la Quiniela" : "Pronosticar en la Quiniela"}
+                {draft ? "Sellar en la Quiniela" : "Pronosticar en la Quiniela"}
               </button>
             </>
           )}
@@ -490,7 +501,7 @@ export function MatchPicks({
           ))}
         </ul>
       ) : (
-        <p className="muted">Nadie pronosticó este partido.</p>
+        <p className="muted">Nadie selló un boleto con este partido.</p>
       )}
     </section>
   );

@@ -227,7 +227,7 @@ export default function CompetitionCreatePage({
           </label>
           <div className="form-field">
             <span className="form-field-label">Icono</span>
-            <IconPicker value={icon} onChange={setIcon} disabled={busy} />
+            <IconPicker value={icon} onChange={setIcon} disabled={busy} name={name} />
           </div>
           <div className="form-field">
             <span className="form-field-label">Compiten</span>

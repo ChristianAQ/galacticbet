@@ -203,3 +203,68 @@ describe("pronósticos de una competición entre amigos", () => {
     expect(pickState("own", "2", played("m4", 0, 0))).toBe("miss");
   });
 });
+
+describe("jornadas y boletos sellados, como en LaLiga", () => {
+  const t = (iso: string) => Date.parse(iso);
+  const calendar = () =>
+    resolveCompetition(comp(), teams, [
+      game("m1", { round: 1, startAt: t("2026-11-28T09:00:00Z") }),
+      game("m2", { round: 1, homeId: "c", awayId: "d", startAt: t("2026-11-28T08:00:00Z") }),
+      game("m3", { round: 1, homeId: "a", awayId: "c", status: "postponed", startAt: t("2026-11-28T07:00:00Z") }),
+      game("m4", { round: 2, startAt: t("2026-12-05T09:00:00Z") }),
+      game("m5", { round: 3, status: "cancelled" }),
+    ]);
+
+  it("cada jornada cierra en su primer partido y pide los que siguen en pie", async () => {
+    const { roundPlans } = await import("../src/lib/customRounds");
+    const plans = roundPlans(calendar());
+    expect(plans).toEqual([
+      { id: "J1", deadline: t("2026-11-28T08:00:00Z"), matchIds: ["m1", "m2"] },
+      { id: "J2", deadline: t("2026-12-05T09:00:00Z"), matchIds: ["m4"] },
+    ]);
+  });
+
+  it("solo cambia jornadas abiertas: una cerrada ya no se toca y no se abre tarde", async () => {
+    const { roundChanges, roundPlans } = await import("../src/lib/customRounds");
+    const plans = roundPlans(calendar());
+    const before = t("2026-11-20T00:00:00Z");
+    // Nothing yet: both rounds open.
+    expect(roundChanges(plans, {}, before).write.map((p) => p.id)).toEqual(["J1", "J2"]);
+    // Up to date: nothing to write.
+    const docs = Object.fromEntries(plans.map((p) => [p.id, { deadline: p.deadline, matchIds: p.matchIds }]));
+    expect(roundChanges(plans, docs, before)).toEqual({ write: [], remove: [] });
+    // A moved match changes an open round…
+    const moved = { ...docs, J2: { deadline: t("2026-12-06T09:00:00Z"), matchIds: ["m4"] } };
+    expect(roundChanges(plans, moved, before).write.map((p) => p.id)).toEqual(["J2"]);
+    // …but a closed one stays as it was sealed.
+    const after = t("2026-11-29T00:00:00Z");
+    const stale = { ...docs, J1: { deadline: t("2026-11-28T08:00:00Z"), matchIds: ["m2"] } };
+    expect(roundChanges(plans, stale, after).write.map((p) => p.id)).toEqual([]);
+    // A round whose first match already started isn't opened late.
+    expect(roundChanges(plans, {}, after).write.map((p) => p.id)).toEqual(["J2"]);
+    // Open rounds without matches any more go away; closed ones stay.
+    const extra = { ...docs, J9: { deadline: t("2026-12-30T00:00:00Z"), matchIds: ["x"] }, J0: { deadline: before - 1, matchIds: ["y"] } };
+    expect(roundChanges(plans, extra, before).remove).toEqual(["J9"]);
+  });
+
+  it("los boletos sellados puntúan como la quiniela y los incompletos no se leen", async () => {
+    const { entriesAsPicks, readEntry } = await import("../src/lib/customRounds");
+    const ana = readEntry({ matchIds: ["m1", "m2"], selections: "2:1,0:0", mode: "exact" })!;
+    const bea = readEntry({ matchIds: ["m1", "m2"], selections: "1X", mode: "classic" })!;
+    expect(ana).toEqual({ m1: { home: 2, away: 1 }, m2: { home: 0, away: 0 } });
+    expect(readEntry({ matchIds: ["m1", "m2"], selections: "2:1", mode: "exact" })).toBeNull();
+    expect(readEntry({ matchIds: ["m1"], selections: "7", mode: "classic" })).toBeNull();
+    const picks = entriesAsPicks({ J1: { ana, bea } });
+    expect(picks).toEqual({ m1: { ana: "2-1", bea: "1" }, m2: { ana: "0-0", bea: "X" } });
+    const rows = pickRanking([finished("m1", 2, 1), finished("m2", 1, 1)], picks, [
+      { id: "ana", name: "Ana", avatar: null },
+      { id: "bea", name: "Bea", avatar: null },
+      { id: "cris", name: "Cris", avatar: null },
+    ]);
+    expect(rows.map((r) => [r.id, r.points])).toEqual([
+      ["ana", 4],
+      ["bea", 2],
+      ["cris", 0],
+    ]);
+  });
+});

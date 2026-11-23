@@ -48,6 +48,16 @@
   border-radius: 50%;
   background: color-mix(in srgb, var(--masthead-ink) 12%, transparent);
 }
+.match-hero-crest.crest-placeholder.has-initials {
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 26px;
+  font-weight: 800;
+}
 .match-hero-name {
   max-width: 100%;
   font-family: var(--font-display);

@@ -4,6 +4,18 @@ import { Crest } from "./ui";
 import "../styles/leagues.css";
 
 /** A top-five board: the leader in large type on featured ones, then the rest. */
+/** «1 gol», «2 goles»: friends' competitions often have ones. */
+const SINGULAR: Record<string, string> = {
+  goles: "gol",
+  asistencias: "asistencia",
+  amarillas: "amarilla",
+  rojas: "roja",
+  "goles recibidos": "gol recibido",
+  "porterías a cero": "portería a cero",
+  "goles + asistencias": "gol o asistencia",
+};
+const unitOf = (unit: string, value: number) => (value === 1 ? SINGULAR[unit] || unit : unit);
+
 export default function RankingCard({
   title,
   unit,
@@ -49,7 +61,7 @@ export default function RankingCard({
               </span>
               <span className="league-ranking-big">
                 <b className="numeral">{leader.value}</b>
-                <small>{unit}</small>
+                <small>{unitOf(unit, leader.value)}</small>
               </span>
             </div>
           )}
@@ -66,7 +78,7 @@ export default function RankingCard({
                   </span>
                   <span className="league-ranking-value">
                     <strong>{r.value}</strong>
-                    <small>{unit}</small>
+                    <small>{unitOf(unit, r.value)}</small>
                   </span>
                 </li>
               );

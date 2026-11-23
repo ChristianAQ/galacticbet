@@ -27,8 +27,15 @@ export function MatchSkeleton() {
 }
 
 /** Large crest that morphs from the fixture row (shared view-transition part). */
-export function HeroCrest({ src, part }: { src?: string; part: string }) {
+export function HeroCrest({ src, part, name }: { src?: string; part: string; name?: string }) {
   const [failed, setFailed] = useState(false);
+  // Friends' teams often have no picture: their initials, like their badge.
+  const initials = (name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
   return src && !failed ? (
     <img
       className="match-hero-crest"
@@ -40,10 +47,12 @@ export function HeroCrest({ src, part }: { src?: string; part: string }) {
     />
   ) : (
     <span
-      className="match-hero-crest crest-placeholder"
+      className={`match-hero-crest crest-placeholder${initials ? " has-initials" : ""}`}
       data-vt-part={part}
       aria-hidden="true"
-    />
+    >
+      {initials}
+    </span>
   );
 }
 

@@ -17,6 +17,8 @@ import {
   followCompetition,
   resolveCompetitionCode,
   unfollowCompetition,
+  useCompetitionRounds,
+  useRoundsSync,
   type CompetitionData,
 } from "../lib/customCompetitionData";
 import { preferredRound, type Match } from "../lib/domain";
@@ -382,6 +384,10 @@ export default function CustomCompetitionView({
     [c, data.participants, data.matches],
   );
   const rankings = useMemo(() => (view ? reportRankings(view) : null), [view]);
+  // Organisers keep the quiniela's rounds in step with what they change here.
+  const organiser = Boolean(user && c && (c.ownerId === user.uid || c.adminIds.includes(user.uid)));
+  const roundDocs = useCompetitionRounds(organiser && c ? c.id : "");
+  useRoundsSync(c, view, roundDocs, user?.uid || "");
   if (data.loading)
     return (
       <div className="league-content">

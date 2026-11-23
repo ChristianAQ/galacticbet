@@ -50,3 +50,11 @@ Se retira «Copiar texto» de `ShareDialog`, el menú compartido de quinielas y 
 ## Comprobaciones
 
 Pruebas unitarias: filtros por liga/temporada, tabla, normalización de rankings, cuotas, rechazo de temporadas incorrectas, caché, noticias y conservación ante fallos. El emulador verifica acceso público por ID y denegación de listados/escrituras. El navegador comprueba 320–1440 px, sticky bajo la cabecera móvil, todas las columnas de clasificación, aislamiento de temporadas, carga/vacío/error/reintento, teclado, enlaces antiguos y compartir únicamente imagen.
+
+## Quiniela de una liga propia
+
+Igual que la de LaLiga: los signos son un borrador privado hasta pulsar **Sellar boleto**, que pide todos los partidos de la jornada y confirma antes de guardar. La jornada cierra en su primer partido. Un boleto sellado no se puede cambiar ni borrar. Los boletos de los demás se ven al sellar el tuyo o, para todos, al cerrarse la jornada. Los borradores no se ven nunca. Solo puntúan los boletos sellados: Clasificación, el tablero de la jornada y la pestaña Pronósticos del partido los leen, y los puntos se calculan siempre con los resultados.
+
+- `customCompetitions/{id}/rounds/{J1|G1|A1|FINAL…}`: plazo (`deadline`, el primer partido) y `matchIds` (partidos ni aplazados ni cancelados, con los dos rivales conocidos). Los escribe la app de la organización al abrir Ligas, la ficha o la Quiniela, cuando cambian fechas, resultados o cruces. Una jornada cerrada no se vuelve a tocar.
+- `…/rounds/{jornada}/entries/{uid}`: el boleto sellado (`matchIds`, `selections`, `mode`), en el mismo formato que los de los grupos. Las reglas comprueban plazo, partidos, modo y que esté completo.
+- `…/roundAttendance/{jornada}`: quién ha sellado (nunca qué), para «Faltáis 2, tú incluido».

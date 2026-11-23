@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { CustomMatch } from "./customCompetition";
-import { loadMyPicks, loadStartedPicks } from "./customCompetitionData";
-import type { PickMap } from "./customPicks";
+import { loadClosedEntries, loadMyPicks } from "./customCompetitionData";
+import type { PredictionValue } from "./domain";
 
 /** A clock that ticks every half minute: enough to close picks at kick-off. */
 export function useClock(step = 30_000) {
@@ -13,48 +12,48 @@ export function useClock(step = 30_000) {
   return now;
 }
 
-/** Reads of matches the server doesn't consider started yet are retried this often. */
+/** Rounds the server doesn't consider closed yet are read again this often. */
 const RETRY_MS = 20_000;
 const MAX_RETRIES = 15;
 
 /**
- * Everyone's picks for matches that have started (each match is fetched once
- * and kept on the device: after kick-off they can't change). Null while loading.
- *
- * `enabled`: wait until the competition has loaded (its empty list would wipe
- * the cache). `prune`: the list is every started match of the competition, so
- * cached matches that aren't in it were deleted (only the full list may prune).
+ * Everyone's sealed slips, by round, for the rounds that have closed (each
+ * round is fetched once and kept on the device: its slips can't change any
+ * more). Null while loading.
  */
-export function useStartedPicks(
+export function useClosedEntries(
   cid: string,
-  started: Pick<CustomMatch, "id" | "startAt">[],
+  closed: { id: string; deadline: number }[],
   uid: string,
-  { enabled = true, prune = false }: { enabled?: boolean; prune?: boolean } = {},
-): Record<string, PickMap> | null {
-  const key = started.map((m) => `${m.id}@${m.startAt}`).join();
-  const [state, setState] = useState<{ owner: string; picks: Record<string, PickMap> } | null>(null);
+  enabled = true,
+): Record<string, Record<string, Record<string, PredictionValue>>> | null {
+  const key = closed.map((r) => `${r.id}@${r.deadline}`).join();
+  const [state, setState] = useState<{
+    owner: string;
+    entries: Record<string, Record<string, Record<string, PredictionValue>>>;
+  } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const owner = `${cid}:${uid}`;
   useEffect(() => {
-    if (!uid || !cid) return setState({ owner, picks: {} });
+    if (!uid || !cid) return setState({ owner, entries: {} });
     if (!enabled) return;
     let live = true;
     let retry = 0;
-    void loadStartedPicks(cid, started, { prune }).then((picks) => {
+    void loadClosedEntries(cid, closed).then((entries) => {
       if (!live) return;
-      setState({ owner, picks });
-      // Kicked off by this device's clock but not yet by the server's (or offline).
-      if (attempt < MAX_RETRIES && started.some((m) => !picks[m.id]))
+      setState({ owner, entries });
+      // Closed by this device's clock but not yet by the server's (or offline).
+      if (attempt < MAX_RETRIES && closed.some((r) => !entries[r.id]))
         retry = window.setTimeout(() => setAttempt((n) => n + 1), RETRY_MS);
     });
     return () => {
       live = false;
       window.clearTimeout(retry);
     };
-    // The list changes identity on every tick; its key only when a match starts or moves.
-  }, [cid, uid, key, enabled, prune, attempt]);
-  // While a newly started match loads, the previous picks of the same competition stay.
-  return state && state.owner === owner ? state.picks : null;
+    // The list changes identity on every tick; its key only when a round closes or moves.
+  }, [cid, uid, key, enabled, attempt]);
+  // While a newly closed round loads, the previous slips of the same competition stay.
+  return state && state.owner === owner ? state.entries : null;
 }
 
 /** Your picks for matches still open (nobody else can read them yet). */

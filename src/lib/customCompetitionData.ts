@@ -9,6 +9,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   Timestamp,
@@ -19,9 +20,11 @@ import {
   type DocumentReference,
   type Firestore,
 } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { db } from "./firebase";
-import type { Match } from "./domain";
+import type { Match, PredictionValue } from "./domain";
+import { encodeDelivery, validDeliveredPicks } from "./roundDelivery";
+import { readEntry, roundChanges, roundPlans, type RoundDocs } from "./customRounds";
 import {
   generateFixtures,
   isCode,
@@ -31,6 +34,7 @@ import {
   toAppMatch,
   type Competition,
   type CompetitionSetup,
+  type CompetitionView,
   type CustomMatch,
   type Fixture,
   type MatchEvent,
@@ -522,9 +526,11 @@ export async function deleteCompetition(
   matchIds: string[],
   code: string | null | undefined,
 ) {
+  const rounds = await getDocs(collection(competitionRef(cid), "rounds")).catch(() => null);
   const refs = [
     ...matchIds.map((id) => doc(competitionRef(cid), "matches", id)),
     ...participantIds.map((id) => doc(competitionRef(cid), "participants", id)),
+    ...(rounds?.docs.map((d) => d.ref) || []),
   ];
   for (let i = 0; i < refs.length; i += BATCH) {
     const batch = writeBatch(store());
@@ -536,7 +542,7 @@ export async function deleteCompetition(
   if (code) last.delete(doc(store(), CODES_COLLECTION, code));
   await last.commit();
   forgetCompetition(cid);
-  forgetPicks(cid);
+  forgetEntries(cid);
 }
 
 /**
@@ -577,7 +583,6 @@ export async function loadCompetitionParticipants(cid: string): Promise<Particip
 // ---------- Predictions ----------
 
 const pickRef = (cid: string, mid: string, uid: string) => doc(competitionRef(cid), "matches", mid, "picks", uid);
-const PICKS_KEY = (cid: string) => `galacticbet:competition-picks:v1:${cid}`;
 
 /** Yours, before kick-off: the rules check the time, the mode and that you follow it. */
 export async function savePick(cid: string, mid: string, uid: string, value: string) {
@@ -598,65 +603,236 @@ export async function loadMyPicks(cid: string, mids: string[], uid: string): Pro
   return Object.fromEntries(pairs.filter((p): p is readonly [string, string] => p !== null));
 }
 
-type PickCache = Record<string, { t: number; p: Record<string, string> }>;
-function readPickCache(cid: string): PickCache {
+// ---------- Rounds and sealed slips (the quiniela, as in LaLiga) ----------
+
+const roundRef = (cid: string, rk: string) => doc(competitionRef(cid), "rounds", rk);
+const entryRef = (cid: string, rk: string, uid: string) => doc(roundRef(cid, rk), "entries", uid);
+const attendanceRef = (cid: string, rk: string) => doc(competitionRef(cid), "roundAttendance", rk);
+const ENTRIES_KEY = (cid: string) => `galacticbet:competition-entries:v1:${cid}`;
+
+/** Each round's deadline (first kick-off) and the matches its slip asks for. */
+export function useCompetitionRounds(cid: string): RoundDocs | null {
+  const [rounds, setRounds] = useState<{ cid: string; docs: RoundDocs } | null>(null);
+  useEffect(() => {
+    if (!cid || !db) return;
+    return onSnapshot(
+      collection(competitionRef(cid), "rounds"),
+      (snap) => {
+        const docs: RoundDocs = {};
+        for (const d of snap.docs) {
+          const data = d.data();
+          if (data.deadline instanceof Timestamp && Array.isArray(data.matchIds))
+            docs[d.id] = {
+              deadline: data.deadline.toMillis(),
+              matchIds: data.matchIds.filter((id: unknown): id is string => typeof id === "string"),
+            };
+        }
+        // A cached first answer may miss rounds: wait for the server's.
+        if (!snap.metadata.fromCache || snap.docs.length) setRounds({ cid, docs });
+      },
+      () => setRounds({ cid, docs: {} }),
+    );
+  }, [cid]);
+  return rounds && rounds.cid === cid ? rounds.docs : null;
+}
+
+/**
+ * The organisers' app keeps the rounds in step with the calendar and the
+ * results (a new match, a moved date, a knockout side now known), like the
+ * backend does for LaLiga. Closed rounds are never touched.
+ */
+export function useRoundsSync(
+  competition: Pick<Competition, "id" | "ownerId" | "adminIds" | "predictionMode"> | null,
+  view: Pick<CompetitionView, "matches"> | null,
+  rounds: RoundDocs | null,
+  uid: string,
+) {
+  const tried = useRef("");
+  const runs = Boolean(competition && uid && (competition.ownerId === uid || competition.adminIds.includes(uid)));
+  useEffect(() => {
+    if (!competition || !view || !rounds || !runs || competition.predictionMode === "off") return;
+    const { write, remove } = roundChanges(roundPlans(view), rounds, Date.now());
+    if (!write.length && !remove.length) return;
+    const signature = JSON.stringify([competition.id, write, remove]);
+    // One attempt per change: a refused write doesn't loop.
+    if (tried.current === signature) return;
+    tried.current = signature;
+    const batch = writeBatch(store());
+    for (const plan of write)
+      batch.set(roundRef(competition.id, plan.id), {
+        deadline: Timestamp.fromMillis(plan.deadline),
+        matchIds: plan.matchIds,
+        updatedAt: serverTimestamp(),
+      });
+    for (const id of remove) batch.delete(roundRef(competition.id, id));
+    batch.commit().catch(() => undefined);
+  }, [competition, view, rounds, runs]);
+}
+
+/** Your sealed slip for a round (null if you haven't sealed it). */
+export function useMyEntry(cid: string, rk: string, uid: string) {
+  const [state, setState] = useState<{ key: string; picks: Record<string, PredictionValue> | null } | null>(null);
+  const key = `${cid}:${rk}:${uid}`;
+  useEffect(() => {
+    if (!cid || !rk || !uid || !db) return setState({ key, picks: null });
+    return onSnapshot(
+      entryRef(cid, rk, uid),
+      (snap) => {
+        if (snap.metadata.fromCache && !snap.exists()) return;
+        setState({ key, picks: snap.exists() ? readEntry(snap.data()) : null });
+      },
+      () => setState({ key, picks: null }),
+    );
+  }, [cid, rk, uid, key]);
+  return state && state.key === key ? { loading: false, picks: state.picks } : { loading: true, picks: null };
+}
+
+/**
+ * Everyone's sealed slips for a round: readable once you have sealed yours or
+ * once the round has closed. Null while loading (or not yet readable).
+ */
+export function useRoundEntries(cid: string, rk: string, enabled: boolean) {
+  const [state, setState] = useState<{ key: string; entries: Record<string, Record<string, PredictionValue>> } | null>(
+    null,
+  );
+  const key = `${cid}:${rk}`;
+  useEffect(() => {
+    if (!enabled || !cid || !rk || !db) return;
+    return onSnapshot(
+      collection(roundRef(cid, rk), "entries"),
+      (snap) => {
+        const entries: Record<string, Record<string, PredictionValue>> = {};
+        for (const d of snap.docs) {
+          const picks = readEntry(d.data());
+          if (picks) entries[d.id] = picks;
+        }
+        setState({ key, entries });
+      },
+      () => setState({ key, entries: {} }),
+    );
+  }, [cid, rk, key, enabled]);
+  return enabled && state && state.key === key ? state.entries : null;
+}
+
+/** Who has sealed the round (never what): for «faltan por sellar». */
+export function useRoundAttendance(cid: string, rk: string) {
+  const [state, setState] = useState<{ key: string; ids: string[] } | null>(null);
+  const key = `${cid}:${rk}`;
+  useEffect(() => {
+    if (!cid || !rk || !db) return;
+    return onSnapshot(
+      attendanceRef(cid, rk),
+      (snap) => setState({ key, ids: Object.keys(snap.data()?.members || {}) }),
+      () => setState({ key, ids: [] }),
+    );
+  }, [cid, rk, key]);
+  return state && state.key === key ? { ready: true, ids: state.ids } : { ready: false, ids: [] as string[] };
+}
+
+/**
+ * Seals the round: a complete, unchangeable slip with a pick for every match
+ * the round asks for, before its deadline. The rules check all of it again.
+ */
+export async function sealCustomRound(
+  cid: string,
+  rk: string,
+  uid: string,
+  mode: "classic" | "exact",
+  picks: Record<string, PredictionValue>,
+) {
+  const s = store();
+  await runTransaction(s, async (t) => {
+    const [mine, round] = await Promise.all([t.get(entryRef(cid, rk, uid)), t.get(roundRef(cid, rk))]);
+    if (mine.exists()) throw new Error("Este boleto ya está sellado.");
+    const data = round.data();
+    if (!data || !(data.deadline instanceof Timestamp) || data.deadline.toMillis() <= Date.now())
+      throw new Error("El plazo de esta jornada ya se cerró.");
+    const matchIds = (data.matchIds || []) as string[];
+    const expected = Object.fromEntries(matchIds.map((id) => [id, picks[id]]));
+    if (!validDeliveredPicks(mode, matchIds, expected))
+      throw new Error("Completa todos los partidos de esta jornada antes de sellar.");
+    t.set(entryRef(cid, rk, uid), {
+      userId: uid,
+      submittedAt: serverTimestamp(),
+      ...encodeDelivery(mode, matchIds, expected),
+    });
+    t.set(attendanceRef(cid, rk), { members: { [uid]: serverTimestamp() } }, { merge: true });
+  });
+}
+
+type EntryCache = Record<string, { t: number; e: Record<string, string> }>;
+function readEntryCache(cid: string): EntryCache {
   try {
-    const raw = JSON.parse(localStorage.getItem(PICKS_KEY(cid)) || "{}");
+    const raw = JSON.parse(localStorage.getItem(ENTRIES_KEY(cid)) || "{}");
     return raw && typeof raw === "object" ? raw : {};
   } catch {
     return {};
   }
 }
-function forgetPicks(cid: string) {
+function forgetEntries(cid: string) {
   try {
-    localStorage.removeItem(PICKS_KEY(cid));
+    localStorage.removeItem(ENTRIES_KEY(cid));
+    localStorage.removeItem(`galacticbet:competition-picks:v1:${cid}`);
   } catch {
     /* Only a cache. */
   }
 }
 
 /**
- * Everyone's picks for matches that have started. Once a match kicks off its
- * picks can't change (the rules refuse late ones), so each match is fetched
- * once and kept on this device; a rescheduled match is fetched again.
+ * Every sealed slip of the rounds that have closed, for the tables. A closed
+ * round's slips can't change (no slip is accepted after the deadline), so each
+ * round is fetched once and kept on this device.
  */
-export async function loadStartedPicks(
+export async function loadClosedEntries(
   cid: string,
-  matches: Pick<CustomMatch, "id" | "startAt">[],
-  { prune = true } = {},
-): Promise<Record<string, Record<string, string>>> {
-  const cache = readPickCache(cid);
-  const out: Record<string, Record<string, string>> = {};
-  const missing: Pick<CustomMatch, "id" | "startAt">[] = [];
-  for (const m of matches) {
-    const hit = cache[m.id];
-    if (hit && hit.t === m.startAt) out[m.id] = hit.p;
-    else missing.push(m);
-  }
+  rounds: { id: string; deadline: number }[],
+): Promise<Record<string, Record<string, Record<string, PredictionValue>>>> {
+  const cache = readEntryCache(cid);
+  const out: Record<string, Record<string, Record<string, PredictionValue>>> = {};
+  const decode = (raw: Record<string, string>) =>
+    Object.fromEntries(
+      Object.entries(raw).flatMap(([uid, json]) => {
+        try {
+          const picks = readEntry(JSON.parse(json));
+          return picks ? [[uid, picks]] : [];
+        } catch {
+          return [];
+        }
+      }),
+    );
+  const missing = rounds.filter((r) => {
+    const hit = cache[r.id];
+    if (hit && hit.t === r.deadline) {
+      out[r.id] = decode(hit.e);
+      return false;
+    }
+    return true;
+  });
   const fetched = await Promise.all(
-    missing.map(async (m) => {
+    missing.map(async (r) => {
       try {
-        const snap = await getDocs(collection(competitionRef(cid), "matches", m.id, "picks"));
-        // A cached-only answer (offline) may be incomplete: show it but don't keep it.
-        const picks: Record<string, string> = {};
-        for (const d of snap.docs) if (typeof d.data().value === "string") picks[d.id] = d.data().value;
-        return { m, picks, complete: !snap.metadata.fromCache };
+        const snap = await getDocs(collection(roundRef(cid, r.id), "entries"));
+        const raw: Record<string, string> = {};
+        for (const d of snap.docs) {
+          const { matchIds, selections, mode } = d.data();
+          raw[d.id] = JSON.stringify({ matchIds, selections, mode });
+        }
+        return { r, raw, complete: !snap.metadata.fromCache };
       } catch {
-        // Not started yet by the server's clock, or offline: try again later.
+        // Not closed yet by the server's clock, or offline: next time.
         return null;
       }
     }),
   );
-  // With the full list of started matches, entries of deleted matches go away.
-  const keep = new Set(matches.map((m) => m.id));
-  const next: PickCache = prune ? Object.fromEntries(Object.entries(cache).filter(([id]) => keep.has(id))) : cache;
+  const keep = new Set(rounds.map((r) => r.id));
+  const next: EntryCache = Object.fromEntries(Object.entries(cache).filter(([id]) => keep.has(id)));
   for (const f of fetched) {
     if (!f) continue;
-    out[f.m.id] = f.picks;
-    if (f.complete) next[f.m.id] = { t: f.m.startAt, p: f.picks };
+    out[f.r.id] = decode(f.raw);
+    if (f.complete) next[f.r.id] = { t: f.r.deadline, e: f.raw };
   }
   try {
-    localStorage.setItem(PICKS_KEY(cid), JSON.stringify(next));
+    localStorage.setItem(ENTRIES_KEY(cid), JSON.stringify(next));
   } catch {
     /* Only a cache. */
   }
