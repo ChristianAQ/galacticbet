@@ -11,6 +11,7 @@ export const pageLoaders = {
   "/porra": () => import("../pages/PorraPage"),
   "/equipos": () => import("../pages/TeamsPage"),
   "/partido": () => import("../pages/MatchPage"),
+  "/competiciones/nueva": () => import("../pages/CompetitionCreatePage"),
 };
 type PagePath = keyof typeof pageLoaders;
 
@@ -23,6 +24,7 @@ export const GroupsPage = lazy(pageLoaders["/grupos"]);
 export const PorraPage = lazy(pageLoaders["/porra"]);
 export const TeamsPage = lazy(pageLoaders["/equipos"]);
 export const MatchPage = lazy(pageLoaders["/partido"]);
+export const CompetitionCreatePage = lazy(pageLoaders["/competiciones/nueva"]);
 
 const loaded = new Map<string, Promise<unknown>>();
 /** Starts (once) the download of a page chunk and resolves when it is ready. */

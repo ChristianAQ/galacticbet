@@ -30,6 +30,7 @@ import { REFRESH_EVENT, RefreshContext } from "./lib/chrome";
 import { go, interceptLinks, isTabRoot } from "./lib/navigation";
 import { keepPushDevice } from "./lib/push";
 import {
+  CompetitionCreatePage,
   GroupsPage,
   HomePage,
   MatchesPage,
@@ -265,6 +266,8 @@ export default function App() {
             onDemo={() => setDemo(true)}
             loading={loading}
             userId={user?.uid || ""}
+            user={user}
+            onLogin={() => setLogin(true)}
           />
         }
       />
@@ -325,6 +328,16 @@ export default function App() {
               if (auth?.currentUser) rememberSession(auth.currentUser);
               setProfileVersion((v) => v + 1);
             }}
+          />
+        }
+      />
+      <Route
+        path="/competiciones/nueva"
+        element={
+          <CompetitionCreatePage
+            user={user}
+            groups={activeGroups}
+            onLogin={() => setLogin(true)}
           />
         }
       />

@@ -26,7 +26,15 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, CalendarPlus, Share2, Target } from "lucide-react";
-import { useStuck } from "../lib/useStuck";
+import DayTitle from "../components/DayTitle";
+import CustomCompetitionView, {
+  CompetitionEntrySheet,
+  competitionEyebrow,
+  CustomChips,
+  CustomSummary,
+} from "../components/CustomCompetition";
+import { useCompetition, useMyCompetitions } from "../lib/customCompetitionData";
+import type { AppUser } from "../lib/session";
 import { knockoutContext } from "../lib/matchInsights";
 import CompetitionTabs from "../components/CompetitionTabs";
 import RoundSelector from "../components/RoundSelector";
@@ -44,49 +52,11 @@ import { roundOptions } from "../lib/roundOptions";
 import { usePreferences } from "../lib/useGroupSelection";
 
 const CompetitionStats = lazy(() => import("../components/CompetitionStats"));
-const weekday = new Intl.DateTimeFormat("es", { weekday: "long" });
-const dayMonth = new Intl.DateTimeFormat("es", {
-  day: "numeric",
-  month: "long",
-});
 const dayTitle = new Intl.DateTimeFormat("es", {
   weekday: "long",
   day: "numeric",
   month: "long",
 });
-
-/** Day separator: «Hoy»/«Mañana» or the weekday, the date and the fixture count. */
-function DayTitle({ date, count }: { date: string; count: number }) {
-  const day = new Date(date);
-  const today = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(today.getDate() + 1);
-  const relative =
-    day.toDateString() === today.toDateString()
-      ? "Hoy"
-      : day.toDateString() === tomorrow.toDateString()
-        ? "Mañana"
-        : "";
-  // Background only while pinned, so the resting list stays light.
-  const { sentinel, stuck } = useStuck();
-  return (
-    <>
-      <span ref={sentinel} className="sticky-sentinel" aria-hidden="true" />
-      <h2
-        className={`match-day-title${relative ? " is-near" : ""}${stuck ? " is-stuck" : ""}`}
-      >
-        <span className="match-day-name">
-          {relative || weekday.format(day)}
-        </span>
-        <span className="match-day-date">{dayMonth.format(day)}</span>
-        <i className="match-day-rule" aria-hidden="true" />
-        <span className="match-day-count">
-          {count} {count === 1 ? "partido" : "partidos"}
-        </span>
-      </h2>
-    </>
-  );
-}
 
 /**
  * One fixture of the list: tap for the match page (the crests morph into it),
@@ -198,14 +168,41 @@ export default function MatchesPage({
   onDemo,
   loading,
   userId,
+  user,
+  onLogin,
 }: {
   matches: Match[];
   demo: boolean;
   onDemo: () => void;
   loading: boolean;
   userId: string;
+  user: AppUser | null;
+  onLogin: () => void;
 }) {
   const [params, setParams] = useSearchParams();
+  // A friends' competition (?liga=code) is shown like one more league.
+  const liga = params.get("liga") || "";
+  const custom = useCompetition(liga);
+  const { competitions: mine } = useMyCompetitions(userId);
+  const [entry, setEntry] = useState(false);
+  const chips = useMemo(() => {
+    if (!liga || mine.some((c) => c.id === liga) || !custom.competition) return mine;
+    const c = custom.competition;
+    return [{ id: c.id, name: c.name, icon: c.icon }, ...mine];
+  }, [mine, liga, custom.competition]);
+  function openCustom(id: string) {
+    haptic();
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.set("liga", id);
+        next.delete("round");
+        next.delete("tab");
+        return next;
+      },
+      { replace: true },
+    );
+  }
   const preferences = usePreferences(userId);
   const requested = params.get("competition");
   const competition: CompetitionCode = isCompetition(requested)
@@ -291,32 +288,71 @@ export default function MatchesPage({
   return (
     <section className="leagues-page" aria-label="Ligas">
       <PageTitle
-        title="Ligas"
-        navTitle={competitionName(competition, true)}
+        title={liga ? custom.competition?.name || "Competición" : "Ligas"}
+        navTitle={liga ? custom.competition?.name || "Competición" : competitionName(competition, true)}
         eyebrow={
-          seasonId ? `Temporada ${seasonLabel(seasonId)}` : "Calendario y resultados"
+          liga
+            ? competitionEyebrow(custom.competition)
+            : seasonId
+              ? `Temporada ${seasonLabel(seasonId)}`
+              : "Calendario y resultados"
         }
       >
         <div className="league-selection">
           <CompetitionTabs
-            value={competition}
+            value={liga ? "none" : competition}
             onChange={(code) => {
-              if (code !== competition) haptic();
+              if (code !== competition || liga) haptic();
               preferenceStore.update(userId, { competition: code });
               setParams(
                 (previous) => {
                   const next = new URLSearchParams(previous);
                   next.set("competition", code);
+                  next.delete("liga");
                   next.delete("season");
                   next.delete("round");
+                  if (liga) next.delete("tab");
                   return next;
                 },
                 { replace: true },
               );
             }}
-          />
+          >
+            <CustomChips list={chips} current={liga} onSelect={openCustom} onAdd={() => setEntry(true)} />
+          </CompetitionTabs>
         </div>
+        {liga && <CustomSummary data={custom} user={user} onLogin={onLogin} />}
       </PageTitle>
+      {entry && (
+        <CompetitionEntrySheet user={user} onLogin={onLogin} onCode={openCustom} onClose={() => setEntry(false)} />
+      )}
+      {liga ? (
+        <CustomCompetitionView
+          data={custom}
+          user={user}
+          tab={params.get("tab") || ""}
+          onTab={(value) =>
+            setParams((previous) => {
+              const next = new URLSearchParams(previous);
+              next.set("tab", value);
+              return next;
+            })
+          }
+          round={round}
+          onRound={(id) =>
+            setParams(
+              (previous) => {
+                const next = new URLSearchParams(previous);
+                next.set("round", id);
+                return next;
+              },
+              { replace: true },
+            )
+          }
+          onLogin={onLogin}
+        />
+      ) : (
+      <>
       <LeagueNavigation
         tab={tab}
         onChange={changeTab}
@@ -469,6 +505,8 @@ export default function MatchesPage({
           </>
         )}
       </div>
+      </>
+      )}
     </section>
   );
 }

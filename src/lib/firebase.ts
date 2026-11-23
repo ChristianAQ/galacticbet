@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import {
+  connectAuthEmulator,
   createUserWithEmailAndPassword,
   getAuth,
   GoogleAuthProvider,
@@ -8,7 +9,13 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
+import {
+  connectFirestoreEmulator,
+  doc,
+  getFirestore,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 import { privateCache } from "./memoryCache";
 const e = import.meta.env;
 export const configured = Boolean(
@@ -27,6 +34,11 @@ const app = configured
   : null;
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getFirestore(app) : null;
+// Local development against the Firebase emulators only (never in a build).
+if (import.meta.env.DEV && e.VITE_USE_EMULATORS === "true" && auth && db) {
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+}
 export async function googleLogin() {
   if (!auth) throw new Error("Configura Firebase para iniciar sesión.");
   await signInWithPopup(auth, new GoogleAuthProvider());

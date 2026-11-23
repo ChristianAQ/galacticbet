@@ -13,15 +13,18 @@ const shortLabels: Partial<Record<LeagueTab, string>> = {
  * navigation bar. It publishes its height so day headers and the table header
  * can pin right below it.
  */
-export default function LeagueNavigation({
+export default function LeagueNavigation<T extends string = LeagueTab>({
   tab,
   onChange,
   panel,
   idPrefix,
   panelId,
+  tabs = LEAGUE_TABS as unknown as readonly { id: T; label: string }[],
 }: {
-  tab: LeagueTab;
-  onChange: (tab: LeagueTab) => void;
+  tab: T;
+  onChange: (tab: T) => void;
+  /** Sections to offer; the four league sections by default. */
+  tabs?: readonly { id: T; label: string }[];
   /** The tab panel, to scroll back to its top when switching far down. */
   panel: RefObject<HTMLElement | null>;
   idPrefix: string;
@@ -64,7 +67,7 @@ export default function LeagueNavigation({
       window.removeEventListener("resize", update);
     };
   }, []);
-  function select(next: LeagueTab) {
+  function select(next: T) {
     if (next === tab) return;
     const target = panel.current;
     const header = ref.current;
@@ -95,12 +98,12 @@ export default function LeagueNavigation({
         ref={ref}
         className={`league-navigation${stuck ? " is-stuck" : ""}`}
       >
-        <Segmented<LeagueTab>
+        <Segmented<T>
           label="Información de la liga"
           value={tab}
-          options={LEAGUE_TABS.map((t) => ({
+          options={tabs.map((t) => ({
             value: t.id,
-            label: shortLabels[t.id] || t.label,
+            label: shortLabels[t.id as LeagueTab] || t.label,
           }))}
           onChange={select}
           tabs={{ idPrefix, controls: panelId }}

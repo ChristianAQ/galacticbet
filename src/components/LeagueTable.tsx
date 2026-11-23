@@ -6,7 +6,7 @@ import { formNames } from "./TeamForm";
 import { Crest } from "./ui";
 import "../styles/leagues.css";
 
-interface Zone {
+export interface Zone {
   kind: "top" | "mid" | "down";
   label: string;
   test: (position: number, size: number) => boolean;
@@ -43,16 +43,22 @@ export default function LeagueTable({
   code,
   highlight = [],
   full = false,
+  zones: ownZones,
+  caption,
 }: {
   rows: LeagueRow[];
-  code: CompetitionCode;
+  /** Official competition (its zones and name); omit for friends' tables. */
+  code?: CompetitionCode;
   /** Team keys to mark, e.g. both sides of the open fixture. */
   highlight?: string[];
   full?: boolean;
+  /** Zones of a table that is not an official league (e.g. who goes through). */
+  zones?: Zone[];
+  caption?: string;
 }) {
   const { sentinel, stuck } = useStuck();
-  const config = leagueZones[code];
-  const zones = config && rows.length === config.size ? config.zones : [];
+  const config = code ? leagueZones[code] : undefined;
+  const zones = ownZones ?? (config && rows.length === config.size ? config.zones : []);
   return (
     <>
       {full && (
@@ -60,7 +66,7 @@ export default function LeagueTable({
       )}
       <table className={full ? "competition-table" : "league-table"}>
         <caption className="sr-only">
-          Clasificación de {competitionName(code)}
+          {caption || `Clasificación de ${competitionName(code)}`}
         </caption>
         {full && (
           <colgroup>

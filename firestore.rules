@@ -41,6 +41,107 @@ service cloud.firestore {
   match /live/football { allow get: if true; }
   // Informational 1X2 prices from public bookmakers; backend writes only.
   match /odds/football { allow get: if true; }
+  // Competitions between friends. The document id is the invitation code:
+  // whoever has it can follow the competition (read only, even without an
+  // account). Signed players follow it; the owner and the administrators run it.
+  match /customCompetitions/{cid} {
+   function competition() { return getAfter(/databases/$(database)/documents/customCompetitions/$(cid)).data; }
+   function owns(c) { return signed() && c.ownerId == request.auth.uid; }
+   function runs(c) { return signed() && (c.ownerId == request.auth.uid || request.auth.uid in c.adminIds); }
+   function text(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+   function picture(v, max) { return v == null || (v is string && v.size() <= max && v.matches('data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+')); }
+   function validCompetition(d) {
+    return text(d.name, 3, 60) && text(d.sport, 0, 40) && picture(d.icon, 60000)
+      && d.participantType in ['team','person']
+      && d.format in ['league','knockout','league_knockout','groups_knockout','custom']
+      && d.legs in [1,2] && d.knockoutLegs in [1,2]
+      && d.qualifiers is int && d.qualifiers >= 0 && d.qualifiers <= 16
+      && d.groups is int && d.groups >= 0 && d.groups <= 8
+      && d.thirdPlace is bool && d.predictionMode in ['exact','classic','off']
+      && d.schedule is map && d.schedule.keys().hasOnly(['start','time','everyDays','slotMinutes','location','timeZone'])
+      && d.schedule.start is string && d.schedule.start.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+      && d.schedule.time is string && d.schedule.time.matches('([01][0-9]|2[0-3]):[0-5][0-9]')
+      && d.schedule.everyDays is int && d.schedule.everyDays >= 1 && d.schedule.everyDays <= 28
+      && d.schedule.slotMinutes is int && d.schedule.slotMinutes >= 0 && d.schedule.slotMinutes <= 240
+      && text(d.schedule.location, 0, 120) && text(d.schedule.timeZone, 1, 60)
+      && d.adminIds is list && d.adminIds.size() <= 20 && d.memberIds is list && d.memberIds.size() <= 500
+      && d.adminIds.toSet().difference(d.memberIds.toSet()).size() == 0
+      && d.ownerId in d.memberIds;
+   }
+   allow get: if true;
+   allow list: if signed() && request.auth.uid in resource.data.memberIds;
+   allow create: if signed()
+     && request.resource.data.keys().hasOnly(['name','sport','icon','participantType','format','legs','knockoutLegs','qualifiers','groups','thirdPlace','predictionMode','schedule','ownerId','adminIds','memberIds','formatVersion','createdAt','updatedAt'])
+     && request.resource.data.ownerId == request.auth.uid
+     && request.resource.data.memberIds == [request.auth.uid] && request.resource.data.adminIds == []
+     && request.resource.data.formatVersion == 1
+     && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+     && validCompetition(request.resource.data);
+   allow update: if signed() && (
+     // Owner: name, sport, icon, prediction mode and who administers.
+     (owns(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','sport','icon','adminIds','predictionMode','updatedAt'])
+       && request.resource.data.updatedAt == request.time && validCompetition(request.resource.data))
+     // Follow with the code: add only yourself.
+     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+       && !(request.auth.uid in resource.data.memberIds)
+       && request.resource.data.memberIds.toSet() == resource.data.memberIds.toSet().union([request.auth.uid].toSet())
+       && request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
+       && request.resource.data.memberIds.size() <= 500)
+     // Unfollow: remove only yourself (an administrator also stops being one).
+     || (request.auth.uid in resource.data.memberIds && resource.data.ownerId != request.auth.uid
+       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds','adminIds'])
+       && request.resource.data.memberIds.toSet() == resource.data.memberIds.toSet().difference([request.auth.uid].toSet())
+       && request.resource.data.adminIds.toSet() == resource.data.adminIds.toSet().difference([request.auth.uid].toSet()))
+   );
+   // The app deletes matches and participants first, then the competition.
+   allow delete: if owns(resource.data);
+   match /participants/{pid} {
+    allow read: if true;
+    allow create, update: if runs(competition()) && pid.matches('[A-Za-z0-9_-]{1,40}')
+      && request.resource.data.keys().hasOnly(['name','kind','userId','icon','seed'])
+      && text(request.resource.data.name, 1, 40) && request.resource.data.kind in ['team','person']
+      && (request.resource.data.userId == null || text(request.resource.data.userId, 1, 128))
+      && picture(request.resource.data.icon, 30000)
+      && request.resource.data.seed is int && request.resource.data.seed >= 0 && request.resource.data.seed < 64;
+    allow delete: if runs(competition());
+   }
+   match /matches/{mid} {
+    function goals(v) { return v == null || (v is int && v >= 0 && v <= 99); }
+    function side(id, slot) {
+     return (id == null || text(id, 1, 40))
+       && (slot == null || (slot is string && slot.matches('league:[0-9]{1,2}|group:[A-H]:[1-8]|(winner|loser):[A-Z0-9]{1,4}')))
+       && (id != null || slot != null);
+    }
+    function validMatch(d) {
+     return d.keys().hasOnly(['phase','round','stage','group','tie','leg','homeId','awayId','homeSlot','awaySlot','startAt','location','status','homeScore','awayScore','homePenalties','awayPenalties','locked','updatedAt','updatedBy'])
+       && d.phase in ['league','group','knockout','custom']
+       && d.round is int && d.round >= 1 && d.round <= 300
+       && d.stage in ['REGULAR_SEASON','GROUP_STAGE','LAST_32','LAST_16','QUARTER_FINALS','SEMI_FINALS','THIRD_PLACE','FINAL']
+       && (d.group == null || (d.group is string && d.group.matches('[A-H]')))
+       && (d.tie == null || (d.tie is string && d.tie.matches('[A-Z0-9]{1,4}')))
+       && (d.leg == null || d.leg in [1,2])
+       && side(d.homeId, d.homeSlot) && side(d.awayId, d.awaySlot)
+       && (d.homeId == null || d.homeId != d.awayId)
+       && d.startAt is timestamp && text(d.location, 0, 120)
+       && d.status in ['scheduled','live','finished','postponed','cancelled']
+       && goals(d.homeScore) && goals(d.awayScore) && goals(d.homePenalties) && goals(d.awayPenalties)
+       && (d.status in ['live','finished'] || (d.homeScore == null && d.awayScore == null))
+       && (d.status != 'finished' || (d.homeScore != null && d.awayScore != null))
+       && ((d.homePenalties == null) == (d.awayPenalties == null))
+       && (d.homePenalties == null || (d.status == 'finished' && d.phase == 'knockout' && d.homePenalties != d.awayPenalties))
+       && d.locked is bool && (d.locked == false || d.status in ['finished','cancelled'])
+       && d.updatedAt == request.time && d.updatedBy == request.auth.uid;
+    }
+    allow read: if true;
+    allow create: if runs(competition()) && mid.matches('[A-Za-z0-9_-]{1,40}')
+      && validMatch(request.resource.data) && request.resource.data.locked == false;
+    // A confirmed (locked) result only changes, or unlocks, with the owner.
+    allow update: if runs(competition()) && validMatch(request.resource.data)
+      && (resource.data.locked != true || owns(competition()));
+    allow delete: if runs(competition())
+      && (owns(competition()) || (resource.data.locked != true && resource.data.status != 'finished'));
+   }
+  }
   match /groups/{gid} {
    // A high-entropy document ID is an invitation capability. Lists remain member-only.
    allow get: if signed();

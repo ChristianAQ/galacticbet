@@ -171,10 +171,13 @@ export function MatchRow({
   match: m,
   history,
   as: Container = "div",
+  plainResult = false,
 }: {
   match: Match;
   history?: Match[];
   as?: "div" | "span";
+  /** Any sport: no «A 90 minutos» under the result (penalties still say so). */
+  plainResult?: boolean;
 }) {
   const result = finishedMatchResult(m);
   const live = ["IN_PLAY", "PAUSED"].includes(m.status);
@@ -225,7 +228,9 @@ export function MatchRow({
                   ? "Empate"
                   : "Finalizado · Ganador pendiente"}
             </span>
-            <small>{result.decision}</small>
+            {(!plainResult || m.scoreDuration === "PENALTY_SHOOTOUT") && (
+              <small>{result.decision}</small>
+            )}
           </>
         ) : live ? (
           <LiveMinute match={m} />

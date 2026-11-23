@@ -1,4 +1,5 @@
 import { Layers } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   COMPETITION_CODES,
   competitionName,
@@ -11,11 +12,15 @@ export default function CompetitionTabs({
   onChange,
   available,
   onAll,
+  children,
 }: {
-  value: CompetitionCode | "global";
+  /** "none": another kind of competition (a friends' one) is selected. */
+  value: CompetitionCode | "global" | "none";
   onChange: (value: CompetitionCode) => void;
   available?: readonly CompetitionCode[];
   onAll?: () => void;
+  /** More chips after the official competitions. */
+  children?: ReactNode;
 }) {
   return (
     <div className="competition-tabs" role="group" aria-label="Competición">
@@ -43,6 +48,7 @@ export default function CompetitionTabs({
           <span>{competitionName(code, true)}</span>
         </button>
       ))}
+      {children}
     </div>
   );
 }

@@ -20,6 +20,7 @@ const titles: Record<string, string> = {
   "/porra": "Porra rápida",
   "/equipos": "Equipos",
   "/partido": "Partido",
+  "/competiciones/nueva": "Nueva competición",
 };
 export const routeTitle = (pathname: string) =>
   titles[pathname] || (pathname.startsWith("/partido/") ? titles["/partido"] : "");
@@ -28,6 +29,7 @@ export const routeTitle = (pathname: string) =>
 export function parentOf(pathname: string) {
   if (pathname.startsWith("/partido/")) return "/ligas";
   if (pathname === "/grupos") return "/perfil";
+  if (pathname.startsWith("/competiciones")) return "/ligas";
   return "/";
 }
 
