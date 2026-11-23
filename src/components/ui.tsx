@@ -1,4 +1,4 @@
-import { ArrowRight, Flag } from "lucide-react";
+import { ArrowRight, ChevronDown, Flag } from "lucide-react";
 import { useContext, useEffect, useRef, type ReactNode } from "react";
 import { matchStatusLabel, type Match } from "../lib/domain";
 import { finishedMatchResult } from "../lib/matchResult";
@@ -89,6 +89,13 @@ export function useCollapsingTitle<T extends HTMLElement>() {
  * Large title on an ink masthead. It shrinks as it scrolls under the bar (CSS
  * scroll timeline where supported) and hands its name to the compact bar.
  */
+export interface TitlePicker {
+  /** What the picker chooses («Grupo»), for screen readers. */
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}
 export function PageTitle({
   eyebrow,
   title,
@@ -96,6 +103,7 @@ export function PageTitle({
   titleControl,
   children,
   navTitle,
+  titlePicker,
 }: {
   eyebrow?: ReactNode;
   title: string;
@@ -104,6 +112,8 @@ export function PageTitle({
   children?: ReactNode;
   /** Shorter name for the compact bar, when the large title is long. */
   navTitle?: string;
+  /** The title is a choice (the selected group): tapping it opens the system picker. */
+  titlePicker?: TitlePicker;
 }) {
   useNavTitle(navTitle || title);
   const heading = useCollapsingTitle<HTMLHeadingElement>();
@@ -112,7 +122,28 @@ export function PageTitle({
       <div className="large-title">
         <div className="large-title-text">
           {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-          <h1 ref={heading}>{title}</h1>
+          {titlePicker ? (
+            <div className="title-picker">
+              <h1 ref={heading}>
+                <span>{title}</span>
+                <ChevronDown className="title-picker-chevron" size={22} strokeWidth={2.6} aria-hidden="true" />
+              </h1>
+              <select
+                className="title-picker-select"
+                aria-label={titlePicker.label}
+                value={titlePicker.value}
+                onChange={(e) => titlePicker.onChange(e.target.value)}
+              >
+                {titlePicker.options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <h1 ref={heading}>{title}</h1>
+          )}
         </div>
         {titleControl && <div className="large-title-control">{titleControl}</div>}
       </div>

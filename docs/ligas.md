@@ -67,4 +67,10 @@ Una liga abierta desde un enlace que no sigues se quita con «Quitar de la lista
 
 ## Quiniela: boleto y clasificación en una pestaña
 
-La barra inferior tiene tres opciones: Inicio, Ligas y Quiniela. Quiniela muestra «Mi boleto» o «Clasificación» (`?vista=clasificacion`) con los mismos filtros. El grupo y la liga van en las preferencias compartidas y la jornada en la URL (`?round=`). Al cambiar de vista se conservan los tres. «Jornada/Total» de la clasificación también va en la URL (`?period=all`). Los enlaces antiguos a `#/clasificacion` (avisos, accesos directos) redirigen a la vista de clasificación con sus parámetros.
+La barra inferior tiene tres opciones: Inicio, Ligas y Quiniela. La cabecera de Quiniela es común a las dos vistas y no se mueve al cambiar de una a otra:
+
+- El título es el grupo seleccionado («Los del barrio ⌄»). Al tocarlo se abre el selector del sistema para cambiar de grupo. Con una liga propia elegida, el título es la liga.
+- Debajo van las competiciones a elegir: LaLiga, Champions, Premier y tus ligas propias, igual que en Ligas. Solo están activas las que juega el grupo; si el grupo no juega la elegida, se elige la primera que sí juega. «Todas» aparece en la clasificación total.
+- El antetítulo indica el modo («Quiniela · 1X2», «Liga propia · Marcador exacto»).
+
+Debajo, «Mi boleto | Clasificación» es el mismo control fijo de Ligas: se queda bajo la barra al bajar, y el panel de «Sellar boleto» se fija justo debajo. Al cambiar de vista, el contenido se desliza hacia el lado de la pestaña elegida; si estabas muy abajo, la nueva vista empieza bajo el control. La vista va en `?vista=clasificacion`, la jornada en `?round=` (común a las dos vistas) y «Jornada/Total» en `?period=all` (con `?todas=1` para todas las competiciones). Los enlaces antiguos a `#/clasificacion` (avisos, accesos directos) redirigen a la vista de clasificación con sus parámetros.

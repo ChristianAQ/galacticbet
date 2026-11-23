@@ -951,10 +951,22 @@
   color: var(--ink-2);
 }
 
-/* «Mi boleto | Clasificación»: one tab, the same filters underneath. */
-.quiniela-views {
-  margin: 0 0 14px;
+/* «Mi boleto | Clasificación» is pinned under the bar (Ligas' section control):
+   the slip's save panel and anything else pinned goes right below it. */
+.quiniela-page .round-save-panel {
+  top: calc(var(--sticky-top) + var(--league-navigation-height, 0px));
 }
-.quiniela-views .segmented button {
-  font-size: 14px;
+.quiniela-view > .page-filters-season {
+  margin-bottom: 12px;
+}
+/* Clasificación: «Jornada / Total» and «Compartir» on one line. */
+.standings-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.standings-toolbar .segmented {
+  flex: 0 1 220px;
 }

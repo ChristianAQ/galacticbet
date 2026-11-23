@@ -1,5 +1,4 @@
-import { competitionCode, competitionName } from "../lib/competitions";
-import { COMPETITION_CODES } from "../lib/competitions";
+import { competitionName, type CompetitionCode } from "../lib/competitions";
 import type { AppUser as User } from "../lib/session";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import {
@@ -9,17 +8,15 @@ import {
   Coins,
   Stamp,
 } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
-import { CustomChips } from "../components/CustomChips";
-import PageFilters from "../components/PageFilters";
 import ConfirmQuiniela from "../components/ConfirmQuiniela";
 import RoundDeliveryStatus from "../components/RoundDeliveryStatus";
 import GroupPredictions from "../components/GroupPredictions";
 import PredictionCard from "../components/PredictionCard";
 import RoundSelector from "../components/RoundSelector";
-import { Empty, PageTitle, readableError } from "../components/ui";
+import { Empty, readableError } from "../components/ui";
 import { SkeletonRows } from "../components/Skeleton";
 import {
   loadGameSeasons,
@@ -39,8 +36,6 @@ import {
   type PredictionValue,
 } from "../lib/domain";
 import { db } from "../lib/firebase";
-import { useFollowedCompetitions } from "../lib/followedCompetitions";
-import { useLeagueChoice } from "../lib/useLeagueChoice";
 import { roundOptions } from "../lib/roundOptions";
 import { useGroupSelection } from "../lib/useGroupSelection";
 import { useRoundDelivery } from "../lib/useRoundDelivery";
@@ -72,26 +67,24 @@ const demoPlayers: Participant[] = [
 export default function PredictionsPage({
   matches,
   groups,
-  groupsReady,
   user,
   demo,
-  viewTabs,
+  liga,
+  hasFollowed,
+  demoCompetition,
 }: {
   matches: Match[];
   groups: Group[];
-  /** Your groups have loaded (an empty list means you really have none). */
-  groupsReady: boolean;
   user: User | null;
   demo: boolean;
-  /** «Mi boleto | Clasificación»: the same tab shows the table with these filters. */
-  viewTabs?: ReactNode;
+  /** A friends' competition chosen in the header above ("" for an official one). */
+  liga: string;
+  hasFollowed: boolean;
+  /** The demo's competition, chosen in the header. */
+  demoCompetition: CompetitionCode;
 }) {
-  const {
-    groupId: group,
-    selectGroup: setGroup,
-    preferences,
-  } = useGroupSelection(demo ? "" : user?.uid || "", demo ? [] : groups);
-  const [demoCompetition, setDemoCompetition] = useState("PD");
+  // Group and competition are chosen in the header above (shared with the table).
+  const { groupId: group, preferences } = useGroupSelection(demo ? "" : user?.uid || "", demo ? [] : groups);
   const [season, setSeason] = useState("");
   const [seasons, setSeasons] = useState<
     { id: string; mode: Mode; competition: string }[]
@@ -161,26 +154,6 @@ export default function PredictionsPage({
       },
       { replace: true },
     );
-  // Your friends' competitions sit next to LaLiga, Champions and Premier.
-  const { list: followed, ready: followedReady } = useFollowedCompetitions(
-    demo ? "" : user?.uid || "",
-  );
-  // The competition chosen in Ligas, Quiniela or Clasificación: one choice for all.
-  const choice = useLeagueChoice(demo ? "" : user?.uid || "");
-  // A friends' league has a slip here only if you follow it (and it has predictions).
-  const chosen =
-    choice.liga &&
-    (!followedReady || followed.some((c) => c.id === choice.liga))
-      ? choice.liga
-      : "";
-  // Without a group the official competitions have no slip: open your league.
-  const liga =
-    demo || !user
-      ? ""
-      : chosen ||
-        (groupsReady && !groups.length ? followed[0]?.id || "" : "");
-  const ligaInfo = followed.find((c) => c.id === liga);
-  const openLiga = (id: string) => choice.chooseLiga(id);
   // LaLiga, Champions or Premier chosen elsewhere meanwhile: show that season.
   useEffect(() => {
     if (demo || liga) return;
@@ -534,109 +507,38 @@ export default function PredictionsPage({
   const selectorsDisabled = savingCount > 0 || submitting;
   const total = delivery.requiredIds.length;
   const progress = total ? completed / total : 0;
-  const status = !list.length
-    ? "Elige grupo y competición y aparecerá tu boleto."
-    : isSealed
-      ? "Boleto sellado. Ahora, a sufrir con el grupo."
-      : missed
-        ? "Plazo cerrado: esta jornada se te escapó."
-        : pending
-          ? "Comprobando tu boleto…"
-          : completed > 0
-            ? "A medio rellenar. Séllalo antes del primer pitido."
-            : "Jornada abierta. Marca tus signos antes del primer partido.";
   return (
     <>
-      <PageTitle
-        eyebrow={
-          liga
-            ? `Mi boleto · ${ligaInfo?.name || "Tu liga"}`
-            : `Mi boleto${list[0] ? ` · ${competitionName(list[0].competition, true)}` : ""}`
-        }
-        title="Quiniela"
-        description={
-          liga
-            ? "Tu liga entre amigos: pronostica cada partido antes de que empiece."
-            : status
-        }
-      />
-      {viewTabs}
-      <PageFilters
-        groups={demo || liga ? [] : groups}
-        groupId={group}
-        groupLabel={
-          demo ? "Grupo de demostración" : liga ? "Seguidores" : undefined
-        }
-        onGroup={setGroup}
-        disabled={selectorsDisabled}
-        competition={
-          liga
-            ? "none"
-            : competitionCode(demo ? demoCompetition : active?.competition)
-        }
-        chips={
-          followed.length > 0 && (
-            <CustomChips
-              list={followed}
-              current={liga}
-              onSelect={(id) => {
-                if (id !== liga) haptic();
-                openLiga(id);
-              }}
-            />
-          )
-        }
-        available={
-          demo
-            ? COMPETITION_CODES
-            : COMPETITION_CODES.filter((code) =>
-                seasons.some((s) => s.competition === code),
-              )
-        }
-        onCompetition={(code) => {
-          // One URL update: leaving your league also forgets its round.
-          choice.chooseOfficial(code);
-          if (demo) setDemoCompetition(code);
-          else setSeason(seasons.find((s) => s.competition === code)?.id || "");
-        }}
-        aside={
-          <span className="page-filters-chip">
-            {(liga ? ligaInfo?.predictionMode || mode : mode) === "classic"
-              ? "1X2"
-              : "Marcador exacto"}
-          </span>
-        }
-      >
+      {/* Several seasons of the same competition in this group: which one. */}
         {!demo &&
-          !liga &&
-          seasons.filter((s) => s.competition === active?.competition).length >
-            1 && (
-            <label className="group-picker page-filters-season">
-              <CalendarDays size={16} aria-hidden="true" />
-              <span className="sr-only">Temporada de la competición</span>
-              <select
-                value={season}
-                disabled={selectorsDisabled}
-                onChange={(e) => {
-                  setSeason(e.target.value);
-                  setRound("");
-                }}
-              >
-                {seasons
-                  .filter((s) => s.competition === active?.competition)
-                  .map((s) => {
-                    const year = Number(s.id.split("-")[1]);
-                    return (
-                      <option key={s.id} value={s.id}>
-                        Temporada {year} / {year + 1}
-                      </option>
-                    );
-                  })}
-              </select>
-              <ChevronDown size={16} aria-hidden="true" />
-            </label>
-          )}
-      </PageFilters>
+        !liga &&
+        seasons.filter((s) => s.competition === active?.competition).length >
+          1 && (
+          <label className="group-picker page-filters-season">
+            <CalendarDays size={16} aria-hidden="true" />
+            <span className="sr-only">Temporada de la competición</span>
+            <select
+              value={season}
+              disabled={selectorsDisabled}
+              onChange={(e) => {
+                setSeason(e.target.value);
+                setRound("");
+              }}
+            >
+              {seasons
+                .filter((s) => s.competition === active?.competition)
+                .map((s) => {
+                  const year = Number(s.id.split("-")[1]);
+                  return (
+                    <option key={s.id} value={s.id}>
+                      Temporada {year} / {year + 1}
+                    </option>
+                  );
+                })}
+            </select>
+            <ChevronDown size={16} aria-hidden="true" />
+          </label>
+        )}
       {liga && user ? (
         <Suspense fallback={<SkeletonRows rows={5} label="Preparando tu boleto" />}>
           <CustomQuiniela key={liga} cid={liga} user={user} />
@@ -841,7 +743,7 @@ export default function PredictionsPage({
               ? "Los partidos aparecerán en cuanto se sincronice el calendario de esta competición."
               : groups.length
                 ? "Toca el escudo de una competición y aparecerá tu boleto."
-                : followed.length
+                : hasFollowed
                   ? "Toca tu liga arriba y aparecerá su boleto. Para LaLiga, Champions y Premier hace falta un grupo: crea el tuyo o únete con el código de un amigo."
                   : "Para rellenar boletos hace falta un grupo. Crea el tuyo o únete con el código de un amigo."}
         </Empty>

@@ -1,4 +1,4 @@
-import { competitionName, isCompetition, type CompetitionCode } from "../lib/competitions";
+import { competitionName, isCompetition } from "../lib/competitions";
 import type { AppUser as User } from "../lib/session";
 import { ChevronDown, ChevronUp, Crown } from "lucide-react";
 import {
@@ -12,11 +12,7 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
-import { CustomChips } from "../components/CustomChips";
-import { useFollowedCompetitions } from "../lib/followedCompetitions";
-import { useLeagueChoice } from "../lib/useLeagueChoice";
-import { haptic } from "../lib/motion";
-import { Empty, PageTitle, PrivateGate } from "../components/ui";
+import { Empty, PrivateGate } from "../components/ui";
 import { SkeletonRows } from "../components/Skeleton";
 import { type Group } from "../lib/data";
 import { useGroupRankings } from "../lib/useGroupRankings";
@@ -30,7 +26,7 @@ import RoundRecap from "../components/RoundRecap";
 import { roundRecap } from "../lib/roundRecap";
 import { groupPotCents, roundPot } from "../lib/pot";
 import { useRoundAttendance } from "../lib/useRoundAttendance";
-import PageFilters, { Segmented } from "../components/PageFilters";
+import { Segmented } from "../components/PageFilters";
 import RoundSelector from "../components/RoundSelector";
 import ShareTrigger from "../components/ShareTrigger";
 import { shareFileName, standingsText } from "../lib/shareSummary";
@@ -60,170 +56,68 @@ const ShareDialog = lazy(() => import("../components/ShareDialog"));
 const CustomStandings = lazy(() => import("../components/CustomStandings"));
 
 /** The group ranking only: competition tables live in each match page. */
+/**
+ * Clasificación inside the Quiniela tab: the header above it (group and
+ * competition) and the round are shared with your slip. This is only the
+ * table: «Jornada/Total», sharing and the ranking itself.
+ */
 export default function StandingsPage({
   groups,
-  groupsReady,
   matches,
   user,
   onLogin,
-  viewTabs,
+  liga,
+  hasFollowed,
 }: {
   groups: Group[];
-  /** Your groups have loaded (an empty list means you really have none). */
-  groupsReady: boolean;
   matches: Match[];
-  loading: boolean;
   user: User | null;
   onLogin: () => void;
-  /** «Mi boleto | Clasificación»: the same tab shows your slip with these filters. */
-  viewTabs?: ReactNode;
+  /** A friends' competition chosen in the header ("" for an official one). */
+  liga: string;
+  hasFollowed: boolean;
 }) {
-  // Your friends' competitions sit next to LaLiga, Champions and Premier.
-  const { list: followed, ready: followedReady } = useFollowedCompetitions(user?.uid || "");
-  // The competition chosen in Ligas, Quiniela or Clasificación: one choice for all.
-  const choice = useLeagueChoice(user?.uid || "");
-  // A friends' league has a table here only if you follow it (and it has predictions).
-  const chosen =
-    choice.liga && (!followedReady || followed.some((c) => c.id === choice.liga)) ? choice.liga : "";
-  // Without a group there is no official table: open your league.
-  const liga = user
-    ? chosen || (groupsReady && !groups.length ? followed[0]?.id || "" : "")
-    : "";
-  const setLiga = (id: string) => choice.chooseLiga(id);
-  const chips = followed.length > 0 && (
-    <CustomChips
-      list={followed}
-      current={liga}
-      onSelect={(id) => {
-        if (id !== liga) haptic();
-        setLiga(id);
-      }}
-    />
-  );
-  if (user && liga)
-    return (
-      <CustomStandingsPage
-        cid={liga}
-        user={user}
-        chips={chips}
-        hasGroups={groups.length > 0}
-        onOfficial={(code) => choice.chooseOfficial(code)}
-        viewTabs={viewTabs}
-      />
-    );
-  if (user && groups.length)
-    return (
-      <GroupStandings
-        groups={groups}
-        matches={matches}
-        user={user}
-        chips={chips}
-        viewTabs={viewTabs}
-      />
-    );
+  if (!user) return <PrivateGate onLogin={onLogin} />;
+  if (liga) return <CustomStandingsView cid={liga} user={user} />;
+  if (groups.length) return <GroupStandings groups={groups} matches={matches} user={user} />;
   return (
-    <>
-      <StandingsTitle viewTabs={viewTabs} />
-      {!user ? (
-        <PrivateGate onLogin={onLogin} />
-      ) : (
-        <>
-          {chips && (
-            <PageFilters
-              groups={[]}
-              groupId=""
-              onGroup={() => undefined}
-              competition="none"
-              available={[]}
-              onCompetition={() => undefined}
-              chips={chips}
-            />
-          )}
-          <Empty
-            art="podium"
-            title="Un podio sin nadie encima"
-            action={<GroupActions />}
-          >
-            {chips
-              ? "Toca tu liga arriba para ver su tabla. Para LaLiga, Champions y Premier hace falta un grupo: crea el tuyo o únete con el código de un amigo."
-              : "La tabla cobra vida con un grupo. Crea el tuyo o únete con el código de un amigo y que empiece el pique."}
-          </Empty>
-        </>
-      )}
-    </>
+    <Empty art="podium" title="Un podio sin nadie encima" action={<GroupActions />}>
+      {hasFollowed
+        ? "Toca tu liga arriba para ver su tabla. Para LaLiga, Champions y Premier hace falta un grupo: crea el tuyo o únete con el código de un amigo."
+        : "La tabla cobra vida con un grupo. Crea el tuyo o únete con el código de un amigo y que empiece el pique."}
+    </Empty>
+  );
+}
+
+/** «Jornada / Total» and, when there is something to share, «Compartir». */
+function StandingsToolbar({ action }: { action?: ReactNode }) {
+  const [period, setPeriod] = usePeriod();
+  return (
+    <div className="standings-toolbar">
+      <Segmented<Period>
+        label="Periodo de clasificación"
+        value={period}
+        options={[
+          { value: "round", label: "Jornada" },
+          { value: "all", label: "Total" },
+        ]}
+        onChange={setPeriod}
+        size="sm"
+      />
+      {action}
+    </div>
   );
 }
 
 /** One of your friends' competitions: its followers' table, by round or in total. */
-function CustomStandingsPage({
-  cid,
-  user,
-  chips,
-  hasGroups,
-  onOfficial,
-  viewTabs,
-}: {
-  cid: string;
-  user: User;
-  chips: ReactNode;
-  /** Without a group the official tables don't exist: their chips stay off. */
-  hasGroups: boolean;
-  onOfficial: (code: CompetitionCode) => void;
-  viewTabs?: ReactNode;
-}) {
-  const [period, setPeriod] = usePeriod();
+function CustomStandingsView({ cid, user }: { cid: string; user: User }) {
+  const [period] = usePeriod();
   return (
     <>
-      <StandingsTitle viewTabs={viewTabs} />
-      <PageFilters
-        groups={[]}
-        groupId=""
-        groupLabel="Seguidores"
-        onGroup={() => undefined}
-        competition="none"
-        available={hasGroups ? undefined : []}
-        onCompetition={onOfficial}
-        chips={chips}
-        aside={
-          <Segmented<Period>
-            label="Periodo de clasificación"
-            value={period}
-            options={[
-              { value: "round", label: "Jornada" },
-              { value: "all", label: "Total" },
-            ]}
-            onChange={setPeriod}
-          />
-        }
-      />
-      <Suspense
-        fallback={
-          <SkeletonRows rows={6} variant="line" label="Cargando clasificación" />
-        }
-      >
+      <StandingsToolbar />
+      <Suspense fallback={<SkeletonRows rows={6} variant="line" label="Cargando clasificación" />}>
         <CustomStandings key={cid} cid={cid} user={user} period={period} />
       </Suspense>
-    </>
-  );
-}
-
-function StandingsTitle({
-  action,
-  viewTabs,
-  eyebrow = "Clasificación",
-}: {
-  action?: ReactNode;
-  viewTabs?: ReactNode;
-  eyebrow?: string;
-}) {
-  return (
-    <>
-      <PageTitle
-        eyebrow={eyebrow}
-        title="Quiniela"
-        titleControl={action}
-      />
-      {viewTabs}
     </>
   );
 }
@@ -250,23 +144,18 @@ function GroupStandings({
   groups,
   matches,
   user,
-  chips,
-  viewTabs,
 }: {
   groups: Group[];
   matches: Match[];
   user: User;
-  chips?: ReactNode;
-  viewTabs?: ReactNode;
 }) {
-  const { groupId, selectGroup, preferences } = useGroupSelection(
-    user.uid,
-    groups,
-  );
+  // Group and competition come from the header above (shared with your slip).
+  const { groupId, preferences } = useGroupSelection(user.uid, groups);
   const competition = preferences.competition;
-  const [combined, setCombined] = useState(false);
   const [params, setParams] = useSearchParams();
-  const [period, setPeriod] = usePeriod();
+  // «Todas» (every competition together) only exists in the season total.
+  const combined = params.get("todas") === "1";
+  const [period] = usePeriod();
   const scope = period === "all" && combined ? "global" : competition;
   /*
    * The round lives in the URL (?round=), shared with your slip: switching
@@ -289,10 +178,8 @@ function GroupStandings({
     if (!round || lastRound.current === round) return;
     lastRound.current = round;
     const code = round.split("-")[0];
-    if (isCompetition(code) && code !== preferences.competition) {
+    if (isCompetition(code) && code !== preferences.competition)
       preferenceStore.update(user.uid, { competition: code, liga: "" });
-      setCombined(false);
-    }
   }, [round]);
   const [sharing, setSharing] = useState(false);
   const selectedGroup = groups.find((g) => g.id === groupId);
@@ -425,9 +312,7 @@ function GroupStandings({
 
   return (
     <>
-      <StandingsTitle
-        viewTabs={viewTabs}
-        eyebrow={`Clasificación · ${scope === "global" ? "Todas" : competitionName(scope, true)}`}
+      <StandingsToolbar
         action={
           <ShareTrigger
             label="Compartir"
@@ -463,33 +348,6 @@ function GroupStandings({
           />
         </Suspense>
       )}
-      <PageFilters
-        groups={groups}
-        groupId={groupId}
-        onGroup={(id) => {
-          selectGroup(id);
-          setRound("");
-        }}
-        competition={scope}
-        onCompetition={(value) => {
-          preferenceStore.update(user.uid, { competition: value, liga: "" });
-          setCombined(false);
-          setRound("");
-        }}
-        onAll={period === "all" ? () => setCombined(true) : undefined}
-        chips={chips}
-        aside={
-          <Segmented<Period>
-            label="Periodo de clasificación"
-            value={period}
-            options={[
-              { value: "round", label: "Jornada" },
-              { value: "all", label: "Total" },
-            ]}
-            onChange={setPeriod}
-          />
-        }
-      />
       {selectedGroup && period === "round" && data && (
         <RoundSelector
           rounds={roundChoices}

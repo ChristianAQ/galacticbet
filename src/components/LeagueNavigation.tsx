@@ -20,6 +20,7 @@ export default function LeagueNavigation<T extends string = LeagueTab>({
   idPrefix,
   panelId,
   tabs = LEAGUE_TABS as unknown as readonly { id: T; label: string }[],
+  label = "Información de la liga",
 }: {
   tab: T;
   onChange: (tab: T) => void;
@@ -29,6 +30,8 @@ export default function LeagueNavigation<T extends string = LeagueTab>({
   panel: RefObject<HTMLElement | null>;
   idPrefix: string;
   panelId: string;
+  /** What the sections are, for screen readers. */
+  label?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLSpanElement>(null);
@@ -99,11 +102,12 @@ export default function LeagueNavigation<T extends string = LeagueTab>({
         className={`league-navigation${stuck ? " is-stuck" : ""}`}
       >
         <Segmented<T>
-          label="Información de la liga"
+          label={label}
           value={tab}
           options={tabs.map((t) => ({
             value: t.id,
-            label: shortLabels[t.id as LeagueTab] || t.label,
+            // Short names only for the four league sections; other sets name their own.
+            label: (tabs === (LEAGUE_TABS as unknown) ? shortLabels[t.id as LeagueTab] : undefined) || t.label,
           }))}
           onChange={select}
           tabs={{ idPrefix, controls: panelId }}
