@@ -7,28 +7,29 @@ La ruta principal es `/ligas`, con pestañas `partidos`, `clasificacion`, `notic
 - **Partidos:** reutiliza tarjetas, jornadas, fichas y el criterio de jornada actual. La temporada se filtra antes de elegir jornadas o mostrar resultados. Un enlace a una jornada histórica permite resolver su temporada si no hay una temporada explícita.
 - **Clasificación:** `CompetitionTable` reutiliza `LeagueTable`, compartida con la nueva ficha de partido, en su modalidad de columnas completas. Reutiliza los resultados normalizados y muestra PJ, V, E, D, goles a favor/en contra en una sola columna +/− (20-10), DG y puntos, con equipos a cero cuando ya están en el calendario. Las columnas compactas caben sin desplazamiento lateral desde 320 px; los nombres largos se truncan visualmente conservando el nombre accesible. La cabecera permanece fija debajo de la navegación y sigue su reducción. La tabla compacta de la ficha de partido conserva sus columnas anteriores. Se usa solo la fase liga de la competición y temporada elegidas, sin mezclar eliminatorias. El orden por puntos/diferencia/goles es una clasificación calculada: no sustituye los desempates particulares ni sanciones del organizador. La interfaz lo indica.
 - **Noticias:** conserva `news/football` y sus seis titulares generales para Inicio. Añade hasta seis titulares por competición en `competitionArticles`, de manera que una competición no desplace los de las otras. La app filtra competición, temporada deportiva julio–junio y antigüedad máxima de siete días; ordena por fecha descendente. No muestra noticias actuales al elegir una temporada histórica. La caché local es de una hora (ausencias dos minutos), sin consultas por pestaña o competición adicionales al mismo feed.
-- **Estadísticas de jugadores:** `leagueStats/{PD|CL|PL}-{año}` contiene únicamente los primeros cinco registros normalizados de cada clasificación disponible. Las categorías y validaciones se concentran en `leagueStats.ts`. Una visita a la pestaña lee un documento de temporada, con caché compartida de quince minutos. Los cambios de competición/temporada cancelan la presentación de respuestas anteriores. Hay estados de carga, error con reintento y ausencia de datos.
-- **Estadísticas de equipos:** máximos goleadores y menos goleados se calculan con todos los resultados reglamentarios de la competición y temporada seleccionadas, incluidas eliminatorias. Solo se consideran equipos con partidos jugados; no se atribuyen porterías a cero a un portero sin evidencia de sus apariciones.
+- **Datos:** solo cifras comprobables, con dos fuentes:
+  - Las cifras de la temporada y las tablas de equipos se calculan en la app con los resultados oficiales (`seasonFigures.ts`): partidos jugados de los programados, goles y media por partido, «ambos marcan», «más de 2,5 goles» y el reparto 1 · X · 2.
+  - Los goleadores vienen de Football-Data, el mismo proveedor que los resultados.
 
-## Fuente de los rankings
+  Las tablas de equipos son top 5 de más goleadores, menos goleados, porterías a cero, mejor local y mejor visitante (puntos en casa y fuera). Cuentan los partidos con resultado oficial a 90 minutos de la competición y temporada elegidas, eliminatorias incluidas; un partido en juego no cuenta. «Menos goleados» ordena por goles recibidos por partido entre los equipos con al menos la mitad de partidos que el que más ha jugado, para que un eliminado pronto no lo encabece. Los empates comparten posición.
 
-Se verificaron el 6 de noviembre de 2026 la [documentación de SportAPI](https://sportapi.ai/docs) y su [OpenAPI](https://sportapi.ai/api/openapi.json). Los endpoints publicados son:
+## Goleadores
 
-- `/leagues/{id}/topscorers?limit=100` → `goals`.
-- `/leagues/{id}/topassists?limit=100` → `assists`.
-- `/leagues/{id}/topcards?limit=100` → `yellow_cards` y `red_cards`.
+`leagueStats/{PD|CL|PL}-{año}` (versión 2) guarda hasta 20 goleadores: nombre, club (nombre corto), escudo, goles, asistencias, penaltis y partidos jugados. Asistencias y penaltis son `null` cuando el proveedor no los publica: nunca se interpretan como cero. Se exige que la temporada y la competición de la respuesta coincidan con las mostradas. Un jugador repetido no se cuenta dos veces. La pestaña muestra los 10 primeros con «Ver los 20», la fuente y cuándo se actualizó. Una visita lee un solo documento, con caché compartida de quince minutos.
 
-IDs publicados: PD=1, CL=18, PL=24. Se exige `success: true`, la fecha `season_from` correspondiente al año de inicio de la temporada deportiva y recuentos enteros no negativos. No se usa `season=all`: mezclaría temporadas. Las fechas locales de enero–mayo no se confunden con el inicio de la siguiente temporada. Los escudos se asocian mediante los alias de equipos y los calendarios de la misma competición/temporada, sin exponer la clave en URLs de imágenes.
-
-Las listas del proveedor tienen límite de cien registros: especialmente tarjetas, ordenadas originalmente por total de tarjetas, pueden ser parciales al separarlas por color. La interfaz informa del límite y la cobertura. Participación en goles suma solo cuando ambas cifras están publicadas para la misma combinación de nombre y equipo; no interpreta una ausencia como cero y avisa de que ese ranking es parcial. Los empates comparten posición.
-
-No se ha verificado un ranking global de minutos por competición/temporada ni de porterías a cero por portero en los endpoints disponibles. Las dos categorías tienen mensajes explícitos de ausencia. El endpoint individual `/players/stats` mezcla totales y partidos de varias competiciones sin parámetros de temporada: no se usa para inventar esas clasificaciones.
+La versión 1 (rankings de SportAPI) ya no se lee. Tenía listas parciales: tarjetas recortadas a cien registros, participación en goles solo de quien salía en ambas listas, y minutos y porterías a cero sin ranking disponible. Por eso se veían huecos y cifras que no cuadraban.
 
 ## Sincronización y consumo
 
-`scripts/syncLeagueStats.ts` se ejecuta desde `scripts/officialSync.ts` dentro de la sincronización completa con el `SPORTAPI_KEY` existente, nunca desde el navegador ni en cada actualización de diez minutos. Caché mínima de seis horas por competición/temporada: máximo nueve peticiones en una renovación de las tres ligas. Comparte los límites transaccionales diarios/mensuales de SportAPI con resultados rápidos. Una clave rechazada, una cuota agotada o una temporada no verificable conserva la edición anterior y detiene nuevas consultas de esa ejecución.
+`scripts/syncLeagueStats.ts` se ejecuta desde `scripts/officialSync.ts`, después de los calendarios y con el mismo `FOOTBALL_DATA_TOKEN`. Consulta `/competitions/{code}/scorers?season={año}&limit=20`:
 
-Firestore permite solo obtener documentos públicos de temporada con IDs válidos; el cliente no puede listar la colección ni escribir estadísticas. `rankings` y los titulares por competición no se indexan. La publicación de reglas e índices va incluida en Deploy frontend. Después de publicar, las primeras estadísticas requieren una ejecución correcta de Synchronize football and standings. No hacen falta secretos nuevos. La cobertura con la clave del repositorio se verifica en Actions; las pruebas locales usan respuestas simuladas.
+- Una sola petición por ejecución: la de la competición cuya edición es más antigua.
+- Cada competición se renueva como mucho cada seis horas.
+- No consulta antes del primer resultado de la temporada.
+
+Un error, una cuota agotada o una temporada no verificable conservan la edición anterior. Los resultados oficiales nunca esperan a este paso.
+
+Firestore permite solo obtener documentos públicos de temporada con IDs válidos; el cliente no puede listar la colección ni escribir estadísticas. `scorers` y los titulares por competición no se indexan. La publicación de reglas e índices va incluida en Deploy frontend. Tras publicar, los goleadores aparecen con las siguientes ejecuciones de Synchronize football and standings (una competición por ejecución). No hacen falta secretos nuevos.
 
 ## Competiciones entre amigos: ficha y acta
 
@@ -49,7 +50,7 @@ Se retira «Copiar texto» de `ShareDialog`, el menú compartido de quinielas y 
 
 ## Comprobaciones
 
-Pruebas unitarias: filtros por liga/temporada, tabla, normalización de rankings, cuotas, rechazo de temporadas incorrectas, caché, noticias y conservación ante fallos. El emulador verifica acceso público por ID y denegación de listados/escrituras. El navegador comprueba 320–1440 px, sticky bajo la cabecera móvil, todas las columnas de clasificación, aislamiento de temporadas, carga/vacío/error/reintento, teclado, enlaces antiguos y compartir únicamente imagen.
+Pruebas unitarias: filtros por liga/temporada, tabla, goleadores oficiales y cifras de la temporada, cuotas, rechazo de temporadas incorrectas, caché, noticias y conservación ante fallos. El emulador verifica acceso público por ID y denegación de listados/escrituras. El navegador comprueba 320–1440 px, sticky bajo la cabecera móvil, todas las columnas de clasificación, aislamiento de temporadas, carga/vacío/error/reintento, teclado, enlaces antiguos y compartir únicamente imagen.
 
 ## Quiniela de una liga propia
 
@@ -76,7 +77,7 @@ Cada liga propia es privada o pública (`visibility`; sin el campo, privada):
 
 Se elige al crearla («Visibilidad») y el propietario la cambia en Gestión › Ajustes.
 
-La lupa a la derecha del título grande, en Ligas y en Quiniela, abre «Buscar ligas»:
+La lupa a la derecha del título grande de Ligas abre «Buscar ligas»:
 
 - Sin texto, lista ligas públicas, primero las más seguidas.
 - Al escribir, busca por el principio de cualquier palabra del nombre o del deporte, sin tildes ni mayúsculas.

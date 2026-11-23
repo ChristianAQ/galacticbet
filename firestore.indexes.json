@@ -33,7 +33,7 @@
     },
     {
       "collectionGroup": "leagueStats",
-      "fieldPath": "rankings",
+      "fieldPath": "scorers",
       "indexes": []
     },
     {

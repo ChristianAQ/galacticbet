@@ -544,7 +544,7 @@ export default function CompetitionCreatePage({
           />
           <p className="footnote">
             {visibility === "public"
-              ? "Cualquiera puede encontrarla con la lupa de Ligas y Quiniela y seguirla."
+              ? "Cualquiera puede encontrarla con la lupa de Ligas y seguirla."
               : "No sale en la búsqueda: solo entra quien tenga su código, su enlace o el QR."}{" "}
             Puedes cambiarlo en Ajustes.
           </p>

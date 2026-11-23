@@ -2,10 +2,11 @@ import { expect, it, vi } from "vitest";
 import type { Firestore } from "firebase-admin/firestore";
 import {
   buildLeagueStats,
-  normalizeLeagueRanking,
+  normalizeScorers,
   syncLeagueStats,
 } from "../scripts/syncLeagueStats";
 import { validLeagueStats, topFive } from "../src/lib/leagueStats";
+import { seasonFigures, teamBoards, teamLines } from "../src/lib/seasonFigures";
 import {
   competitionSeasons,
   leagueTab,
@@ -35,115 +36,82 @@ const fixture = (extra: Partial<Match> = {}): Match => ({
   awayScore: 1,
   ...extra,
 });
-const player = (i: number) => ({
-  player_name: `Jugador ${i}`,
-  team_name: "Barcelona",
-  team_id: 1,
+const scorer = (i: number, extra: Record<string, unknown> = {}) => ({
+  player: { id: i, name: `Jugador ${i}` },
+  team: { id: 81, name: "FC Barcelona", shortName: "Barça", crest: "https://crests.football-data.org/81.png" },
+  playedMatches: 12,
   goals: i,
-  assists: i,
-  yellow_cards: i,
-  red_cards: i,
+  assists: i % 2 ? null : 1,
+  penalties: 0,
+  ...extra,
 });
-const response = (data: unknown[], season = "2026-08-01") => ({
-  success: true,
-  season_from: season,
-  data,
+const scorers = (list: unknown[], startDate = "2026-08-15", code = "PD") => ({
+  competition: { code },
+  season: { startDate },
+  scorers: list,
 });
-it("valida temporada y nombres, no acepta cifras negativas ni reutiliza escudos de otra liga", () => {
-  const rows = normalizeLeagueRanking(
-    response([
-      player(1),
-      { ...player(2), goals: -1 },
-      { ...player(3), assists: null },
-    ]),
+it("goleadores oficiales: valida temporada y competición, no inventa asistencias y ordena por goles", () => {
+  const rows = normalizeScorers(
+    scorers([scorer(3), scorer(7), { ...scorer(5), goals: -1 }, scorer(7), scorer(4, { team: { name: "Girona FC" } })]),
     "PD",
     "PD-2026",
-    [fixture()],
   );
-  expect(rows[0].crest).toBe(fixture().homeCrest);
-  expect(rows[1].goals).toBeUndefined();
-  expect(rows[2].assists).toBeUndefined();
-  expect(
-    normalizeLeagueRanking(response([player(1)]), "CL", "CL-2026", [
-      fixture(),
-    ])[0].crest,
-  ).toBeUndefined();
-  expect(() =>
-    normalizeLeagueRanking(
-      response([player(1)], "2025-08-01"),
-      "PD",
-      "PD-2026",
-      [],
-    ),
-  ).toThrow();
-  expect(() =>
-    normalizeLeagueRanking(
-      response([player(1)], "2026-01-01"),
-      "PD",
-      "PD-2026",
-      [],
-    ),
-  ).toThrow();
-  expect(() =>
-    normalizeLeagueRanking(
-      { success: false, season_from: "2026-08-01", data: [] },
-      "PD",
-      "PD-2026",
-      [],
-    ),
-  ).toThrow();
-  expect(
-    normalizeLeagueRanking(
-      response([player(1), player(1)]),
-      "PD",
-      "PD-2026",
-      [],
-    ),
-  ).toEqual([]);
-});
-it("construye top 5 ordenados, separa tarjetas y suma participación solo si ambas cifras están publicadas", () => {
-  const goals = normalizeLeagueRanking(
-    response(Array.from({ length: 8 }, (_, i) => player(i + 1))),
-    "PD",
-    "PD-2026",
-    [],
-  );
-  const assists = normalizeLeagueRanking(
-    response([player(8), player(7)]),
-    "PD",
-    "PD-2026",
-    [],
-  );
-  const stats = buildLeagueStats(
-    "PD",
-    "PD-2026",
-    { topscorers: goals, topassists: assists, topcards: [...goals].reverse() },
-    now,
-  );
-  expect(stats.rankings.goals?.map((r) => r.value)).toEqual([8, 7, 6, 5, 4]);
-  expect(stats.rankings.goalContributions?.map((r) => r.value)).toEqual([
-    16, 14,
+  expect(rows.map((r) => [r.name, r.goals])).toEqual([
+    ["Jugador 7", 7],
+    ["Jugador 4", 4],
+    ["Jugador 3", 3],
   ]);
-  expect(stats.rankings.minutes).toBeUndefined();
-  expect(stats.rankings.cleanSheets).toBeUndefined();
+  expect(rows[0]).toMatchObject({ key: "p7", team: "Barça", assists: null, penalties: 0, played: 12 });
+  expect(rows[0].crest).toMatch(/^https:/);
+  expect(rows[1]).toMatchObject({ team: "Girona FC", assists: 1 });
+  expect(rows[1].crest).toBeUndefined();
+  expect(() => normalizeScorers(scorers([scorer(1)], "2025-08-15"), "PD", "PD-2026")).toThrow();
+  expect(() => normalizeScorers(scorers([scorer(1)], "2026-08-15", "PL"), "PD", "PD-2026")).toThrow();
+  expect(() => normalizeScorers({ scorers: "x" }, "PD", "PD-2026")).toThrow();
+  const stats = buildLeagueStats("PD", "PD-2026", rows, now);
   expect(validLeagueStats(stats)).toBe(true);
+  expect(validLeagueStats({ ...stats, scorers: [{ ...rows[0], goals: -1 }] })).toBe(false);
+  expect(validLeagueStats({ ...stats, scorers: [rows[0], rows[0]] })).toBe(false);
+  // The old SportAPI edition is not read any more.
+  expect(validLeagueStats({ ...stats, version: 1, provider: "SportAPI", rankings: {} })).toBe(false);
   expect(
-    validLeagueStats({
-      ...stats,
-      rankings: { goals: [{ ...stats.rankings.goals![0], value: -1 }] },
-    }),
-  ).toBe(false);
-  expect(
-    topFive(
-      goals.map((g) => ({
-        key: g.key,
-        name: g.name,
-        team: g.team,
-        value: g.goals!,
-      })),
-      true,
-    )[0].value,
+    topFive([1, 3, 2].map((v) => ({ key: `k${v}`, name: `N${v}`, team: "", value: v })), true)[0].value,
   ).toBe(1);
+});
+it("cifras de la temporada y tablas de equipos salen solo de resultados oficiales", () => {
+  const m = (id: string, home: string, away: string, h: number | null, a: number | null, extra: Partial<Match> = {}) =>
+    fixture({ id, home, away, homeTeamId: undefined, awayTeamId: undefined, homeCrest: undefined, homeScore: h, awayScore: a, ...extra });
+  const matches = [
+    m("1", "A", "B", 2, 1),
+    m("2", "B", "C", 0, 0),
+    m("3", "C", "A", 1, 3),
+    m("4", "A", "C", 1, 1),
+    m("5", "B", "A", null, null, { status: "TIMED" }),
+    m("6", "C", "B", 2, 2, { status: "IN_PLAY" }),
+    m("7", "C", "B", null, null, { status: "CANCELLED" }),
+  ];
+  expect(seasonFigures(matches)).toEqual({
+    played: 4,
+    total: 6,
+    goals: 9,
+    home: 1,
+    draws: 2,
+    away: 1,
+    bothScored: 3,
+    overTwoAndHalf: 2,
+  });
+  const boards = teamBoards(teamLines(matches));
+  expect(boards.attack.map((r) => [r.name, r.value])).toEqual([["A", 6], ["C", 2], ["B", 1]]);
+  expect(boards.attack[0].team).toBe("3 partidos · 2,0 por partido");
+  expect(boards.defence.map((r) => [r.name, r.value])).toEqual([["B", 2], ["A", 3], ["C", 4]]);
+  expect(boards.cleanSheets.map((r) => [r.name, r.value])).toEqual([["B", 1], ["C", 1]]);
+  expect(boards.cleanSheets[0].team).toBe("de 2 partidos");
+  expect(boards.home.map((r) => [r.name, r.value])).toEqual([["A", 4], ["B", 1], ["C", 0]]);
+  expect(boards.home[0].team).toBe("2 partidos · 1V 1E 0D");
+  expect(boards.away.map((r) => [r.name, r.value])).toEqual([["A", 3], ["C", 2], ["B", 0]]);
+  // A team with far fewer matches doesn't lead «menos goleados».
+  const early = [...matches, m("8", "D", "A", 0, 0)];
+  expect(teamBoards(teamLines(early)).defence.map((r) => r.name)).not.toContain("D");
 });
 it("la tabla separa competición y temporada, incluye equipos sin partidos y conserva V/E/D y GF/GC", () => {
   const matches = [
@@ -225,82 +193,39 @@ function database() {
   } as unknown as Firestore;
   return { db, documents, set };
 }
-it("sincroniza con 3 consultas por liga, reutiliza seis horas de caché y comparte el límite mensual", async () => {
+it("goleadores: una consulta por ejecución a la liga más desactualizada y seis horas de caché", async () => {
   const { db, documents, set } = database();
-  const request = vi
-    .fn<typeof fetch>()
-    .mockImplementation(
-      async () => new Response(JSON.stringify(response([player(2)]))),
-    );
+  const api = vi.fn(async (path: string) => scorers([scorer(5)], "2026-08-15", path.split("/")[2]) as never);
   const log = vi.fn();
-  await syncLeagueStats(db, "TEST_KEY", [fixture()], {
-    now,
-    request,
-    runId: "first",
-    log,
-  });
-  expect(request).toHaveBeenCalledTimes(3);
-  expect(set).toHaveBeenCalledTimes(1);
-  expect(validLeagueStats(documents.get("leagueStats/PD-2026"))).toBe(true);
-  expect(
-    (documents.get("providerBudgets/sportapi") as { monthUsed: number })
-      .monthUsed,
-  ).toBe(3);
-  expect(
-    request.mock.calls.every(
-      ([url, options]) =>
-        String(url).startsWith("https://sportapi.ai/api/leagues/1/") &&
-        !String(url).includes("TEST_KEY") &&
-        options?.redirect === "error",
-    ),
-  ).toBe(true);
-  await syncLeagueStats(db, "TEST_KEY", [fixture()], {
-    now: now + 3600000,
-    request,
-    runId: "cached",
-    log,
-  });
-  expect(request).toHaveBeenCalledTimes(3);
+  const played = [fixture(), fixture({ id: "pl", competition: "PL", seasonId: "PL-2026" })];
+  documents.set("leagueStats/PD-2026", buildLeagueStats("PD", "PD-2026", [], now - 7 * 3600000));
+  await syncLeagueStats(db, api, played, { now, log });
+  // PL had no edition at all: it goes first, and only it.
+  expect(api).toHaveBeenCalledTimes(1);
+  expect(api.mock.calls[0][0]).toBe("/competitions/PL/scorers?season=2026&limit=20");
+  expect(validLeagueStats(documents.get("leagueStats/PL-2026"))).toBe(true);
+  await syncLeagueStats(db, api, played, { now, log });
+  expect(api.mock.calls[1][0]).toMatch(/^\/competitions\/PD\//);
+  await syncLeagueStats(db, api, played, { now: now + 3600000, log });
+  expect(api).toHaveBeenCalledTimes(2);
+  expect(set).toHaveBeenCalledTimes(2);
 });
-it("una temporada incorrecta o un bloqueo HTTP conserva los datos y no reintenta ni registra secretos", async () => {
-  for (const invalid of [true, false]) {
-    const { db, documents, set } = database();
+it("goleadores: sin resultados no consulta; un error o una temporada distinta conservan la edición anterior", async () => {
+  const { db, documents, set } = database();
+  const api = vi.fn(async () => scorers([scorer(5)]) as never);
+  await syncLeagueStats(db, api, [fixture({ status: "TIMED", homeScore: null, awayScore: null })], { now, log: vi.fn() });
+  expect(api).not.toHaveBeenCalled();
+  for (const failure of [
+    async () => {
+      throw new Error("Football-Data HTTP 403");
+    },
+    async () => scorers([scorer(5)], "2025-08-15") as never,
+  ]) {
     documents.set("leagueStats/PD-2026", { old: "KEEP" });
-    const request = vi
-      .fn<typeof fetch>()
-      .mockImplementation(async () =>
-        invalid
-          ? new Response(JSON.stringify(response([player(2)], "2025-08-01")))
-          : new Response("PRIVATE_BODY", { status: 401 }),
-      );
     const log = vi.fn();
-    await syncLeagueStats(db, "PRIVATE_KEY", [fixture()], {
-      now,
-      request,
-      runId: "invalid",
-      log,
-    });
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(set).not.toHaveBeenCalled();
+    await syncLeagueStats(db, vi.fn(failure), [fixture()], { now, log });
     expect(documents.get("leagueStats/PD-2026")).toEqual({ old: "KEEP" });
-    expect(JSON.stringify(log.mock.calls)).not.toMatch(/PRIVATE/);
+    expect(log.mock.calls[0][0]).toMatch(/se conserva la edición anterior/);
   }
-});
-it("no consulta al proveedor sin calendarios o con el presupuesto mensual agotado", async () => {
-  const { db, documents } = database();
-  const request = vi.fn<typeof fetch>();
-  await syncLeagueStats(db, "TEST_KEY", [], { now, request, runId: "empty" });
-  expect(request).not.toHaveBeenCalled();
-  documents.set("providerBudgets/sportapi", {
-    version: 1,
-    reservations: [],
-    month: "2026-11",
-    monthUsed: 12000,
-  });
-  await syncLeagueStats(db, "TEST_KEY", [fixture()], {
-    now,
-    request,
-    runId: "quota",
-  });
-  expect(request).not.toHaveBeenCalled();
+  expect(set).not.toHaveBeenCalled();
 });

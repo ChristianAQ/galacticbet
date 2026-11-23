@@ -100,16 +100,11 @@ export async function officialSync(db: Firestore, token: string) {
   // Avisos never hold up or break the official results.
   await notifyCompletedRounds(db, completed);
   await notifyPendingRounds(db);
-  if (process.env.SPORTAPI_KEY?.trim()) {
-    try {
-      await syncLeagueStats(
-        db,
-        process.env.SPORTAPI_KEY,
-        [...cache.values()].flat(),
-      );
-    } catch {
-      console.warn("Estadísticas SportAPI: se conserva la edición anterior.");
-    }
+  // Top scorers from the same provider as the results (one request per run).
+  try {
+    await syncLeagueStats(db, api, [...cache.values()].flat());
+  } catch {
+    console.warn("Goleadores: se conserva la edición anterior.");
   }
   try {
     await syncTeamDirectory(db, api);
