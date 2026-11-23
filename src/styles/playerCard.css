@@ -1,0 +1,348 @@
+/*
+ * A player's «cromo»: a trading card in the paper's colours. Gold foil frame,
+ * the masthead's ink for club and portrait, the page's paper for the numbers.
+ * The overlay keeps it centred; it moves on the compositor only.
+ */
+.player-cards {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: calc(env(safe-area-inset-top) + 56px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  overscroll-behavior: contain;
+}
+.player-cards-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(10 9 7 / 0.74);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+.player-cards-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 10px);
+  right: 16px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.14);
+  color: #fff;
+  transition: transform 160ms var(--press), background-color 160ms ease;
+}
+.player-cards-close:active {
+  transform: scale(0.88);
+  background: rgb(255 255 255 / 0.24);
+}
+.player-cards-center {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: 100%;
+}
+.player-cards-stage {
+  width: min(340px, 100%);
+  touch-action: none;
+  cursor: grab;
+  will-change: transform;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.player-cards-stage:active {
+  cursor: grabbing;
+}
+
+/* ---------- The card ---------- */
+.cromo {
+  --foil: linear-gradient(
+    135deg,
+    #ffd100 0%,
+    #fff3b0 18%,
+    #e3aa00 38%,
+    #ffe56a 58%,
+    #c99400 80%,
+    #ffe36b 100%
+  );
+  position: relative;
+  display: block;
+  padding: 8px;
+  border-radius: 24px;
+  background: var(--foil);
+  box-shadow:
+    0 34px 70px -24px rgb(0 0 0 / 0.7),
+    0 0 0 1px rgb(0 0 0 / 0.25),
+    inset 0 1px 0 rgb(255 255 255 / 0.6);
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 420ms var(--spring-smooth);
+}
+.cromo[data-lit] {
+  transition: transform 90ms linear;
+}
+.cromo-face {
+  position: relative;
+  overflow: hidden;
+  border-radius: 17px;
+  background: var(--card);
+  color: var(--ink);
+}
+.cromo-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 14px 8px 10px;
+  background: var(--masthead);
+  color: var(--masthead-ink);
+}
+.cromo-crest {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #fff;
+}
+.cromo-crest img,
+.cromo-crest .crest-placeholder {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+.cromo-club {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.cromo-number {
+  margin-left: auto;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
+}
+/* Halftone on ink with a band of highlighter: the paper's own texture. */
+.cromo-portrait {
+  position: relative;
+  display: grid;
+  /* Initials to the right, the rank to the left: they never overlap. */
+  place-items: center end;
+  height: 150px;
+  padding-right: 22px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle, rgb(255 209 0 / 0.34) 1.1px, transparent 1.7px) 0 0 / 9px 9px,
+    linear-gradient(165deg, #2b2820 0%, var(--masthead) 70%);
+}
+.cromo-portrait::before {
+  content: "";
+  position: absolute;
+  inset: -40% -10%;
+  background: linear-gradient(100deg, transparent 42%, rgb(255 209 0 / 0.9) 42% 56%, transparent 56%);
+  opacity: 0.22;
+}
+.cromo-initials {
+  position: relative;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 104px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-shadow: 0 6px 0 rgb(0 0 0 / 0.35);
+}
+.cromo-rank {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 5px 10px 5px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 650;
+  box-shadow: 0 6px 14px -6px rgb(0 0 0 / 0.6);
+}
+.cromo-rank b {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 16px;
+  font-weight: 900;
+}
+.cromo-identity {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px 12px;
+}
+.cromo-identity h2 {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.cromo-identity h2.is-long {
+  font-size: 26px;
+}
+.cromo-identity p {
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 1.35;
+}
+.cromo-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: var(--rule);
+}
+.cromo-stats > div {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px 9px;
+  background: var(--card);
+  animation: cromo-stat-in 420ms var(--spring-smooth) both;
+  animation-delay: calc(var(--i, 0) * 40ms + 80ms);
+}
+.cromo-stats dt {
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.cromo-stats dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+}
+.cromo-stats > .is-lead {
+  background: var(--accent);
+}
+.cromo-stats > .is-lead dt,
+.cromo-stats > .is-lead dd {
+  color: var(--accent-ink);
+}
+.cromo-note {
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.cromo-foot {
+  padding: 9px 16px 11px;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 550;
+}
+/* Light on the foil, following the finger. */
+.cromo-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at var(--mx, 30%) var(--my, 18%), rgb(255 255 255 / 0.42), transparent 42%),
+    linear-gradient(115deg, transparent 34%, rgb(255 255 255 / 0.16) 47%, rgb(255 209 0 / 0.12) 53%, transparent 64%);
+  mix-blend-mode: soft-light;
+  opacity: 0.55;
+  transition: opacity 300ms ease;
+}
+.cromo[data-lit] .cromo-shine {
+  opacity: 1;
+}
+
+/* ---------- Around the card ---------- */
+.player-cards-pager {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: #fff;
+}
+.player-cards-pager button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.14);
+  color: #fff;
+  transition: transform 160ms var(--press), opacity 160ms ease;
+}
+.player-cards-pager button:active:not(:disabled) {
+  transform: scale(0.88);
+}
+.player-cards-pager button:disabled {
+  opacity: 0.3;
+}
+.player-cards-pager span {
+  min-width: 64px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 20px;
+  font-weight: 900;
+  text-align: center;
+}
+.player-cards-pager small {
+  color: rgb(255 255 255 / 0.7);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 550;
+}
+.player-cards-hint {
+  color: rgb(255 255 255 / 0.66);
+  font-size: 12.5px;
+}
+@keyframes cromo-stat-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cromo,
+  .cromo[data-lit] {
+    transform: none;
+    transition: none;
+  }
+  .cromo-stats > div {
+    animation: none;
+  }
+}
+/* Short screens (iPhone SE, landscape): a lower portrait keeps it all in view. */
+@media (max-height: 700px) {
+  .cromo-portrait {
+    height: 104px;
+  }
+  .cromo-initials {
+    font-size: 76px;
+  }
+  .player-cards-hint {
+    display: none;
+  }
+}

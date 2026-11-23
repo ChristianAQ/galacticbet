@@ -62,6 +62,18 @@ it("goleadores oficiales: valida temporada y competición, no inventa asistencia
     ["Jugador 3", 3],
   ]);
   expect(rows[0]).toMatchObject({ key: "p7", team: "Barça", assists: null, penalties: 0, played: 12 });
+  // Details for the player's card, when published.
+  const detailed = normalizeScorers(
+    scorers([
+      scorer(9, {
+        player: { id: 9, name: "Kylian Mbappé", dateOfBirth: "1998-12-20", nationality: "France", section: "Offence", position: null, shirtNumber: 9 },
+      }),
+    ]),
+    "PD",
+    "PD-2026",
+  )[0];
+  expect(detailed).toMatchObject({ playerId: 9, position: "Offence", nationality: "France", birthDate: "1998-12-20", shirtNumber: 9 });
+  expect(rows[2]).toMatchObject({ playerId: 3, position: null, nationality: null, birthDate: null, shirtNumber: null });
   expect(rows[0].crest).toMatch(/^https:/);
   expect(rows[1]).toMatchObject({ team: "Girona FC", assists: 1 });
   expect(rows[1].crest).toBeUndefined();

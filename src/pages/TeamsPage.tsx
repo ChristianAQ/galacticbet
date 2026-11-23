@@ -15,6 +15,12 @@ import {
 } from "../lib/teamExplorer";
 import { loadTeamDirectory } from "../lib/teamDirectoryCache";
 import type { Match } from "../lib/domain";
+import PlayerCards, { type CardPlayer } from "../components/PlayerCard";
+import { competitionName } from "../lib/competitions";
+import { seasonLabel } from "../lib/leagueHub";
+import { teamLines } from "../lib/seasonFigures";
+import { useLeagueStats } from "../lib/useLeagueStats";
+import { nation } from "../lib/nations";
 import "../styles/matchExtras.css";
 import "../styles/teams.css";
 
@@ -39,6 +45,80 @@ const stamp = new Intl.DateTimeFormat("es", {
   dateStyle: "medium",
   timeStyle: "short",
 });
+
+const STAT_COMPETITIONS = ["PD", "PL", "CL"] as const;
+
+/**
+ * The squad's «cromos». Mounted only while one is open: the season's top
+ * scorers (one document per competition, cached) say how many goals a
+ * player has, matched by the provider's own player id.
+ */
+function SquadCards({
+  players,
+  club,
+  crest,
+  matches,
+  start,
+  origin,
+  onClose,
+}: {
+  players: SquadPlayer[];
+  club: string;
+  crest?: string;
+  matches: Match[];
+  start: number;
+  origin: HTMLElement;
+  onClose: () => void;
+}) {
+  const now = new Date();
+  const year = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 1 : 0);
+  const pd = useLeagueStats(`PD-${year}`, false);
+  const pl = useLeagueStats(`PL-${year}`, false);
+  const cl = useLeagueStats(`CL-${year}`, false);
+  const loading = pd.loading || pl.loading || cl.loading;
+  const cards = useMemo(() => {
+    const boards = [pd.data, pl.data, cl.data];
+    const goalsOf = new Map<string, ReturnType<typeof teamLines>>();
+    return players.map((p): CardPlayer => {
+      const at = boards.findIndex((b) => b?.scorers.some((s) => s.playerId === p.id));
+      const board = at >= 0 ? boards[at]! : null;
+      const scorer = board?.scorers.find((s) => s.playerId === p.id);
+      let season: CardPlayer["season"];
+      if (board && scorer) {
+        const code = STAT_COMPETITIONS[at];
+        const seasonId = `${code}-${year}`;
+        if (!goalsOf.has(seasonId))
+          goalsOf.set(seasonId, teamLines(matches.filter((m) => m.competition === code && m.seasonId === seasonId)));
+        const line = goalsOf.get(seasonId)!.find((t) => t.crest && t.crest === scorer.crest);
+        season = {
+          label: `${competitionName(code, true)} ${seasonLabel(seasonId)}`,
+          goals: scorer.goals,
+          assists: scorer.assists,
+          penalties: scorer.penalties,
+          played: scorer.played,
+          rank: board.scorers.findIndex((s) => s.goals === scorer.goals) + 1,
+          teamGoals: line?.goalsFor,
+        };
+      }
+      return {
+        key: `p${p.id}`,
+        name: p.name,
+        team: club,
+        crest,
+        position: p.position,
+        nationality: p.nationality,
+        birthDate: p.birthDate,
+        shirtNumber: scorer?.shirtNumber ?? null,
+        season,
+        note: loading
+          ? "Buscando sus goles de esta temporada…"
+          : "No está entre los 20 máximos goleadores de LaLiga, Premier o Champions esta temporada.",
+        source: "Football-Data.org",
+      };
+    });
+  }, [players, club, crest, matches, pd.data, pl.data, cl.data, loading, year]);
+  return <PlayerCards players={cards} start={start} origin={origin} onClose={onClose} />;
+}
 
 function Lineup({ match, club }: { match: Match; club: number }) {
   const { insight, loading, error, onRetry } = useMatchInsight(match, false);
@@ -169,6 +249,9 @@ export default function TeamsPage({
     return m?.homeTeamId === id ? m.homeCrest : m?.awayCrest;
   };
   const clubsRef = useRef<HTMLDivElement>(null);
+  // The squad as it reads on screen, for swiping from one card to the next.
+  const shownPlayers = useMemo(() => lines.flatMap((l) => l.players), [lines]);
+  const [card, setCard] = useState<{ index: number; row: HTMLElement } | null>(null);
   function chooseClub(id: number, button: HTMLElement) {
     if (id === club) return;
     haptic();
@@ -315,29 +398,50 @@ export default function TeamsPage({
                       const age = playerAge(p.birthDate);
                       return (
                         <li key={p.id}>
-                          <span className="teams-player-icon" aria-hidden="true">
-                            {p.name.charAt(0)}
-                          </span>
-                          <div>
-                            <strong>{p.name}</strong>
-                            <small>
-                              {positionName(p.position)}
-                              {p.nationality && ` · ${p.nationality}`}
-                            </small>
-                          </div>
-                          <span
-                            className="teams-age"
-                            aria-label={age === null ? "Edad no disponible" : `${age} años`}
+                          <button
+                            type="button"
+                            className="teams-player-open"
+                            aria-label={`${p.name}. Ver su cromo`}
+                            onClick={(event) => {
+                              haptic();
+                              setCard({ index: shownPlayers.indexOf(p), row: event.currentTarget });
+                            }}
                           >
-                            {age ?? "—"}
-                            <small aria-hidden="true">años</small>
-                          </span>
+                            <span className="teams-player-icon" aria-hidden="true">
+                              {p.name.charAt(0)}
+                            </span>
+                            <div>
+                              <strong>{p.name}</strong>
+                              <small>
+                                {positionName(p.position)}
+                                {p.nationality && ` · ${nation(p.nationality)?.name || p.nationality}`}
+                              </small>
+                            </div>
+                            <span
+                              className="teams-age"
+                              aria-label={age === null ? "Edad no disponible" : `${age} años`}
+                            >
+                              {age ?? "—"}
+                              <small aria-hidden="true">años</small>
+                            </span>
+                          </button>
                         </li>
                       );
                     })}
                   </ul>
                 </section>
               ))}
+              {card && (
+                <SquadCards
+                  players={shownPlayers}
+                  club={clubName}
+                  crest={crest(club)}
+                  matches={matches}
+                  start={card.index}
+                  origin={card.row}
+                  onClose={() => setCard(null)}
+                />
+              )}
               {!players.length && (
                 <Empty art="bench" title="Nadie con ese nombre">
                   Prueba con el apellido o borra la búsqueda.

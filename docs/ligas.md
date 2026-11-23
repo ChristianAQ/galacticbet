@@ -19,6 +19,22 @@ La ruta principal es `/ligas`, con pestañas `partidos`, `clasificacion`, `notic
 
 La versión 1 (rankings de SportAPI) ya no se lee. Tenía listas parciales: tarjetas recortadas a cien registros, participación en goles solo de quien salía en ambas listas, y minutos y porterías a cero sin ranking disponible. Por eso se veían huecos y cifras que no cuadraban.
 
+### El cromo de cada jugador
+
+Al pulsar un goleador en Datos, o un jugador de la plantilla en Equipos, se abre su cromo (`PlayerCard.tsx`): una carta con marco dorado, el club y el dorsal sobre la tinta de la cabecera, sus iniciales sobre trama de puntos y el puesto en la tabla de goleadores. Debajo:
+
+- quién es: posición en español, bandera y país en español (`nations.ts`) y edad;
+- su temporada: goles, asistencias, partidos, goles de penalti, goles por partido y qué parte de los goles de su club son suyos (con los resultados oficiales de esa competición).
+
+Navegación:
+
+- El cromo crece desde la fila pulsada y, al cerrarlo, el foco vuelve a esa fila.
+- Deslizar a un lado pasa al siguiente o al anterior de la misma lista; deslizar hacia abajo lo cierra. Las flechas, «Anterior/Siguiente», Esc y tocar fuera hacen lo mismo.
+- El brillo del marco sigue al dedo.
+- Con movimiento reducido no hay giros ni brillos.
+
+En Equipos, los goles se buscan por el identificador del jugador entre los 20 máximos goleadores de LaLiga, Premier y Champions. Quien no está entre ellos lo dice en vez de mostrar ceros. La sincronización guarda con cada goleador su id, posición, nacionalidad, fecha de nacimiento y dorsal. Las ediciones anteriores, sin esos datos, se renuevan en la siguiente ejecución.
+
 ## Sincronización y consumo
 
 `scripts/syncLeagueStats.ts` se ejecuta desde `scripts/officialSync.ts`, después de los calendarios y con el mismo `FOOTBALL_DATA_TOKEN`. Consulta `/competitions/{code}/scorers?season={año}&limit=20`:

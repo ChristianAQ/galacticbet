@@ -21,6 +21,12 @@ export interface Scorer {
   assists: number | null;
   penalties: number | null;
   played: number | null;
+  /** For the player's card («cromo»); older editions don't have them. */
+  playerId?: number;
+  position?: string | null;
+  nationality?: string | null;
+  birthDate?: string | null;
+  shirtNumber?: number | null;
 }
 
 /**
@@ -42,6 +48,7 @@ const text = (value: unknown, max = 180): value is string =>
 const count = (value: unknown): value is number =>
   Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 1000;
 const optionalCount = (value: unknown) => value === null || count(value);
+const optionalText = (value: unknown) => value === undefined || value === null || text(value, 60);
 const crest = (value: unknown) =>
   value === undefined || (typeof value === "string" && value.length <= 1000 && /^https:\/\//.test(value));
 
@@ -56,7 +63,12 @@ export function validScorer(value: unknown): value is Scorer {
     count(s.goals) &&
     optionalCount(s.assists) &&
     optionalCount(s.penalties) &&
-    optionalCount(s.played)
+    optionalCount(s.played) &&
+    (s.playerId === undefined || (Number.isSafeInteger(s.playerId) && s.playerId > 0)) &&
+    optionalText(s.position) &&
+    optionalText(s.nationality) &&
+    (s.birthDate === undefined || s.birthDate === null || /^\d{4}-\d{2}-\d{2}$/.test(s.birthDate)) &&
+    (s.shirtNumber === undefined || s.shirtNumber === null || (count(s.shirtNumber) && s.shirtNumber <= 99))
   );
 }
 

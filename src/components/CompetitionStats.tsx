@@ -3,8 +3,10 @@ import { competitionName, type CompetitionCode } from "../lib/competitions";
 import type { Match } from "../lib/domain";
 import { seasonLabel } from "../lib/leagueHub";
 import type { Scorer } from "../lib/leagueStats";
-import { perMatch, seasonFigures, teamBoards, teamLines } from "../lib/seasonFigures";
+import { haptic } from "../lib/motion";
+import { perMatch, seasonFigures, teamBoards, teamLines, type TeamLine } from "../lib/seasonFigures";
 import { useLeagueStats } from "../lib/useLeagueStats";
+import PlayerCards, { type CardPlayer } from "./PlayerCard";
 import RankingCard from "./RankingCard";
 import { SkeletonRows } from "./Skeleton";
 import { Crest } from "./ui";
@@ -110,7 +112,17 @@ function SeasonFigures({ matches }: { matches: Match[] }) {
 }
 
 const SHORT_LIST = 10;
-function ScorerRow({ scorer: s, position, index }: { scorer: Scorer; position: number; index: number }) {
+function ScorerRow({
+  scorer: s,
+  position,
+  index,
+  onOpen,
+}: {
+  scorer: Scorer;
+  position: number;
+  index: number;
+  onOpen: (index: number, row: HTMLElement) => void;
+}) {
   const details = [
     s.played !== null ? `${s.played} PJ` : null,
     s.assists ? `${s.assists} ${s.assists === 1 ? "asistencia" : "asistencias"}` : null,
@@ -118,25 +130,73 @@ function ScorerRow({ scorer: s, position, index }: { scorer: Scorer; position: n
   ].filter(Boolean);
   return (
     <li className={index === 0 ? "is-leader" : undefined} style={{ "--i": index } as CSSProperties}>
-      <span className="scorer-position">{position}</span>
-      <Crest src={s.crest} />
-      <span className="scorer-person">
-        <strong>{s.name}</strong>
-        <small>{[s.team, ...details].join(" · ")}</small>
-      </span>
-      <span className="scorer-goals">
-        <b className="numeral">{s.goals}</b>
-        <small>{s.goals === 1 ? "gol" : "goles"}</small>
-      </span>
+      <button
+        type="button"
+        className="scorer-open"
+        aria-label={`${s.name}, ${s.goals} ${s.goals === 1 ? "gol" : "goles"}. Ver su cromo`}
+        onClick={(event) => onOpen(index, event.currentTarget)}
+      >
+        <span className="scorer-position">{position}</span>
+        <Crest src={s.crest} />
+        <span className="scorer-person">
+          <strong>{s.name}</strong>
+          <small>{[s.team, ...details].join(" · ")}</small>
+        </span>
+        <span className="scorer-goals">
+          <b className="numeral">{s.goals}</b>
+          <small>{s.goals === 1 ? "gol" : "goles"}</small>
+        </span>
+      </button>
     </li>
   );
 }
 
-/** Top scorers from the same provider as the results. */
-function Scorers({ seasonId, demo }: { seasonId: string; demo: boolean }) {
+/** Top scorers from the same provider as the results; each opens its «cromo». */
+function Scorers({
+  competition,
+  seasonId,
+  demo,
+  lines,
+}: {
+  competition: CompetitionCode;
+  seasonId: string;
+  demo: boolean;
+  lines: TeamLine[];
+}) {
   const stats = useLeagueStats(seasonId, demo);
   const [all, setAll] = useState(false);
+  const [card, setCard] = useState<{ index: number; row: HTMLElement } | null>(null);
   const list = stats.data?.scorers || [];
+  const cards = useMemo(
+    () =>
+      list.map((s): CardPlayer => {
+        // The club's goals in this competition: same crest (same provider), or same name.
+        const club =
+          (s.crest && lines.find((t) => t.crest === s.crest)) ||
+          lines.find((t) => t.name.toLocaleLowerCase("es") === s.team.toLocaleLowerCase("es"));
+        return {
+          key: s.key,
+          name: s.name,
+          team: s.team,
+          crest: s.crest,
+          position: s.position,
+          nationality: s.nationality,
+          birthDate: s.birthDate,
+          shirtNumber: s.shirtNumber,
+          source: "Football-Data.org",
+          season: {
+            label: `${competitionName(competition, true)} ${seasonLabel(seasonId)}`,
+            goals: s.goals,
+            assists: s.assists,
+            penalties: s.penalties,
+            played: s.played,
+            rank: list.findIndex((other) => other.goals === s.goals) + 1,
+            teamGoals: club?.goalsFor,
+          },
+        };
+      }),
+    [list, lines, competition, seasonId],
+  );
   const shown = all ? list : list.slice(0, SHORT_LIST);
   // Equal goals share the position: 1, 2, 2, 4…
   const position = (i: number) => list.findIndex((s) => s.goals === list[i].goals) + 1;
@@ -151,16 +211,29 @@ function Scorers({ seasonId, demo }: { seasonId: string; demo: boolean }) {
         <>
           <ol className="scorer-list">
             {shown.map((s, i) => (
-              <ScorerRow key={s.key} scorer={s} position={position(i)} index={i} />
+              <ScorerRow
+                key={s.key}
+                scorer={s}
+                position={position(i)}
+                index={i}
+                onOpen={(index, row) => {
+                  haptic();
+                  setCard({ index, row });
+                }}
+              />
             ))}
           </ol>
+          {card && (
+            <PlayerCards players={cards} start={card.index} origin={card.row} onClose={() => setCard(null)} />
+          )}
           {list.length > SHORT_LIST && (
             <button type="button" className="text-button scorer-more" onClick={() => setAll(!all)}>
               {all ? "Ver menos" : `Ver los ${list.length}`}
             </button>
           )}
           <p className="league-source">
-            Fuente: Football-Data.org, la misma que los resultados · actualizado {updated(stats.data!.fetchedAt)}
+            Toca un jugador para ver su cromo. Fuente: Football-Data.org, la misma que los resultados ·
+            actualizado {updated(stats.data!.fetchedAt)}
           </p>
         </>
       ) : (
@@ -210,7 +283,7 @@ export default function CompetitionStats({
       ) : (
         <p className="league-notice">La temporada aún no ha empezado: las cifras llegarán con el primer resultado.</p>
       )}
-      <Scorers seasonId={seasonId} demo={demo} />
+      <Scorers competition={competition} seasonId={seasonId} demo={demo} lines={lines} />
       {started && (
         <section aria-labelledby="team-boards-title">
           <div className="section-heading">

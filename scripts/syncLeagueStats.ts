@@ -44,7 +44,15 @@ export function normalizeScorers(value: unknown, competition: CompetitionCode, s
   for (const raw of body.scorers) {
     if (!raw || typeof raw !== "object") continue;
     const r = raw as {
-      player?: { id?: unknown; name?: unknown };
+      player?: {
+        id?: unknown;
+        name?: unknown;
+        dateOfBirth?: unknown;
+        nationality?: unknown;
+        section?: unknown;
+        position?: unknown;
+        shirtNumber?: unknown;
+      };
       team?: { name?: unknown; shortName?: unknown; crest?: unknown };
       goals?: unknown;
       assists?: unknown;
@@ -73,6 +81,15 @@ export function normalizeScorers(value: unknown, competition: CompetitionCode, s
       assists: optional(r.assists),
       penalties: optional(r.penalties),
       played: optional(r.playedMatches),
+      playerId: id as number,
+      // The specific position when published, else the line (Offence…).
+      position: text(r.player?.position, 60) ? r.player!.position : text(r.player?.section, 60) ? r.player!.section : null,
+      nationality: text(r.player?.nationality, 60) ? r.player!.nationality : null,
+      birthDate:
+        typeof r.player?.dateOfBirth === "string" && /^\d{4}-\d{2}-\d{2}/.test(r.player.dateOfBirth)
+          ? r.player.dateOfBirth.slice(0, 10)
+          : null,
+      shirtNumber: count(r.player?.shirtNumber) && (r.player!.shirtNumber as number) <= 99 ? (r.player!.shirtNumber as number) : null,
     });
   }
   return sortScorers(rows).slice(0, MAX_SCORERS);
@@ -115,7 +132,11 @@ export async function syncLeagueStats(
     if (!matches.some((m) => m.competition === competition && m.seasonId === seasonId && hasPublishedResult(m)))
       continue;
     const old = (await db.doc(`leagueStats/${seasonId}`).get()).data();
-    const fetched = validLeagueStats(old) && old.seasonId === seasonId ? Date.parse(old.fetchedAt) : NaN;
+    // Editions from before the players' details are renewed straight away.
+    const fetched =
+      validLeagueStats(old) && old.seasonId === seasonId && old.scorers.every((s) => s.playerId !== undefined)
+        ? Date.parse(old.fetchedAt)
+        : NaN;
     const age = Number.isFinite(fetched) && fetched <= now ? now - fetched : Infinity;
     if (age < STATS_MAX_AGE) continue;
     if (!due || age > due.age) due = { competition, seasonId, age };
