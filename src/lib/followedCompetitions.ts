@@ -14,17 +14,14 @@ export interface FollowedCompetition {
  * Quiniela and Clasificación, next to LaLiga, Champions and Premier. Kept
  * apart from the competition module so those pages stay light.
  */
-export function useFollowedCompetitions(uid: string): FollowedCompetition[] {
-  const [list, setList] = useState<FollowedCompetition[]>([]);
+export function useFollowedCompetitions(uid: string): { list: FollowedCompetition[]; ready: boolean } {
+  const [state, setState] = useState<{ uid: string; list: FollowedCompetition[] } | null>(null);
   useEffect(() => {
-    if (!uid || !db) {
-      setList([]);
-      return;
-    }
+    if (!uid || !db) return;
     return onSnapshot(
       query(collection(db, "customCompetitions"), where("memberIds", "array-contains", uid)),
       (snap) =>
-        setList(
+        setState({ uid, list: 
           snap.docs
             .map((d) => {
               const data = d.data();
@@ -39,10 +36,10 @@ export function useFollowedCompetitions(uid: string): FollowedCompetition[] {
               (c): c is FollowedCompetition =>
                 Boolean(c.name) && (c.predictionMode === "exact" || c.predictionMode === "classic"),
             )
-            .sort((a, b) => a.name.localeCompare(b.name, "es")),
-        ),
-      () => setList([]),
+            .sort((a, b) => a.name.localeCompare(b.name, "es")) }),
+      () => setState({ uid, list: [] }),
     );
   }, [uid]);
-  return list;
+  if (!uid || !db) return { list: [], ready: true };
+  return state && state.uid === uid ? { list: state.list, ready: true } : { list: [], ready: false };
 }

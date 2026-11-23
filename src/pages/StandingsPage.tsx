@@ -13,6 +13,7 @@ import { useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
 import { CustomChips } from "../components/CustomChips";
 import { useFollowedCompetitions } from "../lib/followedCompetitions";
+import { useLeagueChoice } from "../lib/useLeagueChoice";
 import { haptic } from "../lib/motion";
 import { Empty, PageTitle, PrivateGate } from "../components/ui";
 import { SkeletonRows } from "../components/Skeleton";
@@ -74,24 +75,17 @@ export default function StandingsPage({
   onLogin: () => void;
 }) {
   // Your friends' competitions sit next to LaLiga, Champions and Premier.
-  const [params, setParams] = useSearchParams();
-  const followed = useFollowedCompetitions(user?.uid || "");
+  const { list: followed, ready: followedReady } = useFollowedCompetitions(user?.uid || "");
+  // The competition chosen in Ligas, Quiniela or Clasificación: one choice for all.
+  const choice = useLeagueChoice(user?.uid || "");
+  // A friends' league has a table here only if you follow it (and it has predictions).
+  const chosen =
+    choice.liga && (!followedReady || followed.some((c) => c.id === choice.liga)) ? choice.liga : "";
   // Without a group there is no official table: open your league.
   const liga = user
-    ? params.get("liga") ||
-      (groupsReady && !groups.length ? followed[0]?.id || "" : "")
+    ? chosen || (groupsReady && !groups.length ? followed[0]?.id || "" : "")
     : "";
-  const setLiga = (id: string) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (id) next.set("liga", id);
-        else next.delete("liga");
-        next.delete("round");
-        return next;
-      },
-      { replace: true },
-    );
+  const setLiga = (id: string) => choice.chooseLiga(id);
   const chips = followed.length > 0 && (
     <CustomChips
       list={followed}
@@ -109,10 +103,7 @@ export default function StandingsPage({
         user={user}
         chips={chips}
         hasGroups={groups.length > 0}
-        onOfficial={(code) => {
-          preferenceStore.update(user.uid, { competition: code });
-          setLiga("");
-        }}
+        onOfficial={(code) => choice.chooseOfficial(code)}
       />
     );
   if (user && groups.length)
@@ -249,7 +240,7 @@ function GroupStandings({
     if (!requestedRound) return;
     const code = requestedRound.split("-")[0];
     if (isCompetition(code) && code !== preferences.competition)
-      preferenceStore.update(user.uid, { competition: code });
+      preferenceStore.update(user.uid, { competition: code, liga: "" });
     setCombined(false);
     setPeriod("round");
     setRound(requestedRound);
@@ -439,7 +430,7 @@ function GroupStandings({
         }}
         competition={scope}
         onCompetition={(value) => {
-          preferenceStore.update(user.uid, { competition: value });
+          preferenceStore.update(user.uid, { competition: value, liga: "" });
           setCombined(false);
           setRound("");
         }}

@@ -312,7 +312,7 @@ function MatchView({
             className="button primary full match-hero-cta"
             to={`/quiniela?round=${encodeURIComponent(match.roundId)}`}
             onClick={() =>
-              preferenceStore.update(userId, { competition: match.competition })
+              preferenceStore.update(userId, { competition: match.competition, liga: "" })
             }
           >
             Hacer mi quiniela <ArrowRight size={17} aria-hidden="true" />

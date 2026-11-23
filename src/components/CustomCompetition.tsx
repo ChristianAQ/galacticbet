@@ -1,4 +1,4 @@
-import { Check, Plus, QrCode, Trophy } from "lucide-react";
+import { Check, Plus, QrCode, Trophy, X } from "lucide-react";
 import { lazy, Suspense, useMemo, useRef, useState, useId } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -59,10 +59,13 @@ export function CustomSummary({
   data,
   user,
   onLogin,
+  onRemove,
 }: {
   data: CompetitionData;
   user: AppUser | null;
   onLogin: () => void;
+  /** Off your list (and out of view): after unfollowing, or one you only opened. */
+  onRemove?: () => void;
 }) {
   const c = data.competition;
   const [busy, setBusy] = useState(false);
@@ -81,6 +84,8 @@ export function CustomSummary({
       else await unfollowCompetition(user.uid, c.id);
       haptic("success");
       setLeaving(false);
+      // «Dejarás de verla en tus competiciones»: it leaves the list too.
+      if (!follow) onRemove?.();
     } catch (e) {
       setError(readableError(e));
     } finally {
@@ -111,6 +116,19 @@ export function CustomSummary({
           <QrCode size={16} aria-hidden="true" />
           Invitar
         </button>
+        {!following && onRemove && (
+          <button
+            type="button"
+            className="share-trigger"
+            onClick={() => {
+              haptic();
+              onRemove();
+            }}
+          >
+            <X size={16} aria-hidden="true" />
+            Quitar de la lista
+          </button>
+        )}
       </div>
       {error && (
         <p className="custom-summary-note" role="status">

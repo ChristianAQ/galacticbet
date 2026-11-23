@@ -69,7 +69,7 @@ export function QuinielaSpotlight({
 }) {
   const [main, ...others] = rounds;
   const pick = (competition: CompetitionCode) =>
-    preferenceStore.update(userId, { competition });
+    preferenceStore.update(userId, { competition, liga: "" });
   if (loading)
     return (
       <div className="home-spotlight" role="status" aria-label="Cargando jornadas">

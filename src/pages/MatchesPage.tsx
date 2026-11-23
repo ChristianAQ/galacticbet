@@ -9,11 +9,7 @@ import {
   type LeagueTab,
 } from "../lib/leagueHub";
 import "../styles/leagues.css";
-import {
-  competitionName,
-  isCompetition,
-  type CompetitionCode,
-} from "../lib/competitions";
+import { competitionName, type CompetitionCode } from "../lib/competitions";
 import {
   lazy,
   Suspense,
@@ -49,7 +45,7 @@ import { haptic, prefersReducedMotion, springEasing } from "../lib/motion";
 import { go } from "../lib/navigation";
 import { preferenceStore } from "../lib/preferences";
 import { roundOptions } from "../lib/roundOptions";
-import { usePreferences } from "../lib/useGroupSelection";
+import { useLeagueChoice } from "../lib/useLeagueChoice";
 
 const CompetitionStats = lazy(() => import("../components/CompetitionStats"));
 const dayTitle = new Intl.DateTimeFormat("es", {
@@ -105,6 +101,7 @@ function FixtureItem({
                   onSelect: () => {
                     preferenceStore.update(userId, {
                       competition: m.competition,
+                      liga: "",
                     });
                     go(`/quiniela?round=${encodeURIComponent(m.roundId)}`);
                   },
@@ -180,34 +177,29 @@ export default function MatchesPage({
   onLogin: () => void;
 }) {
   const [params, setParams] = useSearchParams();
-  // A friends' competition (?liga=code) is shown like one more league.
-  const liga = params.get("liga") || "";
+  // One choice for Ligas, Quiniela and Clasificación: an official league or
+  // a friends' one (?liga=), shown like one more league.
+  const choice = useLeagueChoice(userId, { officialParam: true });
+  const liga = choice.liga;
   const custom = useCompetition(liga);
-  const { competitions: mine } = useMyCompetitions(userId);
+  const { competitions: mine, remove } = useMyCompetitions(userId);
+  // Off the list: back to the official league in the three views.
+  const removeCustom = (id: string) => {
+    choice.forgetLiga(id);
+    // After its live view has stopped (a last snapshot would remember it again).
+    window.setTimeout(() => remove(id), 400);
+  };
   const [entry, setEntry] = useState(false);
   const chips = useMemo(() => {
     if (!liga || mine.some((c) => c.id === liga) || !custom.competition) return mine;
     const c = custom.competition;
-    return [{ id: c.id, name: c.name, icon: c.icon }, ...mine];
-  }, [mine, liga, custom.competition]);
+    return [{ id: c.id, name: c.name, icon: c.icon, followed: Boolean(userId && c.memberIds.includes(userId)) }, ...mine];
+  }, [mine, liga, custom.competition, userId]);
   function openCustom(id: string) {
     haptic();
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        next.set("liga", id);
-        next.delete("round");
-        next.delete("tab");
-        return next;
-      },
-      { replace: true },
-    );
+    choice.chooseLiga(id, (next) => next.delete("tab"));
   }
-  const preferences = usePreferences(userId);
-  const requested = params.get("competition");
-  const competition: CompetitionCode = isCompetition(requested)
-    ? requested
-    : preferences.competition;
+  const competition: CompetitionCode = choice.competition;
   const round = params.get("round") || "";
   const tab = leagueTab(params.get("tab"));
   const ids = useId();
@@ -260,11 +252,6 @@ export default function MatchesPage({
       return next;
     });
   }
-  // A competition opened from a link becomes the shared choice for quiniela and standings.
-  useEffect(() => {
-    if (isCompetition(requested))
-      preferenceStore.update(userId, { competition: requested });
-  }, [userId, requested]);
   const filtered = useMemo(
     () =>
       matches.filter(
@@ -303,25 +290,24 @@ export default function MatchesPage({
             value={liga ? "none" : competition}
             onChange={(code) => {
               if (code !== competition || liga) haptic();
-              preferenceStore.update(userId, { competition: code });
-              setParams(
-                (previous) => {
-                  const next = new URLSearchParams(previous);
-                  next.set("competition", code);
-                  next.delete("liga");
-                  next.delete("season");
-                  next.delete("round");
-                  if (liga) next.delete("tab");
-                  return next;
-                },
-                { replace: true },
-              );
+              choice.chooseOfficial(code, (next) => {
+                next.delete("season");
+                if (liga) next.delete("tab");
+              });
             }}
           >
-            <CustomChips list={chips} current={liga} onSelect={openCustom} onAdd={() => setEntry(true)} />
+            <CustomChips
+              list={chips}
+              current={liga}
+              onSelect={openCustom}
+              onAdd={() => setEntry(true)}
+              onRemove={removeCustom}
+            />
           </CompetitionTabs>
         </div>
-        {liga && <CustomSummary data={custom} user={user} onLogin={onLogin} />}
+        {liga && (
+          <CustomSummary data={custom} user={user} onLogin={onLogin} onRemove={() => removeCustom(liga)} />
+        )}
       </PageTitle>
       {entry && (
         <CompetitionEntrySheet user={user} onLogin={onLogin} onCode={openCustom} onClose={() => setEntry(false)} />
@@ -494,7 +480,7 @@ export default function MatchesPage({
               <p className="league-more">
                 <Link to={`/quiniela?round=${encodeURIComponent(selected)}`}
                   onClick={() =>
-                    preferenceStore.update(userId, { competition })
+                    preferenceStore.update(userId, { competition, liga: "" })
                   }
                 >
                   Ir a mi quiniela de esta jornada

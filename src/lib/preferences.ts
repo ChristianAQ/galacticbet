@@ -7,13 +7,15 @@ export type { CompetitionCode } from "./competitions";
 export interface UserPreferences {
   groupId: string;
   competition: CompetitionCode;
+  /** A friends' competition chosen in Ligas, Quiniela or Clasificación ("" = the official one). */
+  liga: string;
 }
 interface PreferenceStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
 export const PREFERENCES_KEY = "galacticbet:preferences:v1";
-const defaults: UserPreferences = { groupId: "", competition: "PD" };
+const defaults: UserPreferences = { groupId: "", competition: "PD", liga: "" };
 const validId = (value: unknown): value is string =>
   typeof value === "string" && value.length <= 128 && !value.includes("/");
 
@@ -40,6 +42,7 @@ export function createPreferenceStore(
                 {
                   groupId: validId(value.groupId) ? value.groupId : "",
                   competition: competitionCode(value.competition),
+                  liga: validId(value.liga) ? value.liga : "",
                 },
               ],
             ];
@@ -67,10 +70,13 @@ export function createPreferenceStore(
       competition: isCompetition(patch.competition)
         ? patch.competition
         : before.competition,
+      liga:
+        patch.liga === "" || validId(patch.liga) ? patch.liga : before.liga,
     };
     if (
       next.groupId === before.groupId &&
-      next.competition === before.competition
+      next.competition === before.competition &&
+      next.liga === before.liga
     )
       return;
     memory.set(uid, next);

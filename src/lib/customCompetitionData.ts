@@ -249,6 +249,8 @@ export interface CompetitionChip {
   id: string;
   name: string;
   icon: string | null;
+  /** Followed with your account (false: only opened on this device). */
+  followed?: boolean;
 }
 function readRecent(): CompetitionChip[] {
   try {
@@ -280,7 +282,7 @@ export function forgetCompetition(cid: string) {
 /** Competitions you follow (and those opened on this device), for the Ligas chips. */
 export function useMyCompetitions(uid: string) {
   const [followed, setFollowed] = useState<CompetitionChip[]>([]);
-  const [version, setVersion] = useState(0);
+  const [, setVersion] = useState(0);
   useEffect(() => {
     if (!uid || !db) {
       setFollowed([]);
@@ -301,8 +303,16 @@ export function useMyCompetitions(uid: string) {
   const recent = readRecent();
   const ids = new Set(followed.map((c) => c.id));
   return {
-    competitions: [...followed, ...recent.filter((r) => !ids.has(r.id))],
-    refresh: () => setVersion(version + 1),
+    competitions: [
+      ...followed.map((c) => ({ ...c, followed: true })),
+      ...recent.filter((r) => !ids.has(r.id)).map((r) => ({ ...r, followed: false })),
+    ],
+    refresh: () => setVersion((v) => v + 1),
+    /** Takes a competition you don't follow off your list on this device. */
+    remove: (cid: string) => {
+      forgetCompetition(cid);
+      setVersion((v) => v + 1);
+    },
   };
 }
 

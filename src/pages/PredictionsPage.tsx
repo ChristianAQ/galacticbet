@@ -40,7 +40,7 @@ import {
 } from "../lib/domain";
 import { db } from "../lib/firebase";
 import { useFollowedCompetitions } from "../lib/followedCompetitions";
-import { preferenceStore } from "../lib/preferences";
+import { useLeagueChoice } from "../lib/useLeagueChoice";
 import { roundOptions } from "../lib/roundOptions";
 import { useGroupSelection } from "../lib/useGroupSelection";
 import { useRoundDelivery } from "../lib/useRoundDelivery";
@@ -159,34 +159,32 @@ export default function PredictionsPage({
       { replace: true },
     );
   // Your friends' competitions sit next to LaLiga, Champions and Premier.
-  const followed = useFollowedCompetitions(demo ? "" : user?.uid || "");
+  const { list: followed, ready: followedReady } = useFollowedCompetitions(
+    demo ? "" : user?.uid || "",
+  );
+  // The competition chosen in Ligas, Quiniela or Clasificación: one choice for all.
+  const choice = useLeagueChoice(demo ? "" : user?.uid || "");
+  // A friends' league has a slip here only if you follow it (and it has predictions).
+  const chosen =
+    choice.liga &&
+    (!followedReady || followed.some((c) => c.id === choice.liga))
+      ? choice.liga
+      : "";
   // Without a group the official competitions have no slip: open your league.
   const liga =
     demo || !user
       ? ""
-      : searchParams.get("liga") ||
+      : chosen ||
         (groupsReady && !groups.length ? followed[0]?.id || "" : "");
   const ligaInfo = followed.find((c) => c.id === liga);
-  const openLiga = (id: string) =>
-    setSearchParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        next.set("liga", id);
-        next.delete("round");
-        return next;
-      },
-      { replace: true },
-    );
-  const closeLiga = () =>
-    setSearchParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        next.delete("liga");
-        next.delete("round");
-        return next;
-      },
-      { replace: true },
-    );
+  const openLiga = (id: string) => choice.chooseLiga(id);
+  // LaLiga, Champions or Premier chosen elsewhere meanwhile: show that season.
+  useEffect(() => {
+    if (demo || liga) return;
+    const target = seasons.find((s) => s.competition === preferences.competition);
+    if (target && seasons.find((s) => s.id === season)?.competition !== preferences.competition)
+      setSeason(target.id);
+  }, [preferences.competition, seasons, demo, liga]);
   // Arriving from a reminder while the page is open: switch to its season.
   useEffect(() => {
     const target = seasons.find((s) => requestedRound.startsWith(`${s.id}-`));
@@ -593,13 +591,9 @@ export default function PredictionsPage({
         }
         onCompetition={(code) => {
           // One URL update: leaving your league also forgets its round.
-          if (liga) closeLiga();
-          else setRound("");
+          choice.chooseOfficial(code);
           if (demo) setDemoCompetition(code);
-          else {
-            if (user) preferenceStore.update(user.uid, { competition: code });
-            setSeason(seasons.find((s) => s.competition === code)?.id || "");
-          }
+          else setSeason(seasons.find((s) => s.competition === code)?.id || "");
         }}
         aside={
           <span className="page-filters-chip">

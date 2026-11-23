@@ -58,3 +58,9 @@ Igual que la de LaLiga: los signos son un borrador privado hasta pulsar **Sellar
 - `customCompetitions/{id}/rounds/{J1|G1|A1|FINAL…}`: plazo (`deadline`, el primer partido) y `matchIds` (partidos ni aplazados ni cancelados, con los dos rivales conocidos). Los escribe la app de la organización al abrir Ligas, la ficha o la Quiniela, cuando cambian fechas, resultados o cruces. Una jornada cerrada no se vuelve a tocar.
 - `…/rounds/{jornada}/entries/{uid}`: el boleto sellado (`matchIds`, `selections`, `mode`), en el mismo formato que los de los grupos. Las reglas comprueban plazo, partidos, modo y que esté completo.
 - `…/roundAttendance/{jornada}`: quién ha sellado (nunca qué), para «Faltáis 2, tú incluido».
+
+## Elección compartida y lista de ligas
+
+La liga elegida en Ligas, Quiniela o Clasificación, ya sea oficial o propia, es una sola elección para las tres pestañas. Se guarda en las preferencias de la cuenta en el dispositivo (`competition` y `liga`). Un enlace (`?liga=` o `?competition=`) la cambia. Una pestaña que vuelve a mostrarse con una URL anterior sigue la elección más reciente en vez de deshacerla. En Quiniela y Clasificación solo se muestran las ligas propias que sigues y que tienen quiniela. Sin grupo, abren la primera, porque las oficiales necesitan un grupo.
+
+Una liga abierta desde un enlace que no sigues se quita con «Quitar de la lista», en su cabecera, o manteniendo pulsado su escudo. Dejar de seguir una liga también la quita de la lista.
