@@ -19,6 +19,6 @@
   ],
   "shortcuts": [
     { "name": "Mi quiniela", "url": "./#/quiniela", "icons": [{ "src": "icon-ink-192.png", "sizes": "192x192" }] },
-    { "name": "Clasificación", "url": "./#/clasificacion", "icons": [{ "src": "icon-ink-192.png", "sizes": "192x192" }] }
+    { "name": "Clasificación", "url": "./#/quiniela?vista=clasificacion", "icons": [{ "src": "icon-ink-192.png", "sizes": "192x192" }] }
   ]
 }

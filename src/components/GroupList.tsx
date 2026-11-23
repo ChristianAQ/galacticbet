@@ -126,7 +126,7 @@ export default function GroupList({
         const open = selected === g.id;
         const pot = groupPotCents(g);
         const quiniela = `/quiniela?group=${encodeURIComponent(g.id)}`;
-        const table = `/clasificacion?group=${encodeURIComponent(g.id)}`;
+        const table = `/quiniela?vista=clasificacion&group=${encodeURIComponent(g.id)}`;
         const menu = menuTarget(() => ({
           title: g.name,
           items: [

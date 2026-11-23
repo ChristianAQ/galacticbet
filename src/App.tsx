@@ -1,7 +1,7 @@
 import BottomNavigation from "./components/BottomNavigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { CalendarDays, Home, Target, Trophy, X } from "lucide-react";
+import { CalendarDays, Home, Target, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, Route, Routes, useLocation, type Location } from "react-router-dom";
 import LoginModal from "./components/LoginModal";
@@ -10,7 +10,7 @@ import NavBar from "./components/NavBar";
 import StackNavigator from "./components/StackNavigator";
 import PullToRefresh from "./components/PullToRefresh";
 import ContextMenuHost from "./components/ContextMenu";
-import { Empty, PageTitle, PrivateGate, readableError } from "./components/ui";
+import { Empty, PageTitle, readableError } from "./components/ui";
 import {
   loadGroups,
   loadMatches,
@@ -37,21 +37,27 @@ import {
   MatchesPage,
   MatchPage,
   PorraPage,
-  PredictionsPage,
   preloadPage,
   preloadTabsWhenIdle,
   ProfilePage,
-  StandingsPage,
+  QuinielaPage,
   TeamsPage,
 } from "./lib/pages";
 
 const nav = [
   { to: "/", label: "Inicio", icon: Home },
   { to: "/ligas", label: "Ligas", icon: CalendarDays },
-  { to: "/quiniela", label: "Mi quiniela", short: "Quiniela", icon: Target },
-  { to: "/clasificacion", label: "Clasificación", icon: Trophy },
+  { to: "/quiniela", label: "Quiniela", icon: Target },
 ];
 const storedCalendar = () => (configured ? loadMatches.peek() ?? [] : []);
+
+/** The old Clasificación tab lives in Quiniela now (avisos and links still land there). */
+function LegacyStandingsRoute() {
+  const { search, hash } = useLocation();
+  const params = new URLSearchParams(search);
+  params.set("vista", "clasificacion");
+  return <Navigate to={{ pathname: "/quiniela", search: `?${params}`, hash }} replace />;
+}
 
 function LegacyMatchesRoute() {
   const { search, hash } = useLocation();
@@ -282,22 +288,17 @@ export default function App() {
         path="/quiniela"
         element={
           !authReady ? (
-            <PageTitle title="Mi quiniela" eyebrow="Comprobando tu ficha…" />
-          ) : !user && !demo ? (
-            <>
-              <PageTitle title="Mi quiniela" eyebrow="Quiniela" />
-              <PrivateGate
-                onLogin={() => setLogin(true)}
-                onDemo={() => setDemo(true)}
-              />
-            </>
+            <PageTitle title="Quiniela" eyebrow="Comprobando tu ficha…" />
           ) : (
-            <PredictionsPage
+            <QuinielaPage
               matches={matches}
               groups={activeGroups}
               groupsReady={groupsReady}
               user={user}
               demo={demo}
+              loading={loading}
+              onLogin={() => setLogin(true)}
+              onDemo={() => setDemo(true)}
             />
           )
         }
@@ -313,19 +314,7 @@ export default function App() {
           />
         }
       />
-      <Route
-        path="/clasificacion"
-        element={
-          <StandingsPage
-            groups={activeGroups}
-            groupsReady={groupsReady}
-            matches={matches}
-            loading={loading}
-            user={user}
-            onLogin={() => setLogin(true)}
-          />
-        }
-      />
+      <Route path="/clasificacion" element={<LegacyStandingsRoute />} />
       <Route
         path="/perfil"
         element={

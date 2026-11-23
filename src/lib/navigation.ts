@@ -5,7 +5,7 @@ import { preloadPage } from "./pages";
 
 /* ---------- Route map ---------- */
 
-export const TAB_ROOTS = ["/", "/ligas", "/quiniela", "/clasificacion"] as const;
+export const TAB_ROOTS = ["/", "/ligas", "/quiniela"] as const;
 export const tabIndex = (pathname: string) =>
   TAB_ROOTS.indexOf(pathname as (typeof TAB_ROOTS)[number]);
 export const isTabRoot = (pathname: string) => tabIndex(pathname) >= 0;
@@ -13,8 +13,7 @@ export const isTabRoot = (pathname: string) => tabIndex(pathname) >= 0;
 const titles: Record<string, string> = {
   "/": "Inicio",
   "/ligas": "Ligas",
-  "/quiniela": "Mi quiniela",
-  "/clasificacion": "Clasificación",
+  "/quiniela": "Quiniela",
   "/perfil": "Perfil",
   "/grupos": "Mis grupos",
   "/porra": "Porra rápida",

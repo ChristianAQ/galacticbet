@@ -9,7 +9,7 @@ import {
   Coins,
   Stamp,
 } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import GroupActions from "../components/GroupActions";
 import { CustomChips } from "../components/CustomChips";
@@ -75,6 +75,7 @@ export default function PredictionsPage({
   groupsReady,
   user,
   demo,
+  viewTabs,
 }: {
   matches: Match[];
   groups: Group[];
@@ -82,6 +83,8 @@ export default function PredictionsPage({
   groupsReady: boolean;
   user: User | null;
   demo: boolean;
+  /** «Mi boleto | Clasificación»: the same tab shows the table with these filters. */
+  viewTabs?: ReactNode;
 }) {
   const {
     groupId: group,
@@ -547,16 +550,17 @@ export default function PredictionsPage({
       <PageTitle
         eyebrow={
           liga
-            ? `Quiniela · ${ligaInfo?.name || "Tu liga"}`
-            : `Quiniela${list[0] ? ` · ${competitionName(list[0].competition, true)}` : ""}`
+            ? `Mi boleto · ${ligaInfo?.name || "Tu liga"}`
+            : `Mi boleto${list[0] ? ` · ${competitionName(list[0].competition, true)}` : ""}`
         }
-        title="Mi quiniela"
+        title="Quiniela"
         description={
           liga
             ? "Tu liga entre amigos: pronostica cada partido antes de que empiece."
             : status
         }
       />
+      {viewTabs}
       <PageFilters
         groups={demo || liga ? [] : groups}
         groupId={group}
@@ -676,7 +680,7 @@ export default function PredictionsPage({
               to={
                 demo
                   ? "/perfil?tab=play"
-                  : `/clasificacion?group=${encodeURIComponent(group)}`
+                  : `/quiniela?vista=clasificacion&group=${encodeURIComponent(group)}&round=${encodeURIComponent(selected)}`
               }
               aria-label={`Bote de la jornada: ${euro(potCents * potPlayers)}, ${potPlayers} ${potPlayers === 1 ? "jugador" : "jugadores"}. Ver detalle`}
             >

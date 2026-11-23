@@ -950,3 +950,11 @@
   font-size: var(--text-sm);
   color: var(--ink-2);
 }
+
+/* «Mi boleto | Clasificación»: one tab, the same filters underneath. */
+.quiniela-views {
+  margin: 0 0 14px;
+}
+.quiniela-views .segmented button {
+  font-size: 14px;
+}

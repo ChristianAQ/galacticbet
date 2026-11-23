@@ -843,7 +843,9 @@
   box-shadow: none;
   color: var(--accent-ink);
 }
-.round-chip[aria-pressed="true"] small {
+.round-chip[aria-pressed="true"] small,
+.round-chip[aria-pressed="true"] strong {
+  /* A finished round's grey number must not fade on the yellow (night edition). */
   color: var(--accent-ink);
 }
 .round-chip:active:not(:disabled) {

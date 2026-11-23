@@ -245,7 +245,16 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
     savingCount === 0 &&
     !submitting &&
     !isSealed;
-  const table = () => go(`/clasificacion?liga=${encodeURIComponent(cid)}`);
+  // «Tabla»: the same tab's table, same league and round.
+  const table = () =>
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.set("vista", "clasificacion");
+        return next;
+      },
+      { replace: true },
+    );
   const followers = c.memberIds.map((id) => people[id] || { id, name: "Jugador", avatar: null });
   return (
     <>

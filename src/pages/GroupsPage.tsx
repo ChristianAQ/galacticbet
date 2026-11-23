@@ -415,7 +415,7 @@ function GroupDetails({
         </Link>
         <Link
           className="button secondary"
-          to={`/clasificacion?group=${encodeURIComponent(group.id)}`}
+          to={`/quiniela?vista=clasificacion&group=${encodeURIComponent(group.id)}`}
         >
           <Trophy size={16} aria-hidden="true" />
           Clasificación

@@ -6,6 +6,7 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -65,6 +66,7 @@ export default function StandingsPage({
   matches,
   user,
   onLogin,
+  viewTabs,
 }: {
   groups: Group[];
   /** Your groups have loaded (an empty list means you really have none). */
@@ -73,6 +75,8 @@ export default function StandingsPage({
   loading: boolean;
   user: User | null;
   onLogin: () => void;
+  /** «Mi boleto | Clasificación»: the same tab shows your slip with these filters. */
+  viewTabs?: ReactNode;
 }) {
   // Your friends' competitions sit next to LaLiga, Champions and Premier.
   const { list: followed, ready: followedReady } = useFollowedCompetitions(user?.uid || "");
@@ -104,6 +108,7 @@ export default function StandingsPage({
         chips={chips}
         hasGroups={groups.length > 0}
         onOfficial={(code) => choice.chooseOfficial(code)}
+        viewTabs={viewTabs}
       />
     );
   if (user && groups.length)
@@ -113,11 +118,12 @@ export default function StandingsPage({
         matches={matches}
         user={user}
         chips={chips}
+        viewTabs={viewTabs}
       />
     );
   return (
     <>
-      <StandingsTitle />
+      <StandingsTitle viewTabs={viewTabs} />
       {!user ? (
         <PrivateGate onLogin={onLogin} />
       ) : (
@@ -155,6 +161,7 @@ function CustomStandingsPage({
   chips,
   hasGroups,
   onOfficial,
+  viewTabs,
 }: {
   cid: string;
   user: User;
@@ -162,11 +169,12 @@ function CustomStandingsPage({
   /** Without a group the official tables don't exist: their chips stay off. */
   hasGroups: boolean;
   onOfficial: (code: CompetitionCode) => void;
+  viewTabs?: ReactNode;
 }) {
-  const [period, setPeriod] = useState<Period>("round");
+  const [period, setPeriod] = usePeriod();
   return (
     <>
-      <StandingsTitle />
+      <StandingsTitle viewTabs={viewTabs} />
       <PageFilters
         groups={[]}
         groupId=""
@@ -199,28 +207,57 @@ function CustomStandingsPage({
   );
 }
 
-function StandingsTitle({ action }: { action?: ReactNode }) {
+function StandingsTitle({
+  action,
+  viewTabs,
+  eyebrow = "Clasificación",
+}: {
+  action?: ReactNode;
+  viewTabs?: ReactNode;
+  eyebrow?: string;
+}) {
   return (
-    <PageTitle
-      eyebrow="Cada acierto suma"
-      title="Clasificación"
-      titleControl={action}
-    />
+    <>
+      <PageTitle
+        eyebrow={eyebrow}
+        title="Quiniela"
+        titleControl={action}
+      />
+      {viewTabs}
+    </>
   );
 }
 
 type Period = "round" | "all";
+/** «Jornada» or «Total», kept in the URL: switching to the slip and back keeps it. */
+function usePeriod() {
+  const [params, setParams] = useSearchParams();
+  const period: Period = params.get("period") === "all" ? "all" : "round";
+  const setPeriod = (value: Period) =>
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (value === "all") next.set("period", "all");
+        else next.delete("period");
+        return next;
+      },
+      { replace: true },
+    );
+  return [period, setPeriod] as const;
+}
 
 function GroupStandings({
   groups,
   matches,
   user,
   chips,
+  viewTabs,
 }: {
   groups: Group[];
   matches: Match[];
   user: User;
   chips?: ReactNode;
+  viewTabs?: ReactNode;
 }) {
   const { groupId, selectGroup, preferences } = useGroupSelection(
     user.uid,
@@ -229,32 +266,34 @@ function GroupStandings({
   const competition = preferences.competition;
   const [combined, setCombined] = useState(false);
   const [params, setParams] = useSearchParams();
-  const [period, setPeriod] = useState<Period>(
-    params.get("period") === "all" ? "all" : "round",
-  );
+  const [period, setPeriod] = usePeriod();
   const scope = period === "all" && combined ? "global" : competition;
-  // An aviso links here with ?round=: open that round (and its competition).
-  const requestedRound = params.get("round") || "";
-  const [round, setRound] = useState(requestedRound);
-  useEffect(() => {
-    if (!requestedRound) return;
-    const code = requestedRound.split("-")[0];
-    if (isCompetition(code) && code !== preferences.competition)
-      preferenceStore.update(user.uid, { competition: code, liga: "" });
-    setCombined(false);
-    setPeriod("round");
-    setRound(requestedRound);
-    // Applied once: showing the page again keeps your filters, and the same
-    // link later is a new visit that opens its round again.
+  /*
+   * The round lives in the URL (?round=), shared with your slip: switching
+   * between them, «Volver», an aviso or a link land on the same round.
+   */
+  const round = params.get("round") || "";
+  const setRound = (id: string) =>
     setParams(
       (previous) => {
         const next = new URLSearchParams(previous);
-        next.delete("round");
+        if (id) next.set("round", id);
+        else next.delete("round");
         return next;
       },
       { replace: true },
     );
-  }, [requestedRound]);
+  // A round of another competition (an aviso, a link): open that competition.
+  const lastRound = useRef("");
+  useEffect(() => {
+    if (!round || lastRound.current === round) return;
+    lastRound.current = round;
+    const code = round.split("-")[0];
+    if (isCompetition(code) && code !== preferences.competition) {
+      preferenceStore.update(user.uid, { competition: code, liga: "" });
+      setCombined(false);
+    }
+  }, [round]);
   const [sharing, setSharing] = useState(false);
   const selectedGroup = groups.find((g) => g.id === groupId);
   const { data, error, retry } = useGroupRankings(user.uid, selectedGroup);
@@ -281,17 +320,18 @@ function GroupStandings({
     );
     return rounds.map((r) => {
       const [, , stage = "", matchday = "0"] = r.id.split("-");
-      return {
-        ...(known.get(r.id) || {
+      // The same name as in your slip («Jornada 10»): one round selector for both views.
+      return (
+        known.get(r.id) || {
           id: r.id,
           short: roundShortLabel({ stage, matchday: Number(matchday) || 0 }),
           start: r.kickoff,
           end: r.kickoff,
           state: "finished" as const,
           matches: 0,
-        }),
-        label: r.label,
-      };
+          label: r.label,
+        }
+      );
     });
   }, [rounds, matches]);
   const roundUnavailable = period === "round" && !selectedRound;
@@ -386,6 +426,8 @@ function GroupStandings({
   return (
     <>
       <StandingsTitle
+        viewTabs={viewTabs}
+        eyebrow={`Clasificación · ${scope === "global" ? "Todas" : competitionName(scope, true)}`}
         action={
           <ShareTrigger
             label="Compartir"

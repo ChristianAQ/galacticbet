@@ -427,7 +427,7 @@ function CustomMatchView({
           <ArrowRight size={16} aria-hidden="true" />
         </Link>
         {user && c.predictionMode !== "off" && (
-          <Link to={`/clasificacion?liga=${encodeURIComponent(c.id)}`}>
+          <Link to={`/quiniela?vista=clasificacion&liga=${encodeURIComponent(c.id)}`}>
             <ClipboardList size={18} aria-hidden="true" />
             <span>Clasificación de pronósticos</span>
             <ArrowRight size={16} aria-hidden="true" />

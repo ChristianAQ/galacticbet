@@ -61,6 +61,10 @@ Igual que la de LaLiga: los signos son un borrador privado hasta pulsar **Sellar
 
 ## Elección compartida y lista de ligas
 
-La liga elegida en Ligas, Quiniela o Clasificación, ya sea oficial o propia, es una sola elección para las tres pestañas. Se guarda en las preferencias de la cuenta en el dispositivo (`competition` y `liga`). Un enlace (`?liga=` o `?competition=`) la cambia. Una pestaña que vuelve a mostrarse con una URL anterior sigue la elección más reciente en vez de deshacerla. En Quiniela y Clasificación solo se muestran las ligas propias que sigues y que tienen quiniela. Sin grupo, abren la primera, porque las oficiales necesitan un grupo.
+La liga elegida en Ligas o en Quiniela (boleto o clasificación), ya sea oficial o propia, es una sola elección. Se guarda en las preferencias de la cuenta en el dispositivo (`competition` y `liga`). Un enlace (`?liga=` o `?competition=`) la cambia. Una pestaña que vuelve a mostrarse con una URL anterior sigue la elección más reciente en vez de deshacerla. En Quiniela y Clasificación solo se muestran las ligas propias que sigues y que tienen quiniela. Sin grupo, abren la primera, porque las oficiales necesitan un grupo.
 
 Una liga abierta desde un enlace que no sigues se quita con «Quitar de la lista», en su cabecera, o manteniendo pulsado su escudo. Dejar de seguir una liga también la quita de la lista.
+
+## Quiniela: boleto y clasificación en una pestaña
+
+La barra inferior tiene tres opciones: Inicio, Ligas y Quiniela. Quiniela muestra «Mi boleto» o «Clasificación» (`?vista=clasificacion`) con los mismos filtros. El grupo y la liga van en las preferencias compartidas y la jornada en la URL (`?round=`). Al cambiar de vista se conservan los tres. «Jornada/Total» de la clasificación también va en la URL (`?period=all`). Los enlaces antiguos a `#/clasificacion` (avisos, accesos directos) redirigen a la vista de clasificación con sus parámetros.

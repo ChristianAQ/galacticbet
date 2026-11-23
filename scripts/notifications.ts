@@ -194,7 +194,7 @@ export function resultMessages(round: CompletedRound): Map<string, PushMessage> 
     messages.set(uid, {
       title: `${roundTitle(round.competition, round.roundId)} cerrada`,
       body,
-      url: `./#/clasificacion?group=${encodeURIComponent(round.groupId)}&round=${encodeURIComponent(round.roundId)}`,
+      url: `./#/quiniela?vista=clasificacion&group=${encodeURIComponent(round.groupId)}&round=${encodeURIComponent(round.roundId)}`,
       tag: `result-${round.roundId}`,
     });
   }

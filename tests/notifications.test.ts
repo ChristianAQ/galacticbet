@@ -74,7 +74,7 @@ describe("Avisos: a quién y con qué texto", () => {
     );
     expect(messages.get("carla")!.title).toBe("LaLiga · Jornada 13 cerrada");
     expect(messages.get("carla")!.url).toBe(
-      "./#/clasificacion?group=g1&round=PD-2026-REGULAR_SEASON-13",
+      "./#/quiniela?vista=clasificacion&group=g1&round=PD-2026-REGULAR_SEASON-13",
     );
   });
 
