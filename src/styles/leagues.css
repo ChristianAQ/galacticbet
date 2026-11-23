@@ -364,6 +364,28 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A team that opens its sheet: the whole row answers the tap. */
+.league-team-open {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.league-team-open:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+tr.is-tappable {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+tr.is-tappable > * {
+  transition: background-color 160ms ease;
+}
+tr.is-tappable:active > * {
+  background-color: var(--paper-2);
+}
 .league-table .team-form {
   gap: 3px;
 }

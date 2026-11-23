@@ -1,0 +1,104 @@
+/*
+ * A deck of cards over the page (players' «cromos», team sheets): blurred
+ * backdrop, the card in the middle, a pager under it. Moves on the
+ * compositor only.
+ */
+.card-deck {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: calc(env(safe-area-inset-top) + 56px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  overscroll-behavior: contain;
+}
+.card-deck-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(10 9 7 / 0.74);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+.card-deck-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 10px);
+  right: 16px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.14);
+  color: #fff;
+  transition: transform 160ms var(--press), background-color 160ms ease;
+}
+.card-deck-close:active {
+  transform: scale(0.88);
+  background: rgb(255 255 255 / 0.24);
+}
+.card-deck-center {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: 100%;
+}
+.card-deck-stage {
+  width: min(340px, 100%);
+  touch-action: none;
+  cursor: grab;
+  will-change: transform;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.card-deck-stage:active {
+  cursor: grabbing;
+}
+
+/* ---------- Around the card ---------- */
+.card-deck-pager {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: #fff;
+}
+.card-deck-pager button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.14);
+  color: #fff;
+  transition: transform 160ms var(--press), opacity 160ms ease;
+}
+.card-deck-pager button:active:not(:disabled) {
+  transform: scale(0.88);
+}
+.card-deck-pager button:disabled {
+  opacity: 0.3;
+}
+.card-deck-pager span {
+  min-width: 64px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 20px;
+  font-weight: 900;
+  text-align: center;
+}
+.card-deck-pager small {
+  color: rgb(255 255 255 / 0.7);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 550;
+}
+.card-deck-hint {
+  color: rgb(255 255 255 / 0.66);
+  font-size: 12.5px;
+}
+@media (max-height: 700px) {
+  .card-deck-hint {
+    display: none;
+  }
+}

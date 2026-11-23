@@ -45,6 +45,7 @@ export default function LeagueTable({
   full = false,
   zones: ownZones,
   caption,
+  onTeam,
 }: {
   rows: LeagueRow[];
   /** Official competition (its zones and name); omit for friends' tables. */
@@ -55,6 +56,8 @@ export default function LeagueTable({
   /** Zones of a table that is not an official league (e.g. who goes through). */
   zones?: Zone[];
   caption?: string;
+  /** Tapping a team opens its sheet (row index and the row, to grow from). */
+  onTeam?: (index: number, row: HTMLElement) => void;
 }) {
   const { sentinel, stuck } = useStuck();
   const config = code ? leagueZones[code] : undefined;
@@ -139,20 +142,30 @@ export default function LeagueTable({
                   [
                     zone ? `zone-${zone.kind}` : "",
                     marked ? "is-highlight" : "",
+                    onTeam ? "is-tappable" : "",
                   ]
                     .filter(Boolean)
                     .join(" ") || undefined
                 }
                 aria-current={marked || undefined}
+                onClick={onTeam ? (event) => onTeam(i, event.currentTarget) : undefined}
               >
                 <td>
                   <span className="league-pos">{position}</span>
                 </td>
                 <th scope="row">
-                  <span className="league-team" title={r.name}>
-                    <Crest src={r.crest} />
-                    <span>{r.name}</span>
-                  </span>
+                  {onTeam ? (
+                    // The row opens the sheet; the button makes it reachable by keyboard.
+                    <button type="button" className="league-team league-team-open" title={r.name} aria-label={`${r.name}: ver su ficha`}>
+                      <Crest src={r.crest} />
+                      <span>{r.name}</span>
+                    </button>
+                  ) : (
+                    <span className="league-team" title={r.name}>
+                      <Crest src={r.crest} />
+                      <span>{r.name}</span>
+                    </span>
+                  )}
                 </th>
                 <td>{r.played}</td>
                 <td className={full ? undefined : "hide-sm"}>{r.wins}</td>

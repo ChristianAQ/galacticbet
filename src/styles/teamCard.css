@@ -1,0 +1,423 @@
+/*
+ * A team's sheet: quieter than a player's «cromo». The club on the
+ * masthead's ink with a soft glow behind its crest, then paper with air
+ * between sections; the accent only where it means something.
+ */
+.card-deck.is-team .card-deck-stage {
+  width: min(384px, 100%);
+}
+.team-sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 168px);
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow:
+    0 40px 80px -28px rgb(0 0 0 / 0.75),
+    0 0 0 1px rgb(255 255 255 / 0.06);
+}
+.team-sheet-hero {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 22px 20px 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgb(255 209 0 / 0.22), transparent 62%),
+    linear-gradient(180deg, #23211b 0%, var(--masthead) 100%);
+  color: var(--masthead-ink);
+  text-align: center;
+  touch-action: none;
+}
+.team-sheet-hero::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.7;
+}
+.team-sheet-position,
+.team-sheet-points {
+  position: absolute;
+  top: 16px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-weight: 900;
+  line-height: 1;
+}
+.team-sheet-position {
+  left: 20px;
+  color: var(--accent);
+  font-size: 40px;
+}
+.team-sheet-position small {
+  font-size: 20px;
+  vertical-align: super;
+}
+.team-sheet-points {
+  right: 20px;
+  display: grid;
+  justify-items: end;
+  font-size: 30px;
+}
+.team-sheet-points small {
+  color: var(--masthead-ink-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.team-sheet-crest {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 6px rgb(255 255 255 / 0.06),
+    0 18px 36px -14px rgb(255 209 0 / 0.55);
+  animation: team-crest-in 520ms var(--spring-bouncy) both;
+}
+.team-sheet-crest img,
+.team-sheet-crest .crest-placeholder {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
+.team-sheet-hero h2 {
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+.team-sheet-hero p {
+  color: var(--masthead-ink-2);
+  font-size: 13px;
+  font-weight: 550;
+}
+.team-sheet-body {
+  display: grid;
+  gap: 18px;
+  padding: 16px 18px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.team-sheet-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.team-sheet-notes li {
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  animation: team-sheet-in 360ms var(--spring-smooth) both;
+  animation-delay: calc(var(--i, 0) * 50ms + 60ms);
+}
+.team-sheet-notes li:first-child {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.team-sheet-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.team-sheet-figures > div {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 4px;
+  text-align: center;
+}
+.team-sheet-figures > div + div {
+  border-left: 1px solid var(--rule);
+}
+.team-sheet-figures dt {
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.team-sheet-figures dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+.team-sheet-section {
+  display: grid;
+  gap: 10px;
+}
+.team-sheet-section h3 {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* The last five, oldest first, as a row of results. */
+.team-sheet-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.team-sheet-game {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 2px 7px;
+  border-radius: 14px;
+  background: var(--paper-2);
+  transition: transform 160ms var(--press);
+}
+.team-sheet-game:active {
+  transform: scale(0.94);
+}
+.team-sheet-game img,
+.team-sheet-game .crest-placeholder {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+.team-sheet-game strong {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+}
+.team-sheet-game small {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.team-sheet-result {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.team-sheet-game.is-win .team-sheet-result {
+  background: var(--win);
+  color: #fff;
+}
+.team-sheet-game.is-draw .team-sheet-result {
+  background: var(--ink-3);
+  color: var(--paper);
+}
+.team-sheet-game.is-loss .team-sheet-result {
+  background: var(--loss);
+  color: #fff;
+}
+.team-sheet-streak {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+}
+.team-sheet-streak.is-wins svg,
+.team-sheet-streak.is-unbeaten svg {
+  color: var(--win);
+}
+.team-sheet-streak.is-losses svg,
+.team-sheet-streak.is-winless svg {
+  color: var(--loss);
+}
+.team-sheet-next {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--paper-2);
+  text-align: left;
+  transition: transform 160ms var(--press);
+}
+.team-sheet-next:active {
+  transform: scale(0.98);
+}
+.team-sheet-next > svg:first-child {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.team-sheet-next img,
+.team-sheet-next .crest-placeholder {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.team-sheet-next > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.team-sheet-next strong {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-sheet-next small {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.team-sheet-next > svg:last-child {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--ink-3);
+}
+.team-sheet-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.team-sheet-venue {
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--paper-2);
+  font-size: 13px;
+}
+.team-sheet-venue strong {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+}
+.team-sheet-venue strong small {
+  font-size: 14px;
+}
+.team-sheet-label {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+.team-sheet-muted {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.team-sheet-scorers {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.team-sheet-scorers li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.team-sheet-scorers li:last-child {
+  border-bottom: 0;
+}
+.team-sheet-scorers span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-sheet-scorers strong {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 20px;
+  font-weight: 900;
+}
+.team-sheet-scorers small {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.team-sheet-foot {
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+@keyframes team-crest-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-8deg);
+  }
+}
+@keyframes team-sheet-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .team-sheet-crest,
+  .team-sheet-notes li {
+    animation: none;
+  }
+}
+/* Short screens (iPhone SE): a lower header leaves room for the numbers. */
+@media (max-height: 700px) {
+  .team-sheet-hero {
+    padding: 14px 18px 12px;
+  }
+  .team-sheet-crest {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 2px;
+  }
+  .team-sheet-crest img,
+  .team-sheet-crest .crest-placeholder {
+    width: 40px;
+    height: 40px;
+  }
+  .team-sheet-hero h2 {
+    font-size: 25px;
+  }
+  .team-sheet-position {
+    font-size: 32px;
+  }
+  .team-sheet-points {
+    font-size: 26px;
+  }
+}

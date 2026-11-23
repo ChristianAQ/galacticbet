@@ -3,59 +3,6 @@
  * the masthead's ink for club and portrait, the page's paper for the numbers.
  * The overlay keeps it centred; it moves on the compositor only.
  */
-.player-cards {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: grid;
-  place-items: center;
-  padding: calc(env(safe-area-inset-top) + 56px) 16px calc(env(safe-area-inset-bottom) + 16px);
-  overscroll-behavior: contain;
-}
-.player-cards-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgb(10 9 7 / 0.74);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  backdrop-filter: blur(14px) saturate(1.2);
-}
-.player-cards-close {
-  position: absolute;
-  top: calc(env(safe-area-inset-top) + 10px);
-  right: 16px;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.14);
-  color: #fff;
-  transition: transform 160ms var(--press), background-color 160ms ease;
-}
-.player-cards-close:active {
-  transform: scale(0.88);
-  background: rgb(255 255 255 / 0.24);
-}
-.player-cards-center {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 14px;
-  width: 100%;
-}
-.player-cards-stage {
-  width: min(340px, 100%);
-  touch-action: none;
-  cursor: grab;
-  will-change: transform;
-  -webkit-user-select: none;
-  user-select: none;
-}
-.player-cards-stage:active {
-  cursor: grabbing;
-}
-
 /* ---------- The card ---------- */
 .cromo {
   --foil: linear-gradient(
@@ -277,47 +224,6 @@
   opacity: 1;
 }
 
-/* ---------- Around the card ---------- */
-.player-cards-pager {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  color: #fff;
-}
-.player-cards-pager button {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.14);
-  color: #fff;
-  transition: transform 160ms var(--press), opacity 160ms ease;
-}
-.player-cards-pager button:active:not(:disabled) {
-  transform: scale(0.88);
-}
-.player-cards-pager button:disabled {
-  opacity: 0.3;
-}
-.player-cards-pager span {
-  min-width: 64px;
-  font-family: var(--font-display);
-  font-stretch: var(--stretch-condensed);
-  font-size: 20px;
-  font-weight: 900;
-  text-align: center;
-}
-.player-cards-pager small {
-  color: rgb(255 255 255 / 0.7);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 550;
-}
-.player-cards-hint {
-  color: rgb(255 255 255 / 0.66);
-  font-size: 12.5px;
-}
 @keyframes cromo-stat-in {
   from {
     opacity: 0;
@@ -341,8 +247,5 @@
   }
   .cromo-initials {
     font-size: 76px;
-  }
-  .player-cards-hint {
-    display: none;
   }
 }

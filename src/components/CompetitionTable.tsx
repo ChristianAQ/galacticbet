@@ -1,12 +1,16 @@
 import LeagueTable from "./LeagueTable";
 import { competitionCode } from "../lib/competitions";
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
+import { haptic } from "../lib/motion";
+import { useLeagueStats } from "../lib/useLeagueStats";
 import { competitionName } from "../lib/competitions";
 import type { Match } from "../lib/domain";
 import { seasonLeagueTable } from "../lib/leagueTable";
 import { seasonLabel } from "../lib/leagueHub";
 import { Empty } from "./ui";
 import { SkeletonRows } from "./Skeleton";
+
+const TeamCards = lazy(() => import("./TeamCard"));
 
 export default function CompetitionTable({
   matches,
@@ -21,6 +25,14 @@ export default function CompetitionTable({
 }) {
   const rows = useMemo(
     () => seasonLeagueTable(matches, competition, seasonId),
+    [matches, competition, seasonId],
+  );
+  const code = competitionCode(competition);
+  const [sheet, setSheet] = useState<{ index: number; row: HTMLElement } | null>(null);
+  // The season's scorers (cached with Datos) name each club's top scorers.
+  const stats = useLeagueStats(sheet ? seasonId : "", false);
+  const own = useMemo(
+    () => matches.filter((m) => m.competition === competition && m.seasonId === seasonId),
     [matches, competition, seasonId],
   );
   return (
@@ -46,8 +58,34 @@ export default function CompetitionTable({
             role="region"
             aria-label="Clasificación completa de equipos"
           >
-            <LeagueTable rows={rows} code={competitionCode(competition)} full />
+            <LeagueTable
+              rows={rows}
+              code={code}
+              full
+              onTeam={
+                code
+                  ? (index, row) => {
+                      haptic();
+                      setSheet({ index, row });
+                    }
+                  : undefined
+              }
+            />
           </div>
+          {sheet && code && (
+            <Suspense fallback={null}>
+              <TeamCards
+                rows={rows}
+                start={sheet.index}
+                origin={sheet.row}
+                matches={own}
+                scorers={stats.data?.scorers || []}
+                competition={code}
+                seasonId={seasonId}
+                onClose={() => setSheet(null)}
+              />
+            </Suspense>
+          )}
           <p className="league-source">
             Calculada con los resultados sincronizados. Orden por puntos,
             diferencia y goles a favor; puede diferir del oficial por sanciones

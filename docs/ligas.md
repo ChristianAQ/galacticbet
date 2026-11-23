@@ -35,6 +35,22 @@ Navegación:
 
 En Equipos, los goles se buscan por el identificador del jugador entre los 20 máximos goleadores de LaLiga, Premier y Champions. Quien no está entre ellos lo dice en vez de mostrar ceros. La sincronización guarda con cada goleador su id, posición, nacionalidad, fecha de nacimiento y dorsal. Las ediciones anteriores, sin esos datos, se renuevan en la siguiente ejecución.
 
+### La ficha de cada equipo
+
+En Ligas › Tabla, al pulsar un equipo se abre su ficha (`TeamCard.tsx`, datos en `teamSheet.ts`). Es más sobria que el cromo: escudo, puesto y puntos sobre la tinta de la cabecera y, debajo, sobre papel:
+
+- **Distancias:** puntos al líder, o ventaja si es líder. En LaLiga y Premier, también a la Champions (o sobre el 5.º) y al descenso (o sobre él). En la Champions, a los octavos directos o al playoff. Solo con la tabla completa, como las zonas.
+- **Cifras:** partidos, V·E·D, goles y puntos por partido.
+- **Últimos cinco partidos:** resultado, rival, marcador, en casa o fuera. Cada uno abre su partido.
+- **Racha:** la más llamativa, por ejemplo victorias seguidas o partidos sin perder.
+- **Próximo partido:** abre su página.
+- **En casa y fuera:** puntos, V·E·D y goles; además, porterías a cero.
+- **Goleadores:** sus máximos goleadores, de la lista de Football-Data.
+
+Las cifras salen de los resultados oficiales de la competición y temporada elegidas: la tabla es de la fase liga, y los partidos de la ficha incluyen las eliminatorias.
+
+El mazo deslizable (`CardDeck.tsx`) es el mismo del cromo: crece desde la fila, se desliza a los equipos de arriba y abajo, y la cabecera se arrastra hacia abajo para cerrar. El resto de la ficha se desplaza por dentro si no cabe, como en un iPhone SE.
+
 ## Sincronización y consumo
 
 `scripts/syncLeagueStats.ts` se ejecuta desde `scripts/officialSync.ts`, después de los calendarios y con el mismo `FOOTBALL_DATA_TOKEN`. Consulta `/competitions/{code}/scorers?season={año}&limit=20`:
