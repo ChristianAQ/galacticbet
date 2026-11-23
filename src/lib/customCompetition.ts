@@ -69,7 +69,49 @@ export interface Competition extends CompetitionSetup {
   ownerId: string;
   adminIds: string[];
   memberIds: string[];
+  /** Short invitation code (6 characters). Competitions from before it have none until the owner opens them. */
+  code?: string | null;
 }
+
+// ---------- Invitation codes ----------
+
+/** No 0/O, 1/I/L: a code read aloud or typed from a screen can't be misread. */
+export const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+export const CODE_LENGTH = 6;
+const CODE_PATTERN = new RegExp(`^[${CODE_ALPHABET}]{${CODE_LENGTH}}$`);
+
+export function randomCode(random: (n: number) => number = secureRandom): string {
+  let code = "";
+  for (let i = 0; i < CODE_LENGTH; i++) code += CODE_ALPHABET[random(CODE_ALPHABET.length)];
+  return code;
+}
+function secureRandom(n: number) {
+  // Rejection sampling keeps every character equally likely.
+  const limit = 256 - (256 % n);
+  const byte = new Uint8Array(1);
+  do crypto.getRandomValues(byte);
+  while (byte[0] >= limit);
+  return byte[0] % n;
+}
+export const isCode = (value: string) => CODE_PATTERN.test(value);
+
+/**
+ * What someone pasted or typed: a short code («k7m 2qx»), an invitation link
+ * (…#/ligas?liga=ID or ?codigo=CODE) or the long identifier of older links.
+ */
+export function parseInvite(input: string): { code: string } | { id: string } | null {
+  const text = input.trim();
+  const link = /[?&]liga=([A-Za-z0-9]{10,40})/.exec(text);
+  if (link) return { id: link[1] };
+  const coded = /[?&]codigo=([A-Za-z0-9]{6})/i.exec(text);
+  if (coded && isCode(coded[1].toUpperCase())) return { code: coded[1].toUpperCase() };
+  const compact = text.replace(/[\s-]/g, "");
+  if (isCode(compact.toUpperCase())) return { code: compact.toUpperCase() };
+  if (/^[A-Za-z0-9]{15,40}$/.test(compact)) return { id: compact };
+  return null;
+}
+/** «K7M 2QX»: two halves are easier to read out loud. */
+export const formatCode = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 export interface Participant {
   id: string;
   name: string;

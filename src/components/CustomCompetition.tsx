@@ -1,7 +1,8 @@
-import { Check, Lock, MapPin, Plus, Share2, Trophy } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, useId } from "react";
+import { Check, Lock, MapPin, Plus, QrCode, Trophy } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useId, type ReactNode } from "react";
 import {
   FORMATS,
+  parseInvite,
   resolveCompetition,
   roundKey,
   tieName,
@@ -13,16 +14,17 @@ import {
 } from "../lib/customCompetition";
 import {
   followCompetition,
+  resolveCompetitionCode,
   unfollowCompetition,
   type CompetitionChip,
   type CompetitionData,
 } from "../lib/customCompetitionData";
 import { preferredRound } from "../lib/domain";
 import { roundOptions } from "../lib/roundOptions";
-import { shareOrCopy } from "../lib/matchActions";
 import { haptic } from "../lib/motion";
 import { go } from "../lib/navigation";
 import type { AppUser } from "../lib/session";
+import InviteCard from "./CompetitionInvite";
 import DayTitle from "./DayTitle";
 import LeagueNavigation from "./LeagueNavigation";
 import LeagueTable, { type Zone } from "./LeagueTable";
@@ -35,6 +37,7 @@ import "../styles/customCompetition.css";
 
 const MatchSheet = lazy(() => import("./CustomMatchSheet"));
 const ManagePanel = lazy(() => import("./CustomManage"));
+const PicksPanel = lazy(() => import("./CustomPicks"));
 
 const dayLabel = new Intl.DateTimeFormat("es", {
   weekday: "long",
@@ -117,6 +120,7 @@ export function CustomSummary({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [leaving, setLeaving] = useState(false);
+  const [inviting, setInviting] = useState(false);
   if (!c) return null;
   const following = Boolean(user && c.memberIds.includes(user.uid));
   const owner = user?.uid === c.ownerId;
@@ -155,25 +159,24 @@ export function CustomSummary({
             </button>
           )
         )}
-        <button
-          type="button"
-          className="share-trigger"
-          onClick={() =>
-            void shareOrCopy({
-              title: c.name,
-              text: `Sigue «${c.name}» en GalacticBet. Código: ${c.id}`,
-              url: `${location.origin}${location.pathname}#/ligas?liga=${c.id}`,
-            }).then((message) => message && setError(message))
-          }
-        >
-          <Share2 size={16} aria-hidden="true" />
-          Compartir
+        <button type="button" className="share-trigger" onClick={() => setInviting(true)}>
+          <QrCode size={16} aria-hidden="true" />
+          Invitar
         </button>
       </div>
       {error && (
         <p className="custom-summary-note" role="status">
           {error}
         </p>
+      )}
+      {inviting && (
+        <Modal title="Invitar" onClose={() => setInviting(false)}>
+          <p className="muted invite-intro">
+            Que escaneen el QR con la cámara, o que escriban el código con el botón ＋ de Ligas, para ver «{c.name}» y
+            seguirla.
+          </p>
+          <InviteCard competition={c} owner={owner} />
+        </Modal>
       )}
       {leaving && (
         <Modal title="¿Dejar de seguirla?" role="alertdialog" onClose={() => setLeaving(false)} initialFocus="[data-cancel]">
@@ -192,17 +195,19 @@ export function CustomSummary({
   );
 }
 
-export type CustomTab = "partidos" | "clasificacion" | "cuadro" | "gestion";
+export type CustomTab = "partidos" | "clasificacion" | "cuadro" | "pronosticos" | "gestion";
 
 /** A match row that opens its sheet: same row as any league fixture. */
-function FixtureButton({
+export function FixtureButton({
   match,
   competition,
   onOpen,
+  extra,
 }: {
   match: ResolvedMatch;
   competition: Competition;
   onOpen: (id: string) => void;
+  extra?: ReactNode;
 }) {
   const app = toAppMatch(competition.id, match);
   return (
@@ -226,6 +231,7 @@ function FixtureButton({
             )}
           </span>
         )}
+        {extra}
       </button>
     </li>
   );
@@ -458,6 +464,7 @@ export default function CustomCompetitionView({
     { id: "partidos", label: "Partidos" },
     ...(view.tables.length ? [{ id: "clasificacion" as const, label: "Tabla" }] : []),
     ...(view.matches.some((m) => m.phase === "knockout") ? [{ id: "cuadro" as const, label: "Cuadro" }] : []),
+    ...(c.predictionMode !== "off" ? [{ id: "pronosticos" as const, label: "Pronósticos" }] : []),
     ...(canRun ? [{ id: "gestion" as const, label: "Gestión" }] : []),
   ];
   const active = tabs.find((t) => t.id === tab)?.id || "partidos";
@@ -490,6 +497,10 @@ export default function CustomCompetitionView({
           <TablePanel competition={c} view={view} />
         ) : active === "cuadro" ? (
           <BracketPanel competition={c} view={view} onOpen={setOpen} />
+        ) : active === "pronosticos" ? (
+          <Suspense fallback={<SkeletonRows rows={4} variant="card" label="Cargando pronósticos" />}>
+            <PicksPanel competition={c} view={view} user={user} onOpen={setOpen} onLogin={onLogin} />
+          </Suspense>
         ) : active === "gestion" ? (
           <Suspense fallback={<SkeletonRows rows={5} variant="line" label="Cargando gestión" />}>
             <ManagePanel competition={c} data={data} view={view} user={user!} onOpenMatch={setOpen} />
@@ -505,7 +516,7 @@ export default function CustomCompetitionView({
             onManage={() => onTab("gestion")}
           />
         )}
-        {!user && (
+        {!user && active !== "pronosticos" && (
           <p className="league-more">
             <button type="button" className="text-button" onClick={onLogin}>
               Entra para seguir esta competición
@@ -542,7 +553,29 @@ export function CompetitionEntrySheet({
   onClose: () => void;
 }) {
   const [code, setCode] = useState("");
-  const clean = code.trim().replace(/^.*[?&]liga=/, "").replace(/[^A-Za-z0-9]/g, "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const invite = parseInvite(code);
+  const open = async () => {
+    if (!invite) return;
+    setError("");
+    if ("id" in invite) {
+      onClose();
+      return onCode(invite.id);
+    }
+    setBusy(true);
+    try {
+      const id = await resolveCompetitionCode(invite.code);
+      if (!id) return setError("No hay ninguna competición con ese código. Revísalo.");
+      haptic("success");
+      onClose();
+      onCode(id);
+    } catch (e) {
+      setError(readableError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Modal title="Competiciones entre amigos" onClose={onClose}>
       <div className="custom-entry">
@@ -564,9 +597,7 @@ export function CompetitionEntrySheet({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (clean.length < 10) return;
-            onClose();
-            onCode(clean);
+            void open();
           }}
         >
           <label>
@@ -574,17 +605,27 @@ export function CompetitionEntrySheet({
             <input
               value={code}
               className="code-input"
-              autoCapitalize="none"
+              autoCapitalize="characters"
               autoCorrect="off"
               autoComplete="off"
               spellCheck={false}
               enterKeyHint="go"
-              placeholder="Pega aquí el código"
-              onChange={(e) => setCode(e.target.value)}
+              placeholder="Ej.: K7M 2QX"
+              aria-invalid={Boolean(error) || undefined}
+              onChange={(e) => {
+                setCode(e.target.value);
+                setError("");
+              }}
             />
           </label>
-          <button className="button secondary full" disabled={clean.length < 10}>
-            Ver competición
+          <p className="code-hint">6 letras y números. También puedes pegar el enlace o escanear el QR con la cámara.</p>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="button secondary full" disabled={!invite || busy}>
+            {busy ? "Buscando…" : "Ver competición"}
           </button>
         </form>
       </div>

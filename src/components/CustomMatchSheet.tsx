@@ -1,5 +1,5 @@
-import { CalendarClock, Lock, LockOpen, MapPin, Trash2 } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { CalendarClock, Lock, LockOpen, MapPin, NotebookPen, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   localParts,
   STATUS_LABELS,
@@ -13,8 +13,17 @@ import {
   type Participant,
   type ResolvedMatch,
 } from "../lib/customCompetition";
-import { deleteMatch, saveMatch } from "../lib/customCompetitionData";
+import {
+  customFixtureId,
+  deleteMatch,
+  loadMyPicks,
+  loadStartedPicks,
+  saveMatch,
+  usePeople,
+} from "../lib/customCompetitionData";
+import { pickHit, pickLabel, pickPoints } from "../lib/customPicks";
 import { haptic } from "../lib/motion";
+import { go } from "../lib/navigation";
 import type { AppUser } from "../lib/session";
 import Modal from "./Modal";
 import { MatchRow, readableError } from "./ui";
@@ -213,6 +222,26 @@ export default function CustomMatchSheet({
           Resultado confirmado: solo el propietario puede cambiarlo.
         </p>
       )}
+      {/* Like any league fixture: a porra among friends, only before kick-off. */}
+      {confirm === null &&
+        competition.memberIds.includes(uid) &&
+        match.status === "scheduled" &&
+        match.startAt > Date.now() &&
+        match.home.id &&
+        match.away.id &&
+        !match.home.pending &&
+        !match.away.pending && (
+          <button
+            type="button"
+            className="text-button custom-porra-link"
+            onClick={() => {
+              onClose();
+              go(`/porra?partido=${encodeURIComponent(customFixtureId(competition.id, match.id))}`);
+            }}
+          >
+            <NotebookPen size={15} aria-hidden="true" /> Porra rápida con este partido
+          </button>
+        )}
       {editable && confirm === null && (
         <form onSubmit={submit} className="custom-match-form">
           <label>
@@ -370,6 +399,79 @@ export default function CustomMatchSheet({
           </div>
         </div>
       )}
+      {confirm === null && user && (competition.predictionMode !== "off" || match.startAt <= Date.now()) && (
+        <MatchPicks competition={competition} match={match} uid={uid} />
+      )}
     </Modal>
+  );
+}
+
+/**
+ * Before kick-off: only your pick (the others stay hidden). Once it starts:
+ * everyone's, with the points when the result is in.
+ */
+function MatchPicks({ competition, match, uid }: { competition: Competition; match: ResolvedMatch; uid: string }) {
+  const started = match.startAt <= Date.now();
+  const [picks, setPicks] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    let live = true;
+    const load = started
+      ? loadStartedPicks(competition.id, [{ id: match.id, startAt: match.startAt }], { prune: false }).then(
+          (r) => r[match.id] || {},
+        )
+      : loadMyPicks(competition.id, [match.id], uid).then((r) => (r[match.id] ? { [uid]: r[match.id] } : {}));
+    load.then(
+      (r) => live && setPicks(r),
+      () => live && setPicks({}),
+    );
+    return () => {
+      live = false;
+    };
+  }, [competition.id, match.id, match.startAt, uid, started]);
+  const people = usePeople(picks ? Object.keys(picks) : []);
+  if (!picks) return null;
+  const rows = Object.entries(picks)
+    .map(([id, raw]) => ({ id, raw, points: pickPoints(raw, match), hit: pickHit(raw, match) }))
+    .sort(
+      (a, b) =>
+        (b.points ?? -1) - (a.points ?? -1) ||
+        (people[a.id]?.name || "").localeCompare(people[b.id]?.name || "", "es"),
+    );
+  return (
+    <section className="custom-match-picks-section" aria-labelledby="match-picks-title">
+      <div className="section-heading">
+        <h2 id="match-picks-title">Pronósticos</h2>
+        {started && <span className="cc-count">{rows.length}</span>}
+      </div>
+      {!started ? (
+        <p className="muted">
+          {picks[uid] ? (
+            <>
+              Tu pronóstico: <strong>{pickLabel(picks[uid])}</strong>.{" "}
+            </>
+          ) : (
+            "Aún no has pronosticado este partido. "
+          )}
+          Los de los demás se verán cuando empiece.
+        </p>
+      ) : rows.length ? (
+        <ul className="custom-match-picks">
+          {rows.map((r) => (
+            <li key={r.id} className={`${r.id === uid ? "is-me" : ""}${r.points ? " is-hit" : ""}`}>
+              <span className="pick-name">
+                {people[r.id]?.name || "Jugador"}
+                {r.id === uid && " · Tú"}
+              </span>
+              <span className="pick-value">{pickLabel(r.raw)}</span>
+              <span className="pick-points">
+                {r.points === null ? "—" : r.hit === "exact" ? `+${r.points} pleno` : `${r.points ? "+" : ""}${r.points}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">Nadie pronosticó este partido.</p>
+      )}
+    </section>
   );
 }

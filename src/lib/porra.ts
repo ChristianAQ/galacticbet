@@ -1,4 +1,4 @@
-import { isKnownCompetition } from "./competitions";
+import { competitionName, isKnownCompetition } from "./competitions";
 import type { Match } from "./domain";
 
 export const MAX_PORRAS = 20;
@@ -6,7 +6,10 @@ export const MAX_PORRA_PLAYERS = 30;
 export type PorraFixture = Pick<
   Match,
   "id" | "competition" | "home" | "away" | "utcDate"
->;
+> & {
+  /** A match of a friends' competition: its name replaces the league's. */
+  league?: string;
+};
 export interface PorraPlayer {
   id: string;
   name: string;
@@ -54,7 +57,9 @@ export function validPorra(value: unknown): value is Porra {
     text(p.title, 60) &&
     Boolean(p.fixture) &&
     text(p.fixture.id, 128) &&
-    isKnownCompetition(p.fixture.competition) &&
+    (p.fixture.league === undefined
+      ? isKnownCompetition(p.fixture.competition)
+      : text(p.fixture.league, 60)) &&
     text(p.fixture.home, 100) &&
     text(p.fixture.away, 100) &&
     typeof p.fixture.utcDate === "string" &&
@@ -81,10 +86,15 @@ export function validPorra(value: unknown): value is Porra {
     p.updatedAt >= p.createdAt
   );
 }
-export function fixtureSnapshot(match: Match): PorraFixture {
+export function fixtureSnapshot(match: Match, league?: string): PorraFixture {
   const { id, competition, home, away, utcDate } = match;
-  return { id, competition, home, away, utcDate };
+  return league
+    ? { id, competition, home, away, utcDate, league }
+    : { id, competition, home, away, utcDate };
 }
+/** «LaLiga» or the name of the friends' competition. */
+export const porraLeague = (fixture: PorraFixture) =>
+  fixture.league || competitionName(fixture.competition);
 export function porraStorageKey(owner: string) {
   return `galacticbet:porras:v1:${owner || "guest"}`;
 }

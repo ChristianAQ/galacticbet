@@ -11,7 +11,7 @@ import {
   Share2,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Modal from "../components/Modal";
 import PorraTicket from "../components/PorraTicket";
@@ -39,6 +39,7 @@ import {
 } from "../lib/porra";
 import { porraImage } from "../lib/porraImage";
 import { upcomingMatches } from "../lib/schedule";
+import type { CompetitionFixtures } from "../lib/customCompetitionData";
 import "../styles/porra.css";
 
 interface DraftPlayer {
@@ -106,6 +107,34 @@ export default function PorraPage({
   const [now, setNow] = useState(Date.now());
   const upcoming = upcomingMatches(matches, now);
   const firstId = upcoming[0]?.id;
+  // Matches of the friends' competitions you follow, loaded only here.
+  const [custom, setCustom] = useState<CompetitionFixtures[]>([]);
+  useEffect(() => {
+    if (!owner || owner === "guest") return;
+    let live = true;
+    import("../lib/customCompetitionData")
+      .then((m) => m.loadFollowedFixtures(owner))
+      .then(
+        (list) => live && setCustom(list),
+        () => undefined,
+      );
+    return () => {
+      live = false;
+    };
+  }, [owner]);
+  const everyMatch = useMemo(
+    () => [...matches, ...custom.flatMap((c) => c.matches)],
+    [matches, custom],
+  );
+  const leagueOf = useMemo(
+    () =>
+      new Map(custom.flatMap((c) => c.matches.map((m) => [m.id, c.name]))),
+    [custom],
+  );
+  const snapshot = (m: Match) => fixtureSnapshot(m, leagueOf.get(m.id));
+  const customUpcoming = custom
+    .map((c) => ({ ...c, matches: upcomingMatches(c.matches, now) }))
+    .filter((c) => c.matches.length);
   const [draft, setDraft] = useState<Draft>(() =>
     initial.items[0]
       ? toDraft(initial.items[0])
@@ -143,15 +172,15 @@ export default function PorraPage({
   const seeded = useRef("");
   useEffect(() => {
     if (!fromMatch || seeded.current === fromMatch) return;
-    const m = matches.find((m) => m.id === fromMatch);
+    const m = everyMatch.find((m) => m.id === fromMatch);
     if (!m) return;
     seeded.current = fromMatch;
-    setDraft(blank(fixtureSnapshot(m)));
+    setDraft(blank(snapshot(m)));
     setEditing(null);
     setPreview(null);
     setError("");
     setMessage("");
-  }, [fromMatch, matches]);
+  }, [fromMatch, everyMatch]);
   useEffect(() => {
     const first = matches.find((m) => m.id === firstId);
     if (first)
@@ -259,7 +288,7 @@ export default function PorraPage({
       );
       return;
     }
-    const current = matches.find((m) => m.id === draft.fixture?.id);
+    const current = everyMatch.find((m) => m.id === draft.fixture?.id);
     if (
       editing?.fixture.id !== draft.fixture.id &&
       (!current || !canPredict(current.utcDate, Date.now(), current.status))
@@ -273,7 +302,7 @@ export default function PorraPage({
     const p: Porra = {
       id: editing?.id || crypto.randomUUID(),
       title: draft.title.trim(),
-      fixture: current ? fixtureSnapshot(current) : draft.fixture,
+      fixture: current ? snapshot(current) : draft.fixture,
       contributionCents,
       players: draft.players.map((row) => ({
         id: row.id,
@@ -363,7 +392,9 @@ export default function PorraPage({
       setError("No se ha podido eliminar la porra. Inténtalo de nuevo.");
     }
   }
-  const selectedUpcoming = upcoming.some((m) => m.id === draft.fixture?.id);
+  const selectedUpcoming =
+    upcoming.some((m) => m.id === draft.fixture?.id) ||
+    customUpcoming.some((c) => c.matches.some((m) => m.id === draft.fixture?.id));
   const amount = parseContribution(draft.contribution);
   const savedPreview = Boolean(preview && items.some((p) => p.id === preview.id));
   return (
@@ -508,11 +539,11 @@ export default function PorraPage({
                 required
                 disabled={loading && !draft.fixture}
                 onChange={(e) => {
-                  const m = matches.find((m) => m.id === e.target.value);
+                  const m = everyMatch.find((m) => m.id === e.target.value);
                   if (m)
                     setDraft((value) => ({
                       ...value,
-                      fixture: fixtureSnapshot(m),
+                      fixture: snapshot(m),
                     }));
                 }}
               >
@@ -540,9 +571,18 @@ export default function PorraPage({
                       ))}
                   </optgroup>
                 ))}
+                {customUpcoming.map((c) => (
+                  <optgroup key={c.id} label={c.name}>
+                    {c.matches.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.home} – {m.away} · {kickoffLabel(m.utcDate, now)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </label>
-            {!upcoming.length && !editing && !loading && (
+            {!upcoming.length && !customUpcoming.length && !editing && !loading && (
               <p className="setup-notice">
                 <span>
                   No hay próximos partidos en el calendario.{" "}

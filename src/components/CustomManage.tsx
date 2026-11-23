@@ -1,12 +1,9 @@
-import { doc, getDoc } from "firebase/firestore";
 import {
   CalendarPlus,
   CalendarRange,
   ChevronRight,
-  Copy,
   ImagePlus,
   Settings2,
-  Share2,
   Trash2,
   UserPlus,
 } from "lucide-react";
@@ -35,13 +32,13 @@ import {
   saveParticipant,
   shrinkImage,
   updateCompetition,
+  usePeople,
   type CompetitionData,
 } from "../lib/customCompetitionData";
-import { db } from "../lib/firebase";
-import { shareOrCopy } from "../lib/matchActions";
 import { haptic } from "../lib/motion";
 import { go } from "../lib/navigation";
 import type { AppUser } from "../lib/session";
+import InviteCard from "./CompetitionInvite";
 import { CompetitionBadge } from "./CustomCompetition";
 import { matchTitle, stored } from "./CustomMatchSheet";
 import Modal from "./Modal";
@@ -88,30 +85,6 @@ function Row({
   );
 }
 
-/** Names of the followers, for choosing administrators (signed players only). */
-function useMemberNames(ids: string[]) {
-  const [names, setNames] = useState<Record<string, string>>({});
-  const key = ids.join();
-  useEffect(() => {
-    if (!db) return;
-    let active = true;
-    Promise.all(
-      ids.slice(0, 60).map(async (uid) => {
-        try {
-          const snap = await getDoc(doc(db!, "users", uid));
-          return [uid, (snap.data()?.name as string) || "Jugador"] as const;
-        } catch {
-          return [uid, "Jugador"] as const;
-        }
-      }),
-    ).then((pairs) => active && setNames(Object.fromEntries(pairs)));
-    return () => {
-      active = false;
-    };
-  }, [key]);
-  return names;
-}
-
 export default function CustomManage({
   competition: c,
   data,
@@ -128,8 +101,7 @@ export default function CustomManage({
   const owner = user.uid === c.ownerId;
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [notice, setNotice] = useState("");
-  const names = useMemberNames(owner ? c.memberIds : []);
-  const link = `${location.origin}${location.pathname}#/ligas?liga=${c.id}`;
+  const people = usePeople(owner ? c.memberIds : []);
   useEffect(() => {
     if (!notice) return;
     const t = window.setTimeout(() => setNotice(""), 3500);
@@ -176,35 +148,10 @@ export default function CustomManage({
           <h2>Invitar</h2>
         </div>
         <p className="muted">
-          Con el código cualquiera puede ver partidos, resultados y tabla. Para seguirla hay que entrar con una cuenta.
+          Con el código o el QR cualquiera puede ver partidos, resultados y tabla. Para seguirla y pronosticar hay que
+          entrar con una cuenta.
         </p>
-        <div className="invite-code">
-          <code>{c.id}</code>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Copiar código"
-            onClick={() =>
-              void navigator.clipboard.writeText(c.id).then(
-                () => setNotice("Código copiado."),
-                () => setNotice("No se pudo copiar. Mantén pulsado el código para copiarlo."),
-              )
-            }
-          >
-            <Copy size={18} />
-          </button>
-        </div>
-        <button
-          type="button"
-          className="button secondary full"
-          onClick={() =>
-            void shareOrCopy({ title: c.name, text: `Sigue «${c.name}» en GalacticBet. Código: ${c.id}`, url: link }).then(
-              (m) => m && setNotice(m),
-            )
-          }
-        >
-          <Share2 size={17} aria-hidden="true" /> Compartir enlace
-        </button>
+        <InviteCard competition={c} owner={owner} />
       </section>
       <section className="custom-manage-section">
         <div className="section-heading">
@@ -273,10 +220,10 @@ export default function CustomManage({
               <li key={uid}>
                 <div className="more-row">
                   <span className="more-icon">
-                    <CompetitionBadge icon={null} name={names[uid] || "?"} />
+                    <CompetitionBadge icon={null} name={people[uid]?.name || "?"} />
                   </span>
                   <span className="more-label" id={`admin-${uid}`}>
-                    {names[uid] || "Jugador"}
+                    {people[uid]?.name || "Jugador"}
                     <small>{uid === c.ownerId ? "Propietario" : c.adminIds.includes(uid) ? "Administrador" : "Seguidor"}</small>
                   </span>
                   {uid !== c.ownerId && (
@@ -770,6 +717,7 @@ function DeleteSheet({ competition: c, data, onClose }: { competition: Competiti
                 c.id,
                 data.participants.map((p) => p.id),
                 data.matches.map((m) => m.id),
+                c.code,
               );
               go("/ligas", { reset: true });
             })

@@ -221,4 +221,119 @@ describe.skipIf(!enabled)("Competiciones entre amigos: permisos en Firestore", (
     await assertSucceeds(wipe.commit());
     await assertSucceeds(deleteDoc(doc(alice, "customCompetitions/big")));
   });
+
+  // ---------- Short codes ----------
+  const withCode = (code: string, owner = "alice") => ({ ...competition(owner), code });
+  const claim = (db: Firestore, code: string, cid: string) =>
+    setDoc(doc(db, `competitionCodes/${code}`), { competitionId: cid, createdAt: serverTimestamp() });
+
+  it("código corto: se crea junto a la competición, es único y no se puede robar", async () => {
+    const alice = as("alice");
+    const create = (cid: string, code: string, owner = alice, ownerId = "alice") => {
+      const batch = writeBatch(owner);
+      batch.set(doc(owner, `customCompetitions/${cid}`), withCode(code, ownerId));
+      batch.set(doc(owner, `competitionCodes/${code}`), { competitionId: cid, createdAt: serverTimestamp() });
+      return batch.commit();
+    };
+    await assertSucceeds(create("n1", "K7M2QX"));
+    // Anyone resolves a code; nobody lists them.
+    await assertSucceeds(getDoc(doc(as(null), "competitionCodes/K7M2QX")));
+    await assertFails(getDocs(collection(as("carol"), "competitionCodes")));
+    // Taken: the rules never overwrite a code (the app retries with another).
+    await assertFails(create("n2", "K7M2QX", as("bob"), "bob"));
+    // Only the alphabet without 0/O/1/I/L, six characters.
+    await assertFails(create("n3", "K0M2QX"));
+    await assertFails(create("n4", "K7M2Q"));
+    // A code must point to a competition you own that names the same code.
+    await assertFails(claim(as("bob"), "BBBBBB", "n1"));
+    await assertFails(claim(alice, "CCCCCC", "n1"));
+    // The competition can't name a code that points elsewhere.
+    await assertFails(setDoc(doc(alice, "customCompetitions/n5"), withCode("K7M2QX")));
+    // And a code can't be edited.
+    await assertFails(updateDoc(doc(alice, "competitionCodes/K7M2QX"), { competitionId: "c1" }));
+    await assertFails(updateDoc(doc(alice, "customCompetitions/n1"), { code: "DDDDDD" }));
+  });
+
+  it("código corto para competiciones de antes: solo el propietario y una vez", async () => {
+    const give = (uid: string, code: string) => {
+      const db = as(uid);
+      const batch = writeBatch(db);
+      batch.update(doc(db, C), { code });
+      batch.set(doc(db, `competitionCodes/${code}`), { competitionId: "c1", createdAt: serverTimestamp() });
+      return batch.commit();
+    };
+    await assertFails(give("bob", "EEEEEE"));
+    await assertSucceeds(give("alice", "FFFFFF"));
+    await assertFails(give("alice", "GGGGGG"));
+  });
+
+  it("borrar la competición libera su código", async () => {
+    const alice = as("alice");
+    const batch = writeBatch(alice);
+    batch.set(doc(alice, "customCompetitions/n1"), withCode("HHHHHH"));
+    batch.set(doc(alice, "competitionCodes/HHHHHH"), { competitionId: "n1", createdAt: serverTimestamp() });
+    await batch.commit();
+    await assertFails(deleteDoc(doc(alice, "competitionCodes/HHHHHH")));
+    await assertFails(deleteDoc(doc(as("bob"), "competitionCodes/HHHHHH")));
+    const wipe = writeBatch(alice);
+    wipe.delete(doc(alice, "customCompetitions/n1"));
+    wipe.delete(doc(alice, "competitionCodes/HHHHHH"));
+    await assertSucceeds(wipe.commit());
+  });
+
+  // ---------- Predictions ----------
+  const future = () => Timestamp.fromMillis(Date.now() + 86_400_000);
+  const past = () => Timestamp.fromMillis(Date.now() - 3_600_000);
+  const fixture = async (mid: string, over: Record<string, unknown>, mode = "exact") =>
+    env.withSecurityRulesDisabled(async (c) => {
+      const db = c.firestore();
+      await updateDoc(doc(db, C), { predictionMode: mode });
+      await setDoc(doc(db, `${C}/matches/${mid}`), { ...match("alice"), updatedAt: Timestamp.now(), ...over });
+    });
+  const pick = (uid: string, mid: string, value: unknown, as_ = uid) =>
+    setDoc(doc(as(as_), `${C}/matches/${mid}/picks/${uid}`), { value, updatedAt: serverTimestamp() });
+
+  it("pronósticos: solo seguidores, solo los suyos y antes de que empiece", async () => {
+    await fixture("open", { startAt: future() });
+    await fixture("gone", { startAt: past() });
+    await assertSucceeds(pick("carol", "open", "2-1"));
+    await assertSucceeds(pick("carol", "open", "0-0")); // can change it until kick-off
+    await assertSucceeds(pick("alice", "open", "1-1"));
+    await assertFails(pick("dave", "open", "2-1")); // has the code, doesn't follow
+    await assertFails(pick("carol", "open", "2-1", "bob")); // someone else's pick
+    await assertFails(pick("carol", "gone", "2-1")); // too late
+    await assertFails(setDoc(doc(as("carol"), `${C}/matches/open/picks/carol`), { value: "1-0", updatedAt: serverTimestamp(), points: 3 }));
+    await assertFails(setDoc(doc(as("carol"), `${C}/matches/missing/picks/carol`), { value: "1-0", updatedAt: serverTimestamp() }));
+  });
+
+  it("pronósticos: el valor sigue el modo y el partido tiene que estar programado", async () => {
+    await fixture("open", { startAt: future() }, "classic");
+    await assertSucceeds(pick("carol", "open", "X"));
+    await assertFails(pick("carol", "open", "2-1"));
+    await assertFails(pick("carol", "open", "3"));
+    await fixture("open", { startAt: future() }, "exact");
+    await assertFails(pick("carol", "open", "X"));
+    await assertFails(pick("carol", "open", "100-1"));
+    await assertFails(pick("carol", "open", "a-b"));
+    await fixture("open", { startAt: future() }, "off");
+    await assertFails(pick("carol", "open", "1-0"));
+    await fixture("open", { startAt: future(), status: "postponed" });
+    await assertFails(pick("carol", "open", "1-0"));
+  });
+
+  it("los pronósticos ajenos no se ven hasta que empieza el partido", async () => {
+    await fixture("open", { startAt: future() });
+    await assertSucceeds(pick("carol", "open", "2-1"));
+    await assertSucceeds(getDoc(doc(as("carol"), `${C}/matches/open/picks/carol`)));
+    await assertFails(getDoc(doc(as("bob"), `${C}/matches/open/picks/carol`)));
+    await assertFails(getDocs(collection(as("bob"), `${C}/matches/open/picks`)));
+    await assertFails(getDocs(collection(as("carol"), `${C}/matches/open/picks`)));
+    // Kick-off (the organiser moves it to the past): everyone signed in sees them, nobody changes them.
+    await fixture("open", { startAt: past() });
+    await assertSucceeds(getDocs(collection(as("bob"), `${C}/matches/open/picks`)));
+    await assertSucceeds(getDoc(doc(as("dave"), `${C}/matches/open/picks/carol`)));
+    await assertFails(getDocs(collection(as(null), `${C}/matches/open/picks`)));
+    await assertFails(pick("carol", "open", "3-0"));
+    await assertFails(deleteDoc(doc(as("carol"), `${C}/matches/open/picks/carol`)));
+  });
 });

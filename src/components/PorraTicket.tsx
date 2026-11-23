@@ -1,5 +1,4 @@
-import { competitionName } from "../lib/competitions";
-import { euro, porraTotal, type Porra } from "../lib/porra";
+import { euro, porraLeague, porraTotal, type Porra } from "../lib/porra";
 import BrandMark from "./BrandMark";
 
 /** The porra as a paper ticket: notched edges, ink header, big scores. */
@@ -19,7 +18,7 @@ export default function PorraTicket({ porra: p }: { porra: Porra }) {
       </header>
       <div className="porra-ticket-match">
         <span className="eyebrow">
-          {competitionName(p.fixture.competition)}
+          {porraLeague(p.fixture)}
         </span>
         <h2>{p.title}</h2>
         <div className="porra-teams">

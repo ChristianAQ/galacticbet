@@ -70,8 +70,14 @@ service cloud.firestore {
    }
    allow get: if true;
    allow list: if signed() && request.auth.uid in resource.data.memberIds;
+   // The short code is written in the same batch: competitionCodes/{code} -> this id.
+   function codeFor(code) {
+    return code is string && code.matches('[A-HJKMNP-Z2-9]{6}')
+      && getAfter(/databases/$(database)/documents/competitionCodes/$(code)).data.competitionId == cid;
+   }
    allow create: if signed()
-     && request.resource.data.keys().hasOnly(['name','sport','icon','participantType','format','legs','knockoutLegs','qualifiers','groups','thirdPlace','predictionMode','schedule','ownerId','adminIds','memberIds','formatVersion','createdAt','updatedAt'])
+     && request.resource.data.keys().hasOnly(['name','sport','icon','participantType','format','legs','knockoutLegs','qualifiers','groups','thirdPlace','predictionMode','schedule','ownerId','adminIds','memberIds','formatVersion','createdAt','updatedAt','code'])
+     && (!('code' in request.resource.data) || codeFor(request.resource.data.code))
      && request.resource.data.ownerId == request.auth.uid
      && request.resource.data.memberIds == [request.auth.uid] && request.resource.data.adminIds == []
      && request.resource.data.formatVersion == 1
@@ -81,6 +87,10 @@ service cloud.firestore {
      // Owner: name, sport, icon, prediction mode and who administers.
      (owns(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','sport','icon','adminIds','predictionMode','updatedAt'])
        && request.resource.data.updatedAt == request.time && validCompetition(request.resource.data))
+     // Owner: give a competition from before short codes its code, once.
+     || (owns(resource.data) && !('code' in resource.data)
+       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['code'])
+       && codeFor(request.resource.data.code))
      // Follow with the code: add only yourself.
      || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
        && !(request.auth.uid in resource.data.memberIds)
@@ -140,7 +150,39 @@ service cloud.firestore {
       && (resource.data.locked != true || owns(competition()));
     allow delete: if runs(competition())
       && (owns(competition()) || (resource.data.locked != true && resource.data.status != 'finished'));
+    // Followers' predictions: only your own, only before kick-off, and nobody
+    // sees anyone else's until the match has started.
+    match /picks/{uid} {
+     function fixture() { return get(/databases/$(database)/documents/customCompetitions/$(cid)/matches/$(mid)).data; }
+     function league() { return get(/databases/$(database)/documents/customCompetitions/$(cid)).data; }
+     function open() { return fixture().status == 'scheduled' && request.time < fixture().startAt; }
+     function validPick(d) {
+      return d.keys().hasOnly(['value','updatedAt']) && d.updatedAt == request.time && d.value is string
+        && ((league().predictionMode == 'classic' && d.value in ['1','X','2'])
+          || (league().predictionMode == 'exact' && d.value.matches('[0-9]{1,2}-[0-9]{1,2}')));
+     }
+     allow get: if signed() && (request.auth.uid == uid || fixture().startAt <= request.time);
+     allow list: if signed() && fixture().startAt <= request.time;
+     allow create, update: if signed() && request.auth.uid == uid && request.auth.uid in league().memberIds
+       && open() && validPick(request.resource.data);
+     allow delete: if signed() && request.auth.uid == uid && open();
+    }
    }
+  }
+  // Short invitation codes. Readable one by one (never listed); only the owner
+  // of the competition it points to creates it, and it never changes.
+  match /competitionCodes/{code} {
+   function target(id) { return /databases/$(database)/documents/customCompetitions/$(id); }
+   allow get: if true;
+   allow create: if signed() && code.matches('[A-HJKMNP-Z2-9]{6}')
+     && request.resource.data.keys().hasOnly(['competitionId','createdAt'])
+     && request.resource.data.createdAt == request.time
+     && request.resource.data.competitionId is string
+     && getAfter(target(request.resource.data.competitionId)).data.ownerId == request.auth.uid
+     && getAfter(target(request.resource.data.competitionId)).data.code == code;
+   // Together with the competition, by its owner.
+   allow delete: if signed() && !existsAfter(target(resource.data.competitionId))
+     && get(target(resource.data.competitionId)).data.ownerId == request.auth.uid;
   }
   match /groups/{gid} {
    // A high-entropy document ID is an invitation capability. Lists remain member-only.

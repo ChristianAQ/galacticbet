@@ -4,6 +4,8 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
@@ -18,9 +20,14 @@ import {
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
+import type { Match } from "./domain";
 import {
   generateFixtures,
+  isCode,
   MAX_ICON_CHARS,
+  randomCode,
+  resolveCompetition,
+  toAppMatch,
   type Competition,
   type CompetitionSetup,
   type CustomMatch,
@@ -35,6 +42,7 @@ import {
  * write; these helpers only shape documents the rules accept.
  */
 export const COMPETITIONS_COLLECTION = "customCompetitions";
+export const CODES_COLLECTION = "competitionCodes";
 const RECENT_KEY = "galacticbet:competitions:recent";
 const BATCH = 400;
 
@@ -69,6 +77,7 @@ export function decodeCompetition(id: string, d: DocumentData): Competition | nu
     ownerId: d.ownerId,
     adminIds: list(d.adminIds),
     memberIds: list(d.memberIds),
+    code: typeof d.code === "string" && isCode(d.code) ? d.code : null,
   };
 }
 function decodeParticipant(id: string, d: DocumentData): Participant {
@@ -180,6 +189,42 @@ export function useCompetition(cid: string): CompetitionData {
     return () => stops.forEach((stop) => stop());
   }, [cid]);
   return state;
+}
+
+export interface Person {
+  id: string;
+  name: string;
+  avatar: string | null;
+}
+/** Names and avatars of signed players (followers, administrators, predictors). */
+export function usePeople(ids: string[]): Record<string, Person> {
+  const [people, setPeople] = useState<Record<string, Person>>({});
+  const key = [...new Set(ids)].sort().join();
+  useEffect(() => {
+    if (!db || !key) return;
+    let active = true;
+    Promise.all(
+      key
+        .split(",")
+        .slice(0, 120)
+        .map(async (uid): Promise<Person> => {
+          try {
+            const d = (await getDoc(doc(store(), "users", uid))).data();
+            return {
+              id: uid,
+              name: typeof d?.name === "string" && d.name.trim() ? d.name.trim() : "Jugador",
+              avatar: typeof d?.avatar === "string" ? d.avatar : null,
+            };
+          } catch {
+            return { id: uid, name: "Jugador", avatar: null };
+          }
+        }),
+    ).then((list) => active && setPeople(Object.fromEntries(list.map((p) => [p.id, p]))));
+    return () => {
+      active = false;
+    };
+  }, [key]);
+  return people;
 }
 
 export interface CompetitionChip {
@@ -294,7 +339,7 @@ export async function createCompetition(
     seed,
   }));
   const fixtures = generateFixtures(setup, participants);
-  await setDoc(ref, {
+  const data = {
     name: setup.name.trim(),
     sport: setup.sport.trim(),
     icon: setup.icon,
@@ -313,6 +358,12 @@ export async function createCompetition(
     formatVersion: 1,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+  };
+  await withFreshCode((code) => {
+    const batch = writeBatch(store());
+    batch.set(ref, { ...data, code });
+    batch.set(doc(store(), CODES_COLLECTION, code), { competitionId: ref.id, createdAt: serverTimestamp() });
+    return batch.commit();
   });
   await commitInBatches([
     ...participants.map(({ id, ...p }): [DocumentReference, Record<string, unknown>] => [
@@ -327,6 +378,40 @@ export async function createCompetition(
   rememberCompetition({ id: ref.id, name: setup.name.trim(), icon: setup.icon });
   return ref.id;
 }
+
+/**
+ * Codes are random, so a clash with an existing one is rare: the rules refuse
+ * to overwrite a code and we simply try another.
+ */
+async function withFreshCode(write: (code: string) => Promise<void>) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await write(randomCode());
+    } catch (e) {
+      if ((e as { code?: string })?.code !== "permission-denied" || attempt >= 4) throw e;
+    }
+  }
+}
+
+/** Owner: competitions created before short codes get theirs the first time. */
+export async function ensureCompetitionCode(cid: string) {
+  await withFreshCode((code) => {
+    const batch = writeBatch(store());
+    batch.update(competitionRef(cid), { code });
+    batch.set(doc(store(), CODES_COLLECTION, code), { competitionId: cid, createdAt: serverTimestamp() });
+    return batch.commit();
+  });
+}
+
+/** The competition a short code points to, or null if there is none. */
+export async function resolveCompetitionCode(code: string): Promise<string | null> {
+  const snap = await getDoc(doc(store(), CODES_COLLECTION, code));
+  const id = snap.data()?.competitionId;
+  return typeof id === "string" ? id : null;
+}
+
+/** The invitation link: opens the competition directly, no lookup needed. */
+export const competitionLink = (cid: string) => `${location.origin}${location.pathname}#/ligas?liga=${cid}`;
 
 export async function followCompetition(uid: string, cid: string) {
   await updateDoc(competitionRef(cid), { memberIds: arrayUnion(uid) });
@@ -378,8 +463,13 @@ export async function deleteParticipant(cid: string, pid: string) {
   await deleteDoc(doc(competitionRef(cid), "participants", pid));
 }
 
-/** Owner: matches and participants first, then the competition itself. */
-export async function deleteCompetition(cid: string, participantIds: string[], matchIds: string[]) {
+/** Owner: matches and participants first, then the code and the competition. */
+export async function deleteCompetition(
+  cid: string,
+  participantIds: string[],
+  matchIds: string[],
+  code: string | null | undefined,
+) {
   const refs = [
     ...matchIds.map((id) => doc(competitionRef(cid), "matches", id)),
     ...participantIds.map((id) => doc(competitionRef(cid), "participants", id)),
@@ -389,8 +479,12 @@ export async function deleteCompetition(cid: string, participantIds: string[], m
     for (const ref of refs.slice(i, i + BATCH)) batch.delete(ref);
     await batch.commit();
   }
-  await deleteDoc(competitionRef(cid));
+  const last = writeBatch(store());
+  last.delete(competitionRef(cid));
+  if (code) last.delete(doc(store(), CODES_COLLECTION, code));
+  await last.commit();
   forgetCompetition(cid);
+  forgetPicks(cid);
 }
 
 /**
@@ -424,7 +518,149 @@ export async function shrinkImage(file: File, size = 160, max = MAX_ICON_CHARS):
 
 /** Participants of another competition, to reuse them in a new one. */
 export async function loadCompetitionParticipants(cid: string): Promise<Participant[]> {
-  const { getDocs } = await import("firebase/firestore");
   const snap = await getDocs(collection(competitionRef(cid), "participants"));
   return snap.docs.map((d) => decodeParticipant(d.id, d.data())).sort((a, b) => a.seed - b.seed);
+}
+
+// ---------- Predictions ----------
+
+const pickRef = (cid: string, mid: string, uid: string) => doc(competitionRef(cid), "matches", mid, "picks", uid);
+const PICKS_KEY = (cid: string) => `galacticbet:competition-picks:v1:${cid}`;
+
+/** Yours, before kick-off: the rules check the time, the mode and that you follow it. */
+export async function savePick(cid: string, mid: string, uid: string, value: string) {
+  await setDoc(pickRef(cid, mid, uid), { value, updatedAt: serverTimestamp() });
+}
+export async function deletePick(cid: string, mid: string, uid: string) {
+  await deleteDoc(pickRef(cid, mid, uid));
+}
+/** Your picks for matches that haven't started (nobody else can read them yet). */
+export async function loadMyPicks(cid: string, mids: string[], uid: string): Promise<Record<string, string>> {
+  const pairs = await Promise.all(
+    mids.map(async (mid) => {
+      const snap = await getDoc(pickRef(cid, mid, uid));
+      const value = snap.data()?.value;
+      return typeof value === "string" ? ([mid, value] as const) : null;
+    }),
+  );
+  return Object.fromEntries(pairs.filter((p): p is readonly [string, string] => p !== null));
+}
+
+type PickCache = Record<string, { t: number; p: Record<string, string> }>;
+function readPickCache(cid: string): PickCache {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PICKS_KEY(cid)) || "{}");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch {
+    return {};
+  }
+}
+function forgetPicks(cid: string) {
+  try {
+    localStorage.removeItem(PICKS_KEY(cid));
+  } catch {
+    /* Only a cache. */
+  }
+}
+
+/**
+ * Everyone's picks for matches that have started. Once a match kicks off its
+ * picks can't change (the rules refuse late ones), so each match is fetched
+ * once and kept on this device; a rescheduled match is fetched again.
+ */
+export async function loadStartedPicks(
+  cid: string,
+  matches: Pick<CustomMatch, "id" | "startAt">[],
+  { prune = true } = {},
+): Promise<Record<string, Record<string, string>>> {
+  const cache = readPickCache(cid);
+  const out: Record<string, Record<string, string>> = {};
+  const missing: Pick<CustomMatch, "id" | "startAt">[] = [];
+  for (const m of matches) {
+    const hit = cache[m.id];
+    if (hit && hit.t === m.startAt) out[m.id] = hit.p;
+    else missing.push(m);
+  }
+  const fetched = await Promise.all(
+    missing.map(async (m) => {
+      try {
+        const snap = await getDocs(collection(competitionRef(cid), "matches", m.id, "picks"));
+        // A cached-only answer (offline) may be incomplete: show it but don't keep it.
+        const picks: Record<string, string> = {};
+        for (const d of snap.docs) if (typeof d.data().value === "string") picks[d.id] = d.data().value;
+        return { m, picks, complete: !snap.metadata.fromCache };
+      } catch {
+        // Not started yet by the server's clock, or offline: try again later.
+        return null;
+      }
+    }),
+  );
+  // With the full list of started matches, entries of deleted matches go away.
+  const keep = new Set(matches.map((m) => m.id));
+  const next: PickCache = prune ? Object.fromEntries(Object.entries(cache).filter(([id]) => keep.has(id))) : cache;
+  for (const f of fetched) {
+    if (!f) continue;
+    out[f.m.id] = f.picks;
+    if (f.complete) next[f.m.id] = { t: f.m.startAt, p: f.picks };
+  }
+  try {
+    localStorage.setItem(PICKS_KEY(cid), JSON.stringify(next));
+  } catch {
+    /* Only a cache. */
+  }
+  return out;
+}
+
+// ---------- Porra rápida ----------
+
+export interface CompetitionFixtures {
+  id: string;
+  name: string;
+  matches: Match[];
+}
+/** Matches of friends' competitions carry this prefix in the porra: never confused with a league fixture. */
+export const customFixtureId = (cid: string, mid: string) => `c:${cid}:${mid}`;
+
+/**
+ * Upcoming matches (both sides known) of the competitions you follow, as
+ * ordinary fixtures for the porra rápida. One read per competition.
+ */
+export async function loadFollowedFixtures(uid: string, now = Date.now()): Promise<CompetitionFixtures[]> {
+  if (!db || !uid) return [];
+  const snap = await getDocs(
+    query(collection(store(), COMPETITIONS_COLLECTION), where("memberIds", "array-contains", uid)),
+  );
+  const competitions = snap.docs
+    .map((d) => decodeCompetition(d.id, d.data()))
+    .filter((c): c is Competition => Boolean(c))
+    .slice(0, 12);
+  const out = await Promise.all(
+    competitions.map(async (c): Promise<CompetitionFixtures> => {
+      const ref = competitionRef(c.id);
+      const [people, games] = await Promise.all([
+        getDocs(collection(ref, "participants")),
+        getDocs(collection(ref, "matches")),
+      ]);
+      const view = resolveCompetition(
+        c,
+        people.docs.map((d) => decodeParticipant(d.id, d.data())),
+        games.docs.map((d) => decodeMatch(d.id, d.data())),
+      );
+      const matches = view.matches
+        .filter(
+          (m) =>
+            m.status === "scheduled" &&
+            m.startAt > now &&
+            m.home.id &&
+            m.away.id &&
+            !m.home.pending &&
+            !m.away.pending,
+        )
+        .sort((a, b) => a.startAt - b.startAt)
+        .slice(0, 30)
+        .map((m) => ({ ...toAppMatch(c.id, m), id: customFixtureId(c.id, m.id) }));
+      return { id: c.id, name: c.name, matches };
+    }),
+  );
+  return out.filter((c) => c.matches.length);
 }

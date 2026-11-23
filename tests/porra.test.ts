@@ -159,3 +159,20 @@ it("el texto compartido incluye todos los marcadores y el dinero, identificando 
   expect(text).toContain("Bote total: 5,00");
   expect(porraText({ ...pool, demo: true })).toContain("DEMO");
 });
+it("acepta partidos de competiciones entre amigos con su nombre y los muestra con él", async () => {
+  const { fixtureSnapshot, porraLeague } = await import("../src/lib/porra");
+  const friends = {
+    ...pool,
+    fixture: { ...pool.fixture, id: "c:liga1:L1-0", league: "Liga de los sábados" },
+  };
+  expect(validPorra(friends)).toBe(true);
+  expect(porraLeague(friends.fixture)).toBe("Liga de los sábados");
+  expect(porraLeague(pool.fixture)).not.toBe("Liga de los sábados");
+  expect(validPorra({ ...friends, fixture: { ...friends.fixture, league: "" } })).toBe(false);
+  expect(validPorra({ ...friends, fixture: { ...friends.fixture, league: "x".repeat(61) } })).toBe(false);
+  // A league fixture still needs a known competition.
+  expect(validPorra({ ...pool, fixture: { ...pool.fixture, competition: "XX" as never } })).toBe(false);
+  const match = { ...pool.fixture, roundId: "r", matchday: 1, status: "TIMED", homeScore: null, awayScore: null };
+  expect(fixtureSnapshot(match as never, "Liga de los sábados")).toMatchObject({ league: "Liga de los sábados" });
+  expect(fixtureSnapshot(match as never)).not.toHaveProperty("league");
+});

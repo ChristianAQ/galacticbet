@@ -1,5 +1,4 @@
-import { competitionName } from "./competitions";
-import { euro, porraTotal, type Porra } from "./porra";
+import { euro, porraLeague, porraTotal, type Porra } from "./porra";
 import { loadShareFonts } from "./shareImage";
 
 const DISPLAY = '"Anybody Variable", "Arial Narrow", sans-serif';
@@ -162,7 +161,7 @@ export async function porraImage(p: Porra): Promise<Blob> {
     ctx.fill();
   }
   // Fixture.
-  caption(competitionName(p.fixture.competition), pad, header + 36);
+  caption(porraLeague(p.fixture), pad, header + 36);
   titleLines.forEach((line, i) =>
     write(line, pad, titleY + i * 54, 50, colors.ink, 850, "display"),
   );

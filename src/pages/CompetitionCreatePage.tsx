@@ -515,8 +515,12 @@ export default function CompetitionCreatePage({
             onChange={setPrediction}
           />
           <p className="footnote">
-            Los pronósticos de las competiciones llegan con la próxima actualización: los seguidores podrán acertar cada
-            partido antes de que empiece. Puedes cambiar el modo en Ajustes.
+            {prediction === "exact"
+              ? "Los seguidores aciertan el marcador antes de que empiece cada partido: 3 puntos el exacto, 1 quién gana o el empate."
+              : prediction === "classic"
+                ? "Los seguidores eligen 1, X o 2 antes de que empiece cada partido: 1 punto por acierto."
+                : "Solo resultados y clasificación, sin pronósticos."}{" "}
+            Puedes cambiarlo en Ajustes.
           </p>
         </section>
 

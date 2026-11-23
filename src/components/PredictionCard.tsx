@@ -36,6 +36,7 @@ function PredictionCard({
   demo,
   onChoose,
   onDetails,
+  detailsLabel,
 }: {
   number: number;
   match: Match;
@@ -48,6 +49,8 @@ function PredictionCard({
   demo: boolean;
   onChoose: (match: Match, value: PredictionValue) => void;
   onDetails: (id: string, from: Element | null) => void;
+  /** Friends' competitions have no odds or preview: just the match sheet. */
+  detailsLabel?: string;
 }) {
   const locked = lock !== null;
   return (
@@ -125,9 +128,10 @@ function PredictionCard({
           onDetails(m.id, event.currentTarget.closest("article"))
         }
       >
-        {["TIMED", "SCHEDULED"].includes(m.status)
-          ? "Previa, cuotas y ficha"
-          : "Ficha del partido"}
+        {detailsLabel ??
+          (["TIMED", "SCHEDULED"].includes(m.status)
+            ? "Previa, cuotas y ficha"
+            : "Ficha del partido")}
         <ChevronRight size={15} aria-hidden="true" />
       </button>
       {m.status === "FINISHED" && <MatchResult match={m} demo={demo} />}
