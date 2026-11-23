@@ -10,8 +10,8 @@ const details: Record<PushState, string> = {
   unsupported: "Este navegador no puede recibir avisos.",
   install: "Añade GalacticBet a la pantalla de inicio para activarlos.",
   denied: "Bloqueados. Actívalos en Ajustes › Notificaciones › GalacticBet.",
-  off: "Al acabar cada jornada que hayas sellado: en qué puesto has quedado.",
-  on: "Al acabar cada jornada que hayas sellado: en qué puesto has quedado.",
+  off: "Antes del cierre si no has sellado, y tu puesto al acabar la jornada que selles.",
+  on: "Antes del cierre si no has sellado, y tu puesto al acabar la jornada que selles.",
 };
 
 function usePushToggle(uid: string) {
@@ -105,18 +105,18 @@ export function PushPrompt({ uid }: { uid: string }) {
         <BellRing size={22} />
       </span>
       <div className="push-prompt-text">
-        <h2 id="push-prompt-title">Tu puesto al acabar la jornada</h2>
+        <h2 id="push-prompt-title">Que no se te pase la jornada</h2>
         {state === "install" ? (
           <p>
             Añade GalacticBet a tu pantalla de inicio (
             <Share size={14} aria-label="Compartir" /> › Añadir a pantalla de
-            inicio) y te avisaremos de tu puesto al acabar cada jornada que
-            selles.
+            inicio) y te avisaremos antes del cierre y con tu puesto al acabar
+            la jornada.
           </p>
         ) : (
           <p>
-            Al acabar cada jornada que hayas sellado te decimos en qué puesto
-            has quedado en tu grupo.
+            Te avisamos antes del cierre si no has sellado y, al acabar cada
+            jornada que selles, en qué puesto has quedado en tu grupo.
           </p>
         )}
         {error && <p className="push-error" role="alert">{error}</p>}

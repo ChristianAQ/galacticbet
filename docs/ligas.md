@@ -115,10 +115,14 @@ Debajo, «Mi boleto | Clasificación» es el mismo control fijo de Ligas: se que
 - Cuando termina, sigue siendo la actual dos días después de su último partido, para ver resultados, tablero y clasificación. Después pasa a la siguiente.
 - Si la siguiente empieza antes, cambia un día antes de su primer partido, para que dé tiempo a sellar el boleto. Si empieza en menos de un día, cambia en cuanto termina la anterior.
 
-**Avisos.** Solo hay uno: el de fin de jornada (`scripts/notifications.ts`).
+**Avisos** (`scripts/notifications.ts`). Hay dos:
+
+- **Recordatorio de cierre:** durante las tres horas antes del cierre, a quien aún no ha sellado. Uno por jugador y jornada, nombrando sus grupos pendientes.
+- **Fin de jornada:** se describe abajo.
+
+Fin de jornada:
 
 - Lo recibe quien selló el boleto de esa jornada en ese grupo. En jornadas anteriores al sellado, quien hizo pronósticos.
 - Dice su puesto entre quienes sellaron: «Has quedado 2.º de 5 en Los del barrio con 7 puntos», «¡Has ganado la jornada…! 1.º de 5». Los empates comparten puesto.
 - Se envía una sola vez por grupo y jornada, y no para jornadas de hace más de 48 horas.
 - La etiqueta lleva el grupo: quien juega en dos grupos recibe los dos avisos.
-- Ya no hay recordatorios de cierre.

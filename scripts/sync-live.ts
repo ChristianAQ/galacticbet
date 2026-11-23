@@ -1,6 +1,7 @@
 import { backendFirestore } from "./backend";
 import { runLiveLoop } from "./liveLoop";
 import { officialSync } from "./officialSync";
+import { notifyPendingRounds } from "./notifications";
 
 const key = process.env.SPORTAPI_KEY?.trim() || "";
 const token = process.env.FOOTBALL_DATA_TOKEN?.trim() || "";
@@ -20,4 +21,6 @@ const result = await runLiveLoop(db, {
   espn: process.env.ESPN_MATCH_DETAILS !== "false",
   officialSync: token ? () => officialSync(db, token) : undefined,
 });
+// Every ten minutes: remind whoever has not sealed a round that closes soon.
+await notifyPendingRounds(db);
 if (result.stopped) process.exitCode = 1;

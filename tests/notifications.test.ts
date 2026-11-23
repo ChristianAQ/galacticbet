@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { resultMessages, type CompletedRound } from "../scripts/notifications";
+import {
+  collectReminders,
+  reminderMessage,
+  resultMessages,
+  type CompletedRound,
+} from "../scripts/notifications";
 import { validPushEndpoint } from "../scripts/push";
 
+const round = {
+  id: "PD-2026-REGULAR_SEASON-13",
+  competition: "PD",
+  deadline: Date.parse("2026-11-21T20:00:00Z"),
+};
 const standing = (points: number, roundPoints: number) => ({
   points,
   hits: points,
@@ -23,6 +33,32 @@ const completed = (rows: [string, number, number][], sealed = rows.map(([uid]) =
 });
 
 describe("Avisos: a quién y con qué texto", () => {
+  it("un recordatorio por jugador y jornada, con todos sus grupos pendientes", () => {
+    const reminders = collectReminders([
+      {
+        round,
+        groups: [
+          { id: "g1", name: "Los del barrio", pending: ["ana", "bruno"] },
+          { id: "g2", name: "Oficina", pending: ["ana"] },
+        ],
+      },
+    ]);
+    expect(reminders).toHaveLength(2);
+    const ana = reminders.find((r) => r.uid === "ana")!;
+    expect(ana.groups.map((g) => g.id)).toEqual(["g1", "g2"]);
+    const message = reminderMessage(ana);
+    expect(message.title).toBe("LaLiga · Jornada 13");
+    expect(message.body).toBe(
+      "Cierra a las 21:00 y aún no has sellado tu quiniela en 2 grupos.",
+    );
+    expect(message.url).toBe(
+      "./#/quiniela?group=g1&round=PD-2026-REGULAR_SEASON-13",
+    );
+    expect(reminderMessage(reminders.find((r) => r.uid === "bruno")!).body).toMatch(
+      /en Los del barrio\.$/,
+    );
+  });
+
   it("al acabar la jornada dice tu puesto entre quienes sellaron, y solo a ellos", () => {
     const messages = resultMessages(
       completed(
