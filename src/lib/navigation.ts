@@ -22,12 +22,23 @@ const titles: Record<string, string> = {
   "/partido": "Partido",
   "/competiciones/nueva": "Nueva competición",
 };
+/** A match of a friends' competition: its own page, like any fixture's. */
+export const customMatchPath = (cid: string, mid: string) =>
+  `/competicion/${encodeURIComponent(cid)}/partido/${encodeURIComponent(mid)}`;
+const CUSTOM_MATCH = /^\/competicion\/[^/]+\/partido\/([^/]+)$/;
+/** The fixture id of a match page path (official or friends'), for the crest morph. */
+const matchIdOf = (pathname: string) =>
+  pathname.startsWith("/partido/")
+    ? decodeURIComponent(pathname.slice("/partido/".length))
+    : decodeURIComponent(CUSTOM_MATCH.exec(pathname)?.[1] || "");
+
 export const routeTitle = (pathname: string) =>
-  titles[pathname] || (pathname.startsWith("/partido/") ? titles["/partido"] : "");
+  titles[pathname] || (matchIdOf(pathname) ? titles["/partido"] : "");
 
 /** Where «Atrás» leads when the page was opened directly (shared link, reload). */
 export function parentOf(pathname: string) {
   if (pathname.startsWith("/partido/")) return "/ligas";
+  if (pathname.startsWith("/competicion/")) return "/ligas";
   if (pathname === "/grupos") return "/perfil";
   if (pathname.startsWith("/competiciones")) return "/ligas";
   return "/";
@@ -175,9 +186,7 @@ export function go(to: string, options: GoOptions = {}) {
   const reset = Boolean(options.reset) || (isTabRoot(target) && target !== currentPath);
   const direction = options.direction || resolveDirection(to, reset);
   const ready = preloadPage(target);
-  const matchId = target.startsWith("/partido/")
-    ? decodeURIComponent(target.slice("/partido/".length))
-    : "";
+  const matchId = matchIdOf(target);
   const run = async () => {
     // A slow network must not freeze the screen: give the chunk a moment only.
     await Promise.race([ready, new Promise((r) => setTimeout(r, 1500))]);

@@ -30,6 +30,19 @@ No se ha verificado un ranking global de minutos por competición/temporada ni d
 
 Firestore permite solo obtener documentos públicos de temporada con IDs válidos; el cliente no puede listar la colección ni escribir estadísticas. `rankings` y los titulares por competición no se indexan. La publicación de reglas e índices va incluida en Deploy frontend. Después de publicar, las primeras estadísticas requieren una ejecución correcta de Synchronize football and standings. No hacen falta secretos nuevos. La cobertura con la clave del repositorio se verifica en Actions; las pruebas locales usan respuestas simuladas.
 
+## Competiciones entre amigos: ficha y acta
+
+Cada partido de una liga propia tiene su página, `#/competicion/{id}/partido/{partido}`, con la misma cabecera, pestañas y piezas que la ficha oficial: marcador, goleadores, forma, fecha y lugar; **Previa** (antes del inicio), **Eventos**, **Alineaciones**, **Pronósticos** y **Clasificación** cuando hay datos. Se abre desde Ligas, la Quiniela y Gestión, con la misma animación de escudos y un solo paso atrás.
+
+Organización (propietario y administradores) tiene en la cabecera **Resultado** (estado, marcador con botones +/−, fecha, lugar, confirmar o borrar), **Evento** y **Alineación**:
+
+- **Evento:** gol (normal, penalti, en propia), tarjeta (amarilla, segunda amarilla, roja) o cambio. Equipo, minuto (+ añadido) y jugador de la plantilla o escrito a mano; asistencia o quién sale, opcional. Se propone el minuto del reloj si se juega. «Guardar y otro» deja la hoja lista para el siguiente. Tocar un evento de la línea de tiempo lo corrige o lo borra.
+- **Marcador:** un gol nuevo sube su marcador salvo que el resultado ya lo contara (goleadores añadidos a un resultado puesto a mano); borrar un gol lo baja solo si el marcador eran exactamente los goles anotados. Anotar en un partido sin empezar lo pone en juego desde 0–0. La hoja muestra el efecto antes de guardar.
+- **Alineación:** titulares y suplentes de cada plantilla, «Repetir la del último partido» y alta rápida de jugadores. Se dibuja sobre el campo por posiciones (POR, DEF, MED, DEL), sin necesidad de once jugadores.
+- **Plantillas:** en Gestión › participante, línea a línea (dorsal, nombre, posición) o pegando una lista («10 Pedro Ruiz DEL»).
+
+Con actas anotadas, Ligas añade **Estadísticas**: goleadores, asistencias y tarjetas. Las reglas solo dejan escribir plantillas (hasta 60 jugadores) y actas (hasta 150 eventos, 40 por alineación) a la organización; el resto se valida al leer. Sin cobertura, el cambio se ve al momento y se envía al volver la red, mientras la app siga abierta.
+
 ## Compartir
 
 Se retira «Copiar texto» de `ShareDialog`, el menú compartido de quinielas y clasificaciones. Se conserva la vista previa PNG, Compartir nativo y Descargar. Sin compartir nativo se indica que se descargue la imagen, sin copiar automáticamente al portapapeles. Las opciones de la hoja del sistema dependen de iOS/Android. La herramienta de porras y la copia de invitaciones conservan su funcionamiento.

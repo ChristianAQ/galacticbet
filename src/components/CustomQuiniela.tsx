@@ -1,5 +1,5 @@
 import { Plus, Trophy } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   resolveCompetition,
@@ -11,7 +11,7 @@ import { followCompetition, savePick, useCompetition, usePeople } from "../lib/c
 import { canPick, decodePick, encodePick } from "../lib/customPicks";
 import { hasMatchStarted, preferredRound, type Match, type PredictionValue } from "../lib/domain";
 import { haptic } from "../lib/motion";
-import { go } from "../lib/navigation";
+import { customMatchPath, go } from "../lib/navigation";
 import { roundBoard, roundHasStarted } from "../lib/roundBoard";
 import { roundOptions } from "../lib/roundOptions";
 import type { AppUser } from "../lib/session";
@@ -25,7 +25,6 @@ import { Empty, readableError } from "./ui";
 import "../styles/quiniela.css";
 import "../styles/customCompetition.css";
 
-const MatchSheet = lazy(() => import("./CustomMatchSheet"));
 
 /** An open match's pick, unless it is of the other kind (the mode changed since): then it's to be made again. */
 function currentPick(raw: string | undefined, mode: "classic" | "exact") {
@@ -90,7 +89,6 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState("");
   const [joining, setJoining] = useState(false);
-  const [sheet, setSheet] = useState("");
   const { sentinel, stuck } = useStuck();
   const following = Boolean(c?.memberIds.includes(uid));
   const valueOf = (mid: string) => mine?.[mid] ?? revealed?.[mid]?.[uid];
@@ -144,7 +142,10 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
     },
     [cid, uid, following, mine, setMine],
   );
-  const onDetails = useCallback((id: string) => setSheet(id), []);
+  const onDetails = useCallback(
+    (id: string, from: Element | null) => go(customMatchPath(cid, id), { sharedFrom: from }),
+    [cid],
+  );
   useEffect(() => {
     if (!notice) return;
     const t = window.setTimeout(() => setNotice(""), 4000);
@@ -176,7 +177,6 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
   const total = open.length;
   const savingCount = Object.keys(saving).length;
   const table = () => go(`/clasificacion?liga=${encodeURIComponent(cid)}`);
-  const match = view.matches.find((m) => m.id === sheet);
   return (
     <>
       <RoundSelector
@@ -314,7 +314,7 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
                 match={appMatch}
                 history={app}
                 started={hasMatchStarted(appMatch, now)}
-                onOpen={onDetails}
+                to={customMatchPath(c.id, m.id)}
                 plainResult
               >
                 <section className="gm-picks" aria-label="Pronósticos de los seguidores">
@@ -361,19 +361,6 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
           : "1X2: 1 punto por acierto."}{" "}
         Cada partido se cierra al empezar y nadie ve los pronósticos de los demás hasta entonces.
       </p>
-      {match && (
-        <Suspense fallback={null}>
-          <MatchSheet
-            competition={c}
-            view={view}
-            match={match}
-            participants={data.participants}
-            user={user}
-            onClose={() => setSheet("")}
-            inQuiniela
-          />
-        </Suspense>
-      )}
     </>
   );
 }

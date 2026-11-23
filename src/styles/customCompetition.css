@@ -26,12 +26,6 @@
   font-size: var(--text-xs);
 }
 
-/* Fixture rows are buttons here: they open the match sheet. */
-.custom-fixture {
-  width: 100%;
-  text-align: inherit;
-  font: inherit;
-}
 
 .custom-champion {
   display: flex;

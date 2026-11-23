@@ -506,22 +506,11 @@ export default function PredictionsPage({
       setSubmitting(false);
     }
   }
-  // Remember the round in the URL so «Volver» returns to the same jornada.
-  const selectedRef = useRef(selected);
-  selectedRef.current = selected;
+  // The round is already in the URL (or is the current one): «Volver» lands on it.
   const onDetails = useCallback(
-    (id: string, from: Element | null) => {
-      setSearchParams(
-        (previous) => {
-          const next = new URLSearchParams(previous);
-          next.set("round", selectedRef.current);
-          return next;
-        },
-        { replace: true },
-      );
-      go(`/partido/${encodeURIComponent(id)}`, { sharedFrom: from });
-    },
-    [setSearchParams],
+    (id: string, from: Element | null) =>
+      go(`/partido/${encodeURIComponent(id)}`, { sharedFrom: from }),
+    [],
   );
   const chooseRef = useRef(choose);
   chooseRef.current = choose;
@@ -830,7 +819,6 @@ export default function PredictionsPage({
                     : selectedGroup?.name || "Grupo"
                 }
                 roundTitle={`${competitionName(list[0].competition)} · ${roundLabel(list[0])}`}
-                onOpen={onDetails}
               />
             </div>
           )}

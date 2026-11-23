@@ -3,6 +3,7 @@ import {
   arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -32,10 +33,13 @@ import {
   type CompetitionSetup,
   type CustomMatch,
   type Fixture,
+  type MatchEvent,
+  type MatchLineups,
   type MatchStatus,
   type Participant,
   type ParticipantKind,
 } from "./customCompetition";
+import { decodeEvents, decodeLineups, decodeSquad } from "./matchReport";
 
 /**
  * Firestore access for competitions between friends. The rules decide who may
@@ -88,6 +92,7 @@ function decodeParticipant(id: string, d: DocumentData): Participant {
     userId: typeof d.userId === "string" ? d.userId : null,
     icon: typeof d.icon === "string" ? d.icon : null,
     seed: num(d.seed) ?? 0,
+    players: decodeSquad(d.players),
   };
 }
 function decodeMatch(id: string, d: DocumentData): CustomMatch {
@@ -111,6 +116,8 @@ function decodeMatch(id: string, d: DocumentData): CustomMatch {
     homePenalties: num(d.homePenalties),
     awayPenalties: num(d.awayPenalties),
     locked: d.locked === true,
+    events: decodeEvents(d.events),
+    lineups: decodeLineups(d.lineups),
   };
 }
 
@@ -141,6 +148,9 @@ export function useCompetition(cid: string): CompetitionData {
     }
     setState({ competition: null, participants: [], matches: [], loading: true, missing: false, error: "" });
     const ref = competitionRef(cid);
+    // Loaded once the competition and its matches have both arrived: a match
+    // page must not say «not found» while the fixtures are still on the way.
+    const seen = { competition: false, matches: false };
     const fail = (e: unknown) =>
       setState((s) => ({
         ...s,
@@ -160,7 +170,8 @@ export function useCompetition(cid: string): CompetitionData {
             return;
           }
           const competition = decodeCompetition(snap.id, snap.data());
-          setState((s) => ({ ...s, competition, loading: false, missing: !competition }));
+          seen.competition = true;
+          setState((s) => ({ ...s, competition, loading: !seen.matches && Boolean(competition), missing: !competition }));
           if (competition) rememberCompetition(competition);
         },
         fail,
@@ -178,11 +189,14 @@ export function useCompetition(cid: string): CompetitionData {
       ),
       onSnapshot(
         collection(ref, "matches"),
-        (snap) =>
+        (snap) => {
+          seen.matches = true;
           setState((s) => ({
             ...s,
             matches: snap.docs.map((d) => decodeMatch(d.id, d.data())).sort((a, b) => a.startAt - b.startAt),
-          })),
+            loading: s.loading && !seen.competition,
+          }));
+        },
         fail,
       ),
     ];
@@ -431,12 +445,46 @@ export async function updateCompetition(
   await updateDoc(competitionRef(cid), { ...patch, updatedAt: serverTimestamp() });
 }
 
-/** Admins: a whole match document (date, place, state, result, lock). */
+/** Admins: a whole match document (date, place, state, result, lock, report). */
 export async function saveMatch(cid: string, match: CustomMatch, uid: string) {
-  const { id, startAt, ...rest } = match;
+  const { id, startAt, events, lineups, ...rest } = match;
   await setDoc(doc(competitionRef(cid), "matches", id), {
     ...rest,
+    // An empty report is simply absent.
+    ...(events?.length ? { events } : {}),
+    ...(lineups ? { lineups } : {}),
     startAt: Timestamp.fromMillis(startAt),
+    updatedAt: serverTimestamp(),
+    updatedBy: uid,
+  });
+}
+/**
+ * Waits a moment for the server. Without signal (a touchline) the write stays
+ * queued and shows at once on this device, so the sheet can move on; a late
+ * refusal undoes it on screen by itself.
+ */
+export async function settled(write: Promise<void>, wait = 2500) {
+  write.catch(() => undefined);
+  await Promise.race([write, new Promise((resolve) => window.setTimeout(resolve, wait))]);
+}
+
+/**
+ * Admins: the report of a match (events and the score/state they imply, or
+ * the lineups). Only these fields change, so a result edited meanwhile stays.
+ */
+export async function saveMatchReport(
+  cid: string,
+  mid: string,
+  patch: Partial<Pick<CustomMatch, "status" | "homeScore" | "awayScore">> & {
+    events?: MatchEvent[];
+    lineups?: MatchLineups | null;
+  },
+  uid: string,
+) {
+  const { lineups, ...rest } = patch;
+  await updateDoc(doc(competitionRef(cid), "matches", mid), {
+    ...rest,
+    ...(lineups !== undefined ? { lineups: lineups ?? deleteField() } : {}),
     updatedAt: serverTimestamp(),
     updatedBy: uid,
   });
@@ -456,8 +504,12 @@ export const newMatchId = (cid: string) => doc(collection(competitionRef(cid), "
 export const newParticipantId = (cid: string) => doc(collection(competitionRef(cid), "participants")).id;
 
 export async function saveParticipant(cid: string, p: Participant) {
-  const { id, ...rest } = p;
-  await setDoc(doc(competitionRef(cid), "participants", id), { ...rest, name: rest.name.trim() });
+  const { id, players, ...rest } = p;
+  await setDoc(doc(competitionRef(cid), "participants", id), {
+    ...rest,
+    ...(players?.length ? { players } : {}),
+    name: rest.name.trim(),
+  });
 }
 export async function deleteParticipant(cid: string, pid: string) {
   await deleteDoc(doc(competitionRef(cid), "participants", pid));

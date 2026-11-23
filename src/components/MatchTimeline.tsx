@@ -1,6 +1,6 @@
 import { ArrowLeftRight, Goal } from "lucide-react";
 import type { Match } from "../lib/domain";
-import type { MatchInsight } from "../lib/matchInsightsData";
+import type { MatchGoal, MatchIncident } from "../lib/matchInsightsData";
 import { chronologicalGoals } from "../lib/matchPresentation";
 import { Empty } from "./ui";
 import "../styles/matchExtras.css";
@@ -19,9 +19,16 @@ const labels = {
 export default function MatchTimeline({
   match,
   insight,
+  onSelect,
 }: {
   match: Match;
-  insight: MatchInsight;
+  /** Goals and incidents (an id each when they can be selected). */
+  insight: {
+    goals: (MatchGoal & { id?: string })[];
+    incidents?: (MatchIncident & { id?: string })[];
+  };
+  /** Organisers of a friends' competition: tap an event to correct it. */
+  onSelect?: (id: string) => void;
 }) {
   const events = chronologicalGoals([
     ...insight.goals.map((g) => ({
@@ -56,8 +63,8 @@ export default function MatchTimeline({
       <ol className="match-extra-goals">
         {events.map((e, index) => {
           const goal = !e.kind.includes("card") && e.kind !== "substitution";
-          const content = (
-            <div className="timeline-content">
+          const inner = (
+            <>
               <span className="timeline-icon" aria-hidden="true">
                 {e.kind === "substitution" ? (
                   <ArrowLeftRight size={15} />
@@ -76,8 +83,21 @@ export default function MatchTimeline({
                 {e.playerOut && <small>Sale {e.playerOut}</small>}
                 {e.assist && <small>Asistencia: {e.assist}</small>}
               </span>
-            </div>
+            </>
           );
+          const content =
+            onSelect && e.id ? (
+              <button
+                type="button"
+                className="timeline-content is-editable"
+                aria-label={`Editar: ${e.label} de ${e.player}, minuto ${e.minute}`}
+                onClick={() => onSelect(e.id!)}
+              >
+                {inner}
+              </button>
+            ) : (
+              <div className="timeline-content">{inner}</div>
+            );
           return (
             <li
               className={`goal-event ${e.side}${goal ? " is-goal" : ""}`}

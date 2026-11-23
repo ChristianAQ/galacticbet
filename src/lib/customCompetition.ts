@@ -121,6 +121,59 @@ export interface Participant {
   userId: string | null;
   icon: string | null;
   seed: number;
+  /** A team's squad, for lineups and the match report. */
+  players?: SquadPlayer[];
+}
+
+// ---------- Squads, lineups and the match report ----------
+
+export const POSITIONS = ["POR", "DEF", "MED", "DEL"] as const;
+export type PlayerPosition = (typeof POSITIONS)[number];
+export const POSITION_NAMES: Record<PlayerPosition, string> = {
+  POR: "Portero",
+  DEF: "Defensa",
+  MED: "Centrocampista",
+  DEL: "Delantero",
+};
+export const MAX_SQUAD = 60;
+export const MAX_EVENTS = 150;
+export const MAX_LINEUP = 40;
+export interface SquadPlayer {
+  /** Stable while the player is in the squad: lineups and events point to it. */
+  id: string;
+  name: string;
+  number: number | null;
+  position: PlayerPosition | null;
+}
+export type EventKind =
+  | "goal"
+  | "penalty"
+  | "own-goal"
+  | "yellow-card"
+  | "second-yellow"
+  | "red-card"
+  | "substitution";
+export interface MatchEvent {
+  id: string;
+  kind: EventKind;
+  /** Goals (an own goal too) count for this side; cards and changes belong to it. */
+  side: "home" | "away";
+  minute: number;
+  /** Added time: 45+2 is minute 45, extra 2. */
+  extra: number | null;
+  /** Scorer, booked player or the one coming on. Names stay if the squad changes. */
+  player: string;
+  playerId: string | null;
+  /** Goal: the assist. Change: the player going off. */
+  other: string | null;
+  otherId: string | null;
+}
+export interface LineupPlayer extends SquadPlayer {
+  starter: boolean;
+}
+export interface MatchLineups {
+  home: LineupPlayer[];
+  away: LineupPlayer[];
 }
 export interface Fixture {
   id: string;
@@ -147,6 +200,9 @@ export interface CustomMatch extends Fixture {
   awayPenalties: number | null;
   /** Confirmed result: only the owner may change it. */
   locked: boolean;
+  /** Goals, cards and changes, entered by the organisers. */
+  events?: MatchEvent[];
+  lineups?: MatchLineups | null;
 }
 
 export const FORMATS: Record<Format, { label: string; description: string }> = {

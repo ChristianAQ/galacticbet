@@ -1,5 +1,6 @@
 import { Check, Plus, QrCode, Trophy } from "lucide-react";
 import { lazy, Suspense, useMemo, useRef, useState, useId } from "react";
+import { Link } from "react-router-dom";
 import {
   FORMATS,
   parseInvite,
@@ -21,7 +22,9 @@ import {
 import { preferredRound, type Match } from "../lib/domain";
 import { roundOptions } from "../lib/roundOptions";
 import { haptic } from "../lib/motion";
-import { go } from "../lib/navigation";
+import { customMatchPath, go } from "../lib/navigation";
+import { reportRankings } from "../lib/matchReport";
+import { topFive } from "../lib/leagueStats";
 import type { AppUser } from "../lib/session";
 import InviteCard from "./CompetitionInvite";
 export { CompetitionBadge, CustomChips } from "./CustomChips";
@@ -29,13 +32,13 @@ import DayTitle from "./DayTitle";
 import LeagueNavigation from "./LeagueNavigation";
 import LeagueTable, { type Zone } from "./LeagueTable";
 import Modal from "./Modal";
+import RankingCard from "./RankingCard";
 import RoundSelector from "./RoundSelector";
 import { SkeletonRows } from "./Skeleton";
 import { Empty, MatchRow, readableError } from "./ui";
 import "../styles/leagues.css";
 import "../styles/customCompetition.css";
 
-const MatchSheet = lazy(() => import("./CustomMatchSheet"));
 const ManagePanel = lazy(() => import("./CustomManage"));
 
 const dayLabel = new Intl.DateTimeFormat("es", {
@@ -138,34 +141,33 @@ export function CustomSummary({
   );
 }
 
-export type CustomTab = "partidos" | "clasificacion" | "cuadro" | "gestion";
+export type CustomTab = "partidos" | "clasificacion" | "cuadro" | "estadisticas" | "gestion";
 
 /**
- * A match row that opens its sheet: the same row as any league fixture, with
- * each side's form in this competition. Place and confirmation are in the sheet.
+ * A fixture of the list, exactly like a league one: tap for its match page
+ * (the crests morph into it), with each side's form in this competition.
  */
-function FixtureButton({
+function FixtureLink({
   match,
   app,
   history,
-  onOpen,
+  competition,
 }: {
   match: ResolvedMatch;
   app: Match;
   history: Match[];
-  onOpen: (id: string) => void;
+  competition: Competition;
 }) {
   return (
     <li className="fixture-item">
-      <button
-        type="button"
-        className="fixture-card-button custom-fixture"
+      <Link
+        className="fixture-card-button"
         aria-label={`Ver ficha de ${app.home} contra ${app.away}`}
-        onClick={() => onOpen(match.id)}
+        to={customMatchPath(competition.id, match.id)}
       >
         <MatchRow match={app} history={history} as="span" plainResult />
         {match.leg ? <span className="fixture-leg">{match.leg === 1 ? "Ida" : "Vuelta"}</span> : null}
-      </button>
+      </Link>
     </li>
   );
 }
@@ -183,7 +185,6 @@ function FixturesPanel({
   view,
   round,
   onRound,
-  onOpen,
   canRun,
   onManage,
 }: {
@@ -191,7 +192,6 @@ function FixturesPanel({
   view: CompetitionView;
   round: string;
   onRound: (id: string) => void;
-  onOpen: (id: string) => void;
   canRun: boolean;
   onManage: () => void;
 }) {
@@ -234,13 +234,15 @@ function FixturesPanel({
             <DayTitle date={new Date(items[0].startAt).toISOString()} count={items.length} />
             <ul className="fixture-list">
               {items.map((m) => (
-                <FixtureButton key={m.id} match={m} app={byId.get(m.id)!} history={app} onOpen={onOpen} />
+                <FixtureLink key={m.id} match={m} app={byId.get(m.id)!} history={app} competition={competition} />
               ))}
             </ul>
           </section>
         ))}
         <p className="league-hint">
-          {canRun ? "Toca un partido para cambiar su fecha, lugar, estado o resultado." : "Toca un partido para ver sus detalles."}
+          {canRun
+            ? "Toca un partido para ver su ficha y anotar el resultado, los goles, las tarjetas y las alineaciones."
+            : "Toca un partido para ver su ficha."}
         </p>
       </div>
     </>
@@ -305,15 +307,7 @@ const STAGE_TITLES: Partial<Record<Stage, string>> = {
   FINAL: "Final",
 };
 
-function BracketPanel({
-  competition,
-  view,
-  onOpen,
-}: {
-  competition: Competition;
-  view: CompetitionView;
-  onOpen: (id: string) => void;
-}) {
+function BracketPanel({ competition, view }: { competition: Competition; view: CompetitionView }) {
   const { app, byId } = useAppMatches(competition, view);
   const knockout = view.matches.filter((m) => m.phase === "knockout");
   const stages = (Object.keys(STAGE_TITLES) as Stage[]).filter((s) => knockout.some((m) => m.stage === s));
@@ -346,7 +340,7 @@ function BracketPanel({
                   </header>
                   <ul className="fixture-list">
                     {legs.map((m) => (
-                      <FixtureButton key={m.id} match={m} app={byId.get(m.id)!} history={app} onOpen={onOpen} />
+                      <FixtureLink key={m.id} match={m} app={byId.get(m.id)!} history={app} competition={competition} />
                     ))}
                   </ul>
                 </article>
@@ -382,12 +376,12 @@ export default function CustomCompetitionView({
 }) {
   const ids = useId();
   const panel = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState("");
   const c = data.competition;
   const view = useMemo(
     () => (c ? resolveCompetition(c, data.participants, data.matches) : null),
     [c, data.participants, data.matches],
   );
+  const rankings = useMemo(() => (view ? reportRankings(view) : null), [view]);
   if (data.loading)
     return (
       <div className="league-content">
@@ -406,10 +400,11 @@ export default function CustomCompetitionView({
     { id: "partidos", label: "Partidos" },
     ...(view.tables.length ? [{ id: "clasificacion" as const, label: "Tabla" }] : []),
     ...(view.matches.some((m) => m.phase === "knockout") ? [{ id: "cuadro" as const, label: "Cuadro" }] : []),
+    ...(view.matches.some((m) => m.events?.length) ? [{ id: "estadisticas" as const, label: "Estadísticas" }] : []),
     ...(canRun ? [{ id: "gestion" as const, label: "Gestión" }] : []),
   ];
   const active = tabs.find((t) => t.id === tab)?.id || "partidos";
-  const match = view.matches.find((m) => m.id === open);
+  const openMatch = (id: string) => go(customMatchPath(c.id, id));
   return (
     <>
       <LeagueNavigation<CustomTab>
@@ -437,10 +432,12 @@ export default function CustomCompetitionView({
         {active === "clasificacion" ? (
           <TablePanel competition={c} view={view} />
         ) : active === "cuadro" ? (
-          <BracketPanel competition={c} view={view} onOpen={setOpen} />
+          <BracketPanel competition={c} view={view} />
+        ) : active === "estadisticas" && rankings ? (
+          <StatsPanel rankings={rankings} />
         ) : active === "gestion" ? (
           <Suspense fallback={<SkeletonRows rows={5} variant="line" label="Cargando gestión" />}>
-            <ManagePanel competition={c} data={data} view={view} user={user!} onOpenMatch={setOpen} />
+            <ManagePanel competition={c} data={data} view={view} user={user!} onOpenMatch={openMatch} />
           </Suspense>
         ) : (
           <FixturesPanel
@@ -448,7 +445,6 @@ export default function CustomCompetitionView({
             view={view}
             round={round}
             onRound={onRound}
-            onOpen={setOpen}
             canRun={canRun}
             onManage={() => onTab("gestion")}
           />
@@ -461,19 +457,25 @@ export default function CustomCompetitionView({
           </p>
         )}
       </div>
-      {match && (
-        <Suspense fallback={null}>
-          <MatchSheet
-            competition={c}
-            view={view}
-            match={match}
-            participants={data.participants}
-            user={user}
-            onClose={() => setOpen("")}
-          />
-        </Suspense>
-      )}
     </>
+  );
+}
+
+/** Scorers, assists and cards from the match reports, like a league's player stats. */
+function StatsPanel({ rankings }: { rankings: ReturnType<typeof reportRankings> }) {
+  return (
+    <div className="competition-stats">
+      <div className="section-heading">
+        <h2>Estadísticas de jugadores</h2>
+      </div>
+      <p className="league-source">Salen de las actas que anota la organización en cada partido.</p>
+      <div className="league-rankings-grid">
+        <RankingCard featured title="Goleadores" unit="goles" rows={topFive(rankings.scorers)} />
+        <RankingCard title="Asistencias" unit="asistencias" rows={topFive(rankings.assists)} />
+        <RankingCard title="Tarjetas amarillas" unit="amarillas" rows={topFive(rankings.yellow)} />
+        <RankingCard title="Tarjetas rojas" unit="rojas" rows={topFive(rankings.red)} />
+      </div>
+    </div>
   );
 }
 

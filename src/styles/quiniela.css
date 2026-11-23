@@ -740,10 +740,6 @@
   transform: scale(0.985);
   transition-duration: 60ms;
 }
-/* Friends' matches open their sheet: same fixture, as a button. */
-button.gm-fixture {
-  width: calc(100% + 16px);
-}
 @media (hover: hover) {
   .gm-fixture:hover {
     background: var(--paper-2);

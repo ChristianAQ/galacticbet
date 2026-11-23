@@ -107,8 +107,10 @@ service cloud.firestore {
    allow delete: if owns(resource.data);
    match /participants/{pid} {
     allow read: if true;
+    // A team's squad travels with it (each player is checked by the app).
     allow create, update: if runs(competition()) && pid.matches('[A-Za-z0-9_-]{1,40}')
-      && request.resource.data.keys().hasOnly(['name','kind','userId','icon','seed'])
+      && request.resource.data.keys().hasOnly(['name','kind','userId','icon','seed','players'])
+      && request.resource.data.get('players', []) is list && request.resource.data.get('players', []).size() <= 60
       && text(request.resource.data.name, 1, 40) && request.resource.data.kind in ['team','person']
       && (request.resource.data.userId == null || text(request.resource.data.userId, 1, 128))
       && picture(request.resource.data.icon, 30000)
@@ -123,7 +125,12 @@ service cloud.firestore {
        && (id != null || slot != null);
     }
     function validMatch(d) {
-     return d.keys().hasOnly(['phase','round','stage','group','tie','leg','homeId','awayId','homeSlot','awaySlot','startAt','location','status','homeScore','awayScore','homePenalties','awayPenalties','locked','updatedAt','updatedBy'])
+     return d.keys().hasOnly(['phase','round','stage','group','tie','leg','homeId','awayId','homeSlot','awaySlot','startAt','location','status','homeScore','awayScore','homePenalties','awayPenalties','locked','events','lineups','updatedAt','updatedBy'])
+       // The report: goals, cards and changes, and both lineups.
+       && d.get('events', []) is list && d.get('events', []).size() <= 150
+       && d.get('lineups', {}) is map && d.get('lineups', {}).keys().hasOnly(['home','away'])
+       && d.get('lineups', {}).get('home', []) is list && d.get('lineups', {}).get('home', []).size() <= 40
+       && d.get('lineups', {}).get('away', []) is list && d.get('lineups', {}).get('away', []).size() <= 40
        && d.phase in ['league','group','knockout','custom']
        && d.round is int && d.round >= 1 && d.round <= 300
        && d.stage in ['REGULAR_SEASON','GROUP_STAGE','LAST_32','LAST_16','QUARTER_FINALS','SEMI_FINALS','THIRD_PLACE','FINAL']

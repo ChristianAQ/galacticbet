@@ -6,8 +6,8 @@ import {
   NotebookPen,
   Tv,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import CompetitionLogo from "../components/CompetitionLogo";
 import LeagueTable from "../components/LeagueTable";
 import LineupPitch from "../components/LineupPitch";
@@ -22,7 +22,13 @@ import MatchStatistics from "../components/MatchStatistics";
 import MatchTimeline from "../components/MatchTimeline";
 import Matchups from "../components/Matchups";
 import TeamForm from "../components/TeamForm";
-import { Skeleton, SkeletonRows } from "../components/Skeleton";
+import { SkeletonRows } from "../components/Skeleton";
+import {
+  HeroCrest,
+  MatchSkeleton,
+  MatchTabs,
+  useMatchTab,
+} from "../components/MatchPageParts";
 import { Empty, PageTitle, useCollapsingTitle } from "../components/ui";
 import { competitionName } from "../lib/competitions";
 import {
@@ -32,11 +38,7 @@ import {
   type Match,
 } from "../lib/domain";
 import { LEAGUE_STAGES, leagueTable, teamKey } from "../lib/leagueTable";
-import {
-  matchPageTabLabels,
-  matchPageTabs,
-  type MatchPageTab,
-} from "../lib/matchDetailTabs";
+import { matchPageTabLabels, matchPageTabs } from "../lib/matchDetailTabs";
 import { headToHead, knockoutContext } from "../lib/matchInsights";
 import {
   insightFitsMatch,
@@ -48,7 +50,6 @@ import { finishedMatchResult } from "../lib/matchResult";
 import { countdownLabel } from "../lib/matchPreview";
 import { preferenceStore } from "../lib/preferences";
 import { useNavTitle } from "../lib/chrome";
-import { haptic } from "../lib/motion";
 import { useLiveMatch } from "../lib/useLiveBoard";
 import { useMatchInsight } from "../lib/useMatchInsight";
 import { useMatchOdds } from "../lib/useMatchOdds";
@@ -64,24 +65,6 @@ const kickoffDay = new Intl.DateTimeFormat("es", {
   day: "numeric",
   month: "long",
 });
-
-/** Ink scoreboard placeholder while the calendar loads. */
-function MatchSkeleton() {
-  return (
-    <div className="match-page" role="status" aria-label="Cargando partido">
-      <div className="masthead match-hero match-hero-skeleton">
-        <Skeleton width={150} height={11} className="on-ink" />
-        <div className="match-hero-board">
-          <Skeleton width={64} height={64} radius="50%" className="on-ink" />
-          <Skeleton width={104} height={56} radius={10} className="on-ink" />
-          <Skeleton width={64} height={64} radius="50%" className="on-ink" />
-        </div>
-        <Skeleton width="60%" height={12} className="on-ink" />
-      </div>
-      <SkeletonRows rows={4} variant="line" label="Cargando ficha" />
-    </div>
-  );
-}
 
 export default function MatchPage({
   matches,
@@ -157,27 +140,6 @@ function useScorers(match: Match, insight: MatchInsight | null) {
   }, [live, insight, match]);
 }
 
-/** Large crest that morphs from the fixture row (shared view-transition part). */
-function HeroCrest({ src, part }: { src?: string; part: string }) {
-  const [failed, setFailed] = useState(false);
-  return src && !failed ? (
-    <img
-      className="match-hero-crest"
-      src={src}
-      alt=""
-      decoding="async"
-      data-vt-part={part}
-      onError={() => setFailed(true)}
-    />
-  ) : (
-    <span
-      className="match-hero-crest crest-placeholder"
-      data-vt-part={part}
-      aria-hidden="true"
-    />
-  );
-}
-
 function MatchView({
   match,
   matches,
@@ -189,7 +151,6 @@ function MatchView({
   demo: boolean;
   userId: string;
 }) {
-  const [params, setParams] = useSearchParams();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -225,10 +186,7 @@ function MatchView({
     table.length > 0,
     now,
   );
-  const requested = params.get("tab") as MatchPageTab | null;
-  const tab = requested && tabs.includes(requested) ? requested : tabs[0];
-  const tabsAnchor = useRef<HTMLSpanElement>(null);
-  const tabsRef = useRef<HTMLDivElement>(null);
+  const [tab, selectTab] = useMatchTab(tabs);
   const scorers = useScorers(match, demo ? null : insight);
   const tie = knockoutContext(match, matches);
   const links = matchExternalLinks(match, insight);
@@ -241,28 +199,6 @@ function MatchView({
     homeScore: m.homeScore!,
     awayScore: m.awayScore!,
   }));
-  function selectTab(next: MatchPageTab) {
-    if (next === tab) return;
-    haptic();
-    setParams(
-      (previous) => {
-        const value = new URLSearchParams(previous);
-        value.set("tab", next);
-        return value;
-      },
-      { replace: true },
-    );
-    // Pinned under the bar: keep the menu where it is while the panel changes.
-    const bar = tabsRef.current;
-    const anchor = tabsAnchor.current;
-    if (bar && anchor) {
-      const offset = parseFloat(getComputedStyle(bar).top) || 0;
-      if (bar.getBoundingClientRect().top <= offset + 1)
-        window.scrollTo({
-          top: window.scrollY + anchor.getBoundingClientRect().top - offset,
-        });
-    }
-  }
   const result = finishedMatchResult(match);
   const canPlay = !demo && canPredict(match.utcDate, now, match.status);
   const status = playing ? (
@@ -384,53 +320,24 @@ function MatchView({
         )}
       </header>
 
-      <span ref={tabsAnchor} className="sticky-sentinel" aria-hidden="true" />
-      <div ref={tabsRef} className="match-tabs">
-        <div
-          className="match-tabs-list"
-          role="tablist"
-          aria-label="Información del partido"
-        >
-        {tabs.map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            id={`match-tab-${t}`}
-            aria-controls="match-panel"
-            aria-selected={tab === t}
-            tabIndex={tab === t ? 0 : -1}
-            onClick={() => selectTab(t)}
-            onKeyDown={(e) => {
-              const index = tabs.indexOf(t);
-              const next =
-                e.key === "ArrowRight"
-                  ? tabs[(index + 1) % tabs.length]
-                  : e.key === "ArrowLeft"
-                    ? tabs[(index - 1 + tabs.length) % tabs.length]
-                    : null;
-              if (!next) return;
-              e.preventDefault();
-              selectTab(next);
-              document.getElementById(`match-tab-${next}`)?.focus();
-            }}
-          >
-            {matchPageTabLabels[t]}
-          </button>
-        ))}
-        </div>
+      <MatchTabs
+        tabs={tabs}
+        labels={matchPageTabLabels}
+        value={tab}
+        onChange={selectTab}
+      >
         {/* Not a tab: opens Porra rápida with this fixture already chosen.
             Only before kick-off: a porra on a played match makes no sense. */}
         {upcoming && (
-        <Link
-          className="match-tabs-porra"
-          to={`/porra?partido=${encodeURIComponent(match.id)}`}
-        >
-          <NotebookPen size={15} aria-hidden="true" />
-          Porra rápida
-        </Link>
+          <Link
+            className="match-tabs-porra"
+            to={`/porra?partido=${encodeURIComponent(match.id)}`}
+          >
+            <NotebookPen size={15} aria-hidden="true" />
+            Porra rápida
+          </Link>
         )}
-      </div>
+      </MatchTabs>
 
       <section
         className="match-page-panel"

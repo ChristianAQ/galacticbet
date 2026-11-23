@@ -12,7 +12,8 @@ export default function Matchups({
   source = "ESPN",
 }: {
   matches: Matchup[];
-  source?: "ESPN" | "Football-Data.org";
+  /** «liga»: earlier meetings in the same friends' competition. */
+  source?: "ESPN" | "Football-Data.org" | "liga";
 }) {
   if (!matches.length) return null;
   return (
@@ -51,11 +52,17 @@ export default function Matchups({
         ))}
       </ul>
       <p className="match-extra-note">
-        Fuente: {source} ·{" "}
-        {source === "ESPN"
-          ? "Marcadores publicados del partido, que pueden incluir prórroga."
-          : "Resultados a 90 minutos del calendario sincronizado."}{" "}
-        Hasta cinco encuentros disponibles.
+        {source === "liga" ? (
+          "Partidos anteriores entre ambos en esta competición, hasta cinco."
+        ) : (
+          <>
+            Fuente: {source} ·{" "}
+            {source === "ESPN"
+              ? "Marcadores publicados del partido, que pueden incluir prórroga."
+              : "Resultados a 90 minutos del calendario sincronizado."}{" "}
+            Hasta cinco encuentros disponibles.
+          </>
+        )}
       </p>
     </section>
   );

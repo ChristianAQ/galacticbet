@@ -31,6 +31,7 @@ import { go, interceptLinks, isTabRoot } from "./lib/navigation";
 import { keepPushDevice } from "./lib/push";
 import {
   CompetitionCreatePage,
+  CustomMatchPage,
   GroupsPage,
   HomePage,
   MatchesPage,
@@ -258,6 +259,10 @@ export default function App() {
             userId={user?.uid || ""}
           />
         }
+      />
+      <Route
+        path="/competicion/:cid/partido/:mid"
+        element={<CustomMatchPage user={user} onLogin={() => setLogin(true)} />}
       />
       <Route
         path="/ligas"

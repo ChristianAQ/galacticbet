@@ -66,7 +66,6 @@ export default function GroupPredictions({
   mode,
   groupName,
   roundTitle,
-  onOpen,
 }: {
   matches: Match[];
   history: Match[];
@@ -87,8 +86,6 @@ export default function GroupPredictions({
   mode: Mode;
   groupName: string;
   roundTitle: string;
-  /** Opens the match page (keeping the round to come back to). */
-  onOpen?: (id: string, from: Element | null) => void;
 }) {
   const [sharing, setSharing] = useState(false);
   const [entries, setEntries] = useState<SharedEntries>({});
@@ -282,7 +279,6 @@ export default function GroupPredictions({
           completedIds={completedIds}
           mode={mode}
           onRetry={() => setAttempt((n) => n + 1)}
-          onOpen={onOpen}
         />
       ))}
     </section>
@@ -341,23 +337,21 @@ export function RoundBoardPanel({
 /**
  * One fixture of a board: the real match first (teams and the score that
  * decides the picks), then whatever picks go with it. Tapping the match opens
- * its ficha.
+ * its page (the app's link handling navigates and morphs the crests).
  */
 export function GroupMatchCard({
   match,
   history,
   started,
   to,
-  onOpen,
   plainResult = false,
   children,
 }: {
   match: Match;
   history: Match[];
   started: boolean;
-  /** The match page; without it the fixture is a button for `onOpen`. */
-  to?: string;
-  onOpen?: (id: string, from: Element | null) => void;
+  /** The match page. */
+  to: string;
   /** Friends' matches (any sport): no «a 90 minutos». */
   plainResult?: boolean;
   children: ReactNode;
@@ -373,7 +367,7 @@ export function GroupMatchCard({
   const sign = score ? outcome(score.home, score.away) : null;
   const label = `${scheduled && !plainResult ? "Previa" : "Ficha"} de ${match.home} contra ${match.away}`;
   const fixture = (
-    <>
+    <Link className="gm-fixture" to={to} aria-label={label}>
       <div className="saved-team">
         <Team name={match.home} crest={match.homeCrest} part="home-crest" />
         <TeamForm match={match} side="home" matches={history} />
@@ -401,7 +395,7 @@ export function GroupMatchCard({
         <Team name={match.away} crest={match.awayCrest} part="away-crest" />
         <TeamForm match={match} side="away" matches={history} />
       </div>
-    </>
+    </Link>
   );
   return (
     <article className="group-match-card" data-vt-match={match.id}>
@@ -421,33 +415,7 @@ export function GroupMatchCard({
           )}
         </span>
       </header>
-      {to ? (
-        <Link
-          className="gm-fixture"
-          to={to}
-          aria-label={label}
-          onClick={
-            onOpen &&
-            ((event) => {
-              event.preventDefault();
-              onOpen(match.id, event.currentTarget.closest("article"));
-            })
-          }
-        >
-          {fixture}
-        </Link>
-      ) : (
-        <button
-          type="button"
-          className="gm-fixture"
-          aria-label={label}
-          onClick={(event) =>
-            onOpen?.(match.id, event.currentTarget.closest("article"))
-          }
-        >
-          {fixture}
-        </button>
-      )}
+      {fixture}
       {result?.extended && result.winnerName && (
         <p className="gm-decision">
           <Trophy size={13} aria-hidden="true" />
@@ -479,7 +447,6 @@ function RivalsCard({
   completedIds,
   mode,
   onRetry,
-  onOpen,
 }: {
   match: Match;
   history: Match[];
@@ -496,7 +463,6 @@ function RivalsCard({
   completedIds: string[];
   mode: Mode;
   onRetry: () => void;
-  onOpen?: (id: string, from: Element | null) => void;
 }) {
   const visible = participants.filter(
     (p) => p.id !== userId && completedIds.includes(p.id),
@@ -507,7 +473,6 @@ function RivalsCard({
       history={history}
       started={started}
       to={`/partido/${encodeURIComponent(match.id)}`}
-      onOpen={onOpen}
     >
       {/* Then every pick of the group against that score. */}
       <section className="gm-picks" aria-label="Pronósticos del grupo">

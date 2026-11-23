@@ -174,6 +174,30 @@ describe.skipIf(!enabled)("Competiciones entre amigos: permisos en Firestore", (
     await assertFails(setDoc(doc(as("bob"), `${C}/matches/m8`), match("bob", { locked: true })));
   });
 
+  it("plantillas y acta del partido: solo la organización, con tamaños acotados", async () => {
+    const players = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ id: `j${i}`, name: `Jugador ${i}`, number: i, position: "MED" }));
+    await assertSucceeds(setDoc(doc(as("bob"), `${C}/participants/p1`), { ...participant, players: players(18) }));
+    await assertFails(setDoc(doc(as("carol"), `${C}/participants/p1`), { ...participant, players: players(18) }));
+    await assertFails(setDoc(doc(as("bob"), `${C}/participants/p1`), { ...participant, players: players(61) }));
+    await assertFails(setDoc(doc(as("bob"), `${C}/participants/p1`), { ...participant, players: "Pedro" }));
+    const goal = { id: "e1", kind: "goal", side: "home", minute: 38, extra: null, player: "Pedro", playerId: "j1", other: null, otherId: null };
+    const lineups = { home: [{ ...players(1)[0], starter: true }], away: [] };
+    const live = { status: "live", homeScore: 1, awayScore: 0 };
+    await assertSucceeds(setDoc(doc(as("bob"), `${C}/matches/m1`), match("bob", { ...live, events: [goal], lineups })));
+    // The report alone, as the match page saves it.
+    await assertSucceeds(
+      updateDoc(doc(as("bob"), `${C}/matches/m1`), { events: [goal, { ...goal, id: "e2" }], homeScore: 2, updatedAt: serverTimestamp(), updatedBy: "bob" }),
+    );
+    await assertFails(
+      updateDoc(doc(as("carol"), `${C}/matches/m1`), { events: [], updatedAt: serverTimestamp(), updatedBy: "carol" }),
+    );
+    await assertFails(setDoc(doc(as("bob"), `${C}/matches/m1`), match("bob", { ...live, events: Array(151).fill(goal) })));
+    await assertFails(setDoc(doc(as("bob"), `${C}/matches/m1`), match("bob", { ...live, events: goal })));
+    await assertFails(setDoc(doc(as("bob"), `${C}/matches/m1`), match("bob", { ...live, lineups: { home: [], bench: [] } })));
+    await assertFails(setDoc(doc(as("bob"), `${C}/matches/m1`), match("bob", { ...live, lineups: { home: players(41) } })));
+  });
+
   it("resultados coherentes con el estado del partido", async () => {
     const save = (over: Record<string, unknown>) => setDoc(doc(as("bob"), `${C}/matches/m1`), match("bob", over));
     await assertSucceeds(save({ status: "finished", homeScore: 2, awayScore: 1 }));

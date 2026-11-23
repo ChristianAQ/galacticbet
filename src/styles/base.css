@@ -175,7 +175,9 @@ label {
   font-weight: 500;
   color: var(--ink-2);
 }
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+/* :where() keeps the defaults weightless, so a component's own field styles
+   (big score digits, padded search or money fields) always win. */
+input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"])),
 select,
 textarea {
   width: 100%;

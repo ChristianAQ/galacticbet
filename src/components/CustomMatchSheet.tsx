@@ -1,11 +1,10 @@
-import { CalendarClock, Lock, LockOpen, MapPin, NotebookPen, Trash2 } from "lucide-react";
+import { Lock, LockOpen, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   localParts,
   roundKey,
   STATUS_LABELS,
   timeToMinutes,
-  toAppMatch,
   zonedInstant,
   type Competition,
   type CompetitionView,
@@ -15,27 +14,22 @@ import {
   type ResolvedMatch,
 } from "../lib/customCompetition";
 import {
-  customFixtureId,
   deleteMatch,
   loadMyPicks,
   loadStartedPicks,
   saveMatch,
+  settled,
   usePeople,
 } from "../lib/customCompetitionData";
 import { pickHit, pickLabel, pickPoints } from "../lib/customPicks";
 import { haptic } from "../lib/motion";
 import { go } from "../lib/navigation";
-import type { AppUser } from "../lib/session";
 import Modal from "./Modal";
-import { MatchRow, readableError } from "./ui";
+import { readableError } from "./ui";
+import "../styles/quiniela.css";
+import "../styles/customCompetition.css";
+import "../styles/customMatch.css";
 
-const when = new Intl.DateTimeFormat("es", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 const STAGE_NAMES: Record<string, string> = {
   LAST_32: "Dieciseisavos",
   LAST_16: "Octavos de final",
@@ -73,6 +67,8 @@ export function stored(m: ResolvedMatch): CustomMatch {
     homePenalties: m.homePenalties,
     awayPenalties: m.awayPenalties,
     locked: m.locked,
+    events: m.events || [],
+    lineups: m.lineups || null,
   };
 }
 const goals = (value: string) => {
@@ -80,29 +76,89 @@ const goals = (value: string) => {
   const n = Number(value);
   return Number.isInteger(n) && n >= 0 && n <= 99 ? n : NaN;
 };
+const STATUSES = Object.keys(STATUS_LABELS) as MatchStatus[];
 
-export default function CustomMatchSheet({
+/** Goals of one side with big steppers: a thumb is enough at the side of the pitch. */
+function ScoreField({
+  team,
+  value,
+  onChange,
+  disabled,
+  label = "Goles",
+}: {
+  team: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+  label?: string;
+}) {
+  const n = goals(value);
+  const step = (by: number) => {
+    haptic();
+    onChange(String(Math.min(99, Math.max(0, (Number.isNaN(n) || n === null ? 0 : n) + by))));
+  };
+  return (
+    <label className="custom-score-side">
+      <span>{team}</span>
+      <span className="exact-side">
+        <button
+          type="button"
+          className="exact-step"
+          aria-label={`${label}: uno menos para ${team}`}
+          disabled={disabled || !n}
+          onClick={() => step(-1)}
+        >
+          <Minus size={16} aria-hidden="true" />
+        </button>
+        <input
+          type="number"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          min={0}
+          max={99}
+          value={value}
+          disabled={disabled}
+          placeholder="–"
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={`${label} de ${team}`}
+        />
+        <button
+          type="button"
+          className="exact-step"
+          aria-label={`${label}: uno más para ${team}`}
+          disabled={disabled || n === 99}
+          onClick={() => step(1)}
+        >
+          <Plus size={16} aria-hidden="true" />
+        </button>
+      </span>
+    </label>
+  );
+}
+
+/**
+ * Organisers: state, result, sides, date and place of a match, plus
+ * confirming, unlocking or deleting it. The match page opens it.
+ */
+export default function MatchEditSheet({
   competition,
   view,
   match,
   participants,
-  user,
+  uid,
   onClose,
-  inQuiniela = false,
+  onDeleted,
 }: {
   competition: Competition;
   view: CompetitionView;
   match: ResolvedMatch;
   participants: Participant[];
-  user: AppUser | null;
+  uid: string;
   onClose: () => void;
-  /** Opened from the Quiniela itself: no link back to it. */
-  inQuiniela?: boolean;
+  onDeleted: () => void;
 }) {
-  const uid = user?.uid || "";
   const owner = uid === competition.ownerId;
-  const runs = owner || competition.adminIds.includes(uid);
-  const editable = runs && (!match.locked || owner);
   const tz = competition.schedule.timeZone;
   const local = localParts(match.startAt, tz);
   const [status, setStatus] = useState<MatchStatus>(match.status);
@@ -122,6 +178,12 @@ export default function CustomMatchSheet({
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState<"lock" | "delete" | null>(null);
   const scored = status === "live" || status === "finished";
+  // Starting it: the score begins at 0–0, ready for the steppers.
+  useEffect(() => {
+    if (!scored) return;
+    setHome((v) => (v === "" ? "0" : v));
+    setAway((v) => (v === "" ? "0" : v));
+  }, [scored]);
 
   // Penalties only when they decide something: a drawn single match, or a
   // second leg that leaves the tie level on aggregate.
@@ -142,7 +204,7 @@ export default function CustomMatchSheet({
     setBusy(true);
     setError("");
     try {
-      await saveMatch(competition.id, next, uid);
+      await settled(saveMatch(competition.id, next, uid));
       haptic("success");
       onClose();
     } catch (e) {
@@ -198,71 +260,27 @@ export default function CustomMatchSheet({
     if (next) void write(next);
   }
 
-  const app = toAppMatch(competition.id, match);
   return (
-    <Modal title={matchTitle(match)} busy={busy} onClose={onClose} className="custom-match-sheet">
-      <div className="custom-match-preview">
-        <MatchRow match={app} plainResult />
-      </div>
-      <ul className="custom-match-facts">
-        <li>
-          <CalendarClock size={16} aria-hidden="true" />
-          {/* Capitalised here: ::first-letter doesn't apply to a flex row. */}
-          {when.format(match.startAt).replace(/^./, (c) => c.toUpperCase())}
-        </li>
-        {match.location && (
-          <li>
-            <MapPin size={16} aria-hidden="true" />
-            {match.location}
-          </li>
-        )}
-        <li>
-          <span className={`custom-status is-${match.status}`}>{STATUS_LABELS[match.status]}</span>
-          {match.locked && (
-            <span className="custom-locked">
-              <Lock size={14} aria-hidden="true" /> Resultado confirmado
-            </span>
-          )}
-        </li>
-      </ul>
-      {runs && match.locked && !owner && (
-        <p className="footnote">
-          <Lock size={13} aria-hidden="true" />
-          Resultado confirmado: solo el propietario puede cambiarlo.
-        </p>
-      )}
-      {/* Like any league fixture: a porra among friends, only before kick-off. */}
-      {confirm === null &&
-        competition.memberIds.includes(uid) &&
-        match.status === "scheduled" &&
-        match.startAt > Date.now() &&
-        match.home.id &&
-        match.away.id &&
-        !match.home.pending &&
-        !match.away.pending && (
-          <button
-            type="button"
-            className="text-button custom-porra-link"
-            onClick={() => {
-              onClose();
-              go(`/porra?partido=${encodeURIComponent(customFixtureId(competition.id, match.id))}`);
-            }}
-          >
-            <NotebookPen size={15} aria-hidden="true" /> Porra rápida con este partido
-          </button>
-        )}
-      {editable && confirm === null && (
+    <Modal title="Editar partido" busy={busy} onClose={onClose} className="custom-match-sheet" detents={["large"]}>
+      {confirm === null ? (
         <form onSubmit={submit} className="custom-match-form">
-          <label>
-            Estado
-            <select value={status} disabled={busy} onChange={(e) => setStatus(e.target.value as MatchStatus)}>
-              {(Object.keys(STATUS_LABELS) as MatchStatus[]).map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <fieldset className="custom-status-choices">
+            <legend>Estado</legend>
+            {STATUSES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                aria-pressed={status === s}
+                disabled={busy}
+                onClick={() => {
+                  if (s !== status) haptic();
+                  setStatus(s);
+                }}
+              >
+                {STATUS_LABELS[s]}
+              </button>
+            ))}
+          </fieldset>
           {pickSides && (
             <div className="custom-two">
               {(
@@ -288,47 +306,15 @@ export default function CustomMatchSheet({
           {scored && (
             <fieldset className="custom-score">
               <legend>Marcador</legend>
-              <label>
-                <span>{match.home.name}</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={99}
-                  value={home}
-                  disabled={busy}
-                  onChange={(e) => setHome(e.target.value)}
-                  aria-label={`Goles de ${match.home.name}`}
-                />
-              </label>
-              <span aria-hidden="true">–</span>
-              <label>
-                <span>{match.away.name}</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={99}
-                  value={away}
-                  disabled={busy}
-                  onChange={(e) => setAway(e.target.value)}
-                  aria-label={`Goles de ${match.away.name}`}
-                />
-              </label>
+              <ScoreField team={match.home.name} value={home} onChange={setHome} disabled={busy} />
+              <ScoreField team={match.away.name} value={away} onChange={setAway} disabled={busy} />
             </fieldset>
           )}
           {needsPenalties && (
             <fieldset className="custom-score is-penalties">
               <legend>Penaltis</legend>
-              <label>
-                <span>{match.home.name}</span>
-                <input type="number" inputMode="numeric" min={0} max={99} value={homePens} disabled={busy} onChange={(e) => setHomePens(e.target.value)} aria-label={`Penaltis de ${match.home.name}`} />
-              </label>
-              <span aria-hidden="true">–</span>
-              <label>
-                <span>{match.away.name}</span>
-                <input type="number" inputMode="numeric" min={0} max={99} value={awayPens} disabled={busy} onChange={(e) => setAwayPens(e.target.value)} aria-label={`Penaltis de ${match.away.name}`} />
-              </label>
+              <ScoreField team={match.home.name} value={homePens} onChange={setHomePens} disabled={busy} label="Penaltis" />
+              <ScoreField team={match.away.name} value={awayPens} onChange={setAwayPens} disabled={busy} label="Penaltis" />
             </fieldset>
           )}
           <div className="custom-two">
@@ -371,8 +357,7 @@ export default function CustomMatchSheet({
             )}
           </div>
         </form>
-      )}
-      {confirm && (
+      ) : (
         <div className="custom-confirm" role="alertdialog" aria-label={confirm === "lock" ? "Confirmar resultado" : "Eliminar partido"}>
           <p>
             {confirm === "lock"
@@ -396,7 +381,7 @@ export default function CustomMatchSheet({
                 if (confirm === "lock") void write({ ...stored(match), locked: true });
                 else {
                   setBusy(true);
-                  deleteMatch(competition.id, match.id).then(onClose, (e) => {
+                  deleteMatch(competition.id, match.id).then(onDeleted, (e) => {
                     setError(readableError(e));
                     setBusy(false);
                   });
@@ -408,9 +393,6 @@ export default function CustomMatchSheet({
           </div>
         </div>
       )}
-      {confirm === null && user && (competition.predictionMode !== "off" || match.startAt <= Date.now()) && (
-        <MatchPicks competition={competition} match={match} uid={uid} onClose={inQuiniela ? null : onClose} />
-      )}
     </Modal>
   );
 }
@@ -419,17 +401,14 @@ export default function CustomMatchSheet({
  * Before kick-off: only your pick (the others stay hidden). Once it starts:
  * everyone's, with the points when the result is in.
  */
-function MatchPicks({
+export function MatchPicks({
   competition,
   match,
   uid,
-  onClose,
 }: {
   competition: Competition;
   match: ResolvedMatch;
   uid: string;
-  /** Null when there is no need to go to the Quiniela (already there). */
-  onClose: (() => void) | null;
 }) {
   const started = match.startAt <= Date.now();
   const [picks, setPicks] = useState<Record<string, string> | null>(null);
@@ -449,7 +428,13 @@ function MatchPicks({
     };
   }, [competition.id, match.id, match.startAt, uid, started]);
   const people = usePeople(picks ? Object.keys(picks) : []);
-  if (!picks) return null;
+  if (!picks)
+    return (
+      <p className="gm-picks-loading" role="status">
+        <span className="sr-only">Cargando pronósticos</span>
+        <span className="skeleton" aria-hidden="true" />
+      </p>
+    );
   const rows = Object.entries(picks)
     .map(([id, raw]) => ({ id, raw, points: pickPoints(raw, match), hit: pickHit(raw, match) }))
     .sort(
@@ -458,11 +443,10 @@ function MatchPicks({
         (people[a.id]?.name || "").localeCompare(people[b.id]?.name || "", "es"),
     );
   return (
-    <section className="custom-match-picks-section" aria-labelledby="match-picks-title">
-      <div className="section-heading">
-        <h2 id="match-picks-title">Pronósticos</h2>
-        {started && <span className="cc-count">{rows.length}</span>}
-      </div>
+    <section className="match-block custom-match-picks-section" aria-labelledby="match-picks-title">
+      <h3 id="match-picks-title" className="match-block-title">
+        Pronósticos{started && rows.length > 0 ? ` · ${rows.length}` : ""}
+      </h3>
       {!started ? (
         <p className="muted">
           {picks[uid] ? (
@@ -473,18 +457,17 @@ function MatchPicks({
             "Aún no has pronosticado este partido. "
           )}
           Los de los demás se verán cuando empiece.
-          {onClose && competition.predictionMode !== "off" && competition.memberIds.includes(uid) && (
+          {competition.predictionMode !== "off" && competition.memberIds.includes(uid) && (
             <>
               {" "}
               <button
                 type="button"
                 className="text-button"
-                onClick={() => {
-                  onClose();
+                onClick={() =>
                   go(
                     `/quiniela?liga=${encodeURIComponent(competition.id)}&round=${encodeURIComponent(`${competition.id}:${roundKey(match)}`)}`,
-                  );
-                }}
+                  )
+                }
               >
                 {picks[uid] ? "Cambiarlo en la Quiniela" : "Pronosticar en la Quiniela"}
               </button>

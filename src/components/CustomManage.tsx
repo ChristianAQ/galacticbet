@@ -42,6 +42,7 @@ import type { AppUser } from "../lib/session";
 import InviteCard from "./CompetitionInvite";
 import { CompetitionBadge } from "./CustomCompetition";
 import { matchTitle, stored } from "./CustomMatchSheet";
+import { SquadEditor } from "./CustomMatchReport";
 import Modal from "./Modal";
 import { readableError } from "./ui";
 import "../styles/profile.css";
@@ -189,7 +190,13 @@ export default function CustomManage({
                 </span>
                 <span className="more-label">
                   {p.name}
-                  <small>{p.kind === "person" ? "Persona" : "Equipo"}</small>
+                  <small>
+                    {p.kind === "person"
+                      ? "Persona"
+                      : p.players?.length
+                        ? `Equipo · ${p.players.length} ${p.players.length === 1 ? "jugador" : "jugadores"}`
+                        : "Equipo · sin plantilla"}
+                  </small>
                 </span>
                 <ChevronRight className="more-chevron" size={18} aria-hidden="true" />
               </button>
@@ -582,6 +589,8 @@ function ParticipantSheet({
 }) {
   const [name, setName] = useState(participant?.name || "");
   const [icon, setIcon] = useState<string | null>(participant?.icon || null);
+  const [players, setPlayers] = useState(participant?.players || []);
+  const team = (participant?.kind || c.participantType) === "team";
   const [confirm, setConfirm] = useState(false);
   const { busy, error, setError, run } = useBusy();
   const used = participant ? data.matches.some((m) => m.homeId === participant.id || m.awayId === participant.id) : false;
@@ -599,12 +608,20 @@ function ParticipantSheet({
         userId: participant?.userId || null,
         icon,
         seed: participant?.seed ?? Math.min(63, data.participants.length),
+        players: team
+          ? players.flatMap((p) => (p.name.trim() ? [{ ...p, name: p.name.trim() }] : []))
+          : participant?.players,
       });
       onClose();
     });
   }
   return (
-    <Modal title={participant ? participant.name : "Nuevo participante"} busy={busy} onClose={onClose}>
+    <Modal
+      title={participant ? participant.name : "Nuevo participante"}
+      busy={busy}
+      onClose={onClose}
+      detents={team ? ["large"] : ["fit"]}
+    >
       {confirm ? (
         <div role="alertdialog" aria-label="Eliminar participante" className="custom-confirm">
           <p>Se eliminará {participant?.name}. No se puede deshacer.</p>
@@ -632,6 +649,7 @@ function ParticipantSheet({
             <input value={name} maxLength={40} required disabled={busy} onChange={(e) => setName(e.target.value)} />
           </label>
           <IconPicker value={icon} onChange={setIcon} disabled={busy} max={MAX_PARTICIPANT_ICON_CHARS} />
+          {team && <SquadEditor players={players} onChange={setPlayers} disabled={busy} />}
           {error && (
             <p className="error" role="alert">
               {error}
