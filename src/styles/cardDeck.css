@@ -6,7 +6,12 @@
  */
 .card-deck {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* To the very bottom of the screen: iOS web apps can lay fixed layers out
+     a few dozen points short of it (--deck-extra, measured on open). */
+  height: calc(100% + var(--deck-extra, 0px));
   z-index: 90;
   display: flex;
   flex-direction: column;
@@ -15,7 +20,8 @@
 }
 .card-deck-backdrop {
   position: absolute;
-  inset: 0;
+  /* Past every edge, so no strip of the page can show around it. */
+  inset: -80px 0 -400px;
   /* Almost solid ink: the page behind recedes without coloured blurs. */
   background: rgb(10 9 7 / 0.9);
   -webkit-backdrop-filter: blur(6px);
@@ -105,4 +111,16 @@
   font-family: inherit;
   font-size: 13px;
   font-weight: 550;
+}
+.card-deck-hint {
+  flex-shrink: 0;
+  color: rgb(255 255 255 / 0.72);
+  font-size: 13px;
+  font-weight: 550;
+  text-align: center;
+}
+@media (display-mode: standalone) {
+  .card-deck {
+    height: max(calc(100% + var(--deck-extra, 0px)), 100lvh);
+  }
 }

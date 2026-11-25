@@ -247,10 +247,8 @@ export default function TeamCards({
   seasonId: string;
   onClose: () => void;
 }) {
-  const openMatch = (id: string) => {
-    onClose();
-    go(`/partido/${encodeURIComponent(id)}`);
-  };
+  // The sheet stays open under the match: going back finds it as it was.
+  const openMatch = (id: string) => go(`/partido/${encodeURIComponent(id)}`);
   return (
     <CardDeck
       count={rows.length}
@@ -297,10 +295,8 @@ export function SingleTeamSheet({
   seasonId: string;
   onClose: () => void;
 }) {
-  const openMatch = (id: string) => {
-    onClose();
-    go(`/partido/${encodeURIComponent(id)}`);
-  };
+  // The sheet stays open under the match: going back finds it as it was.
+  const openMatch = (id: string) => go(`/partido/${encodeURIComponent(id)}`);
   return (
     <CardDeck
       count={1}

@@ -5,13 +5,34 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { haptic, prefersReducedMotion, rubberBand, springTo } from "../lib/motion";
-import { useBodyScrollLock } from "../lib/useBodyScrollLock";
+import { lockBody } from "../lib/useBodyScrollLock";
 import "../styles/cardDeck.css";
+
+/**
+ * How far short of the screen's bottom a fixed layer ends in an iOS web app
+ * (some iOS versions lay out the home screen app's fixed layers on a
+ * viewport shorter than the screen). Zero elsewhere.
+ */
+function screenShortfall() {
+  const ios =
+    /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const standalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  if (!ios || !standalone) return 0;
+  const portrait = window.innerHeight >= window.innerWidth;
+  const full = portrait
+    ? Math.max(screen.width, screen.height)
+    : Math.min(screen.width, screen.height);
+  return Math.max(0, Math.min(140, Math.round(full - window.innerHeight)));
+}
 
 interface Drag {
   id: number;
@@ -60,6 +81,7 @@ export default function CardDeck({
   label: string;
 }) {
   const [index, setIndex] = useState(Math.min(Math.max(start, 0), count - 1));
+  const [extra] = useState(screenShortfall);
   const titleId = useId();
   const backdrop = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -68,7 +90,21 @@ export default function CardDeck({
   const entering = useRef(0);
   const closing = useRef(false);
   const busy = useRef(false);
-  useBodyScrollLock(true);
+  // The page stays still under the deck. Locked once the page's own scroll
+  // is in place (also when it is shown again after going back to it), and
+  // released before another page sets its scroll (when this one is left
+  // with the deck open, e.g. to open a match from it).
+  const release = useRef<((options?: { restore?: boolean }) => void) | null>(null);
+  useEffect(() => {
+    release.current = lockBody();
+  }, []);
+  useLayoutEffect(
+    () => () => {
+      release.current?.();
+      release.current = null;
+    },
+    [],
+  );
 
   // Open: out of the tapped row, into the middle.
   useLayoutEffect(() => {
@@ -273,6 +309,7 @@ export default function CardDeck({
     <div
       ref={dialog}
       className={`card-deck ${className}`}
+      style={extra ? ({ "--deck-extra": `${extra}px` } as CSSProperties) : undefined}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -312,6 +349,9 @@ export default function CardDeck({
             </button>
           </nav>
         )}
+        <p className="card-deck-hint" aria-hidden="true">
+          {count > 1 ? "Desliza para ver otro · hacia abajo para cerrar" : "Desliza hacia abajo para cerrar"}
+        </p>
       </div>
     </div>,
     document.body,

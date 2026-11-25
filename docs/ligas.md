@@ -33,6 +33,9 @@ Navegación:
 - La carta se inclina un poco siguiendo el dedo.
 - Con movimiento reducido no hay giros.
 - La carta ocupa el alto de la pantalla, desde debajo del botón de cerrar hasta las flechas, sin dejar hueco abajo. La zona de las iniciales se estira para llenarlo. En pantallas altas deja de crecer y se centra.
+- Bajo las flechas, un texto recuerda cómo cerrar: «Desliza para ver otro · hacia abajo para cerrar».
+- En la app instalada en iPhone, la capa llega hasta el borde inferior de la pantalla. Algunas versiones de iOS calculan las capas fijas un poco más cortas que la pantalla; la capa mide esa diferencia y la cubre, y el fondo oscuro se extiende más allá de los bordes.
+- **Volver atrás:** si desde una ficha de equipo se abre un partido, la ficha sigue abierta debajo. Al volver, aparece donde estaba, y al cerrarla la página sigue en su posición. La página se bloquea cuando ya tiene su propio desplazamiento y se libera antes de que otra fije el suyo, así que ninguna página hereda el desplazamiento de otra.
 
 En Equipos, los goles se buscan por el identificador del jugador entre los 20 máximos goleadores de LaLiga, Premier y Champions. Quien no está entre ellos lo dice en vez de mostrar ceros. La sincronización guarda con cada goleador su id, posición, nacionalidad, fecha de nacimiento y dorsal. Las ediciones anteriores, sin esos datos, se renuevan en la siguiente ejecución.
 
