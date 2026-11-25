@@ -115,7 +115,6 @@ export function Cromo({ player, titleId }: { player: CardPlayer; titleId: string
         )}
         <footer className="cromo-foot">{s ? `${s.label} · ${player.source}` : `Plantilla · ${player.source}`}</footer>
       </div>
-      <span className="cromo-shine" aria-hidden="true" />
     </article>
   );
 }

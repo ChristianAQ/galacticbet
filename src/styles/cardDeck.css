@@ -1,23 +1,25 @@
 /*
- * A deck of cards over the page (players' «cromos», team sheets): blurred
- * backdrop, the card in the middle, a pager under it. Moves on the
- * compositor only.
+ * A deck of cards over the page (players' «cromos», team sheets): the card
+ * takes the screen from under the close button down to the pager, so there
+ * is no empty band below it; on tall screens it stops growing and centres.
+ * Moves on the compositor only.
  */
 .card-deck {
   position: fixed;
   inset: 0;
   z-index: 90;
-  display: grid;
-  place-items: center;
-  padding: calc(env(safe-area-inset-top) + 56px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 64px) 14px calc(env(safe-area-inset-bottom) + 12px);
   overscroll-behavior: contain;
 }
 .card-deck-backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(10 9 7 / 0.74);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  backdrop-filter: blur(14px) saturate(1.2);
+  /* Almost solid ink: the page behind recedes without coloured blurs. */
+  background: rgb(10 9 7 / 0.9);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 .card-deck-close {
   position: absolute;
@@ -39,13 +41,23 @@
 }
 .card-deck-center {
   position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 14px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 0;
   width: 100%;
 }
 .card-deck-stage {
-  width: min(340px, 100%);
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  width: min(440px, 100%);
+  min-height: 0;
+  max-height: 780px;
   touch-action: none;
   cursor: grab;
   will-change: transform;
@@ -59,6 +71,7 @@
 /* ---------- Around the card ---------- */
 .card-deck-pager {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 18px;
   color: #fff;
@@ -92,13 +105,4 @@
   font-family: inherit;
   font-size: 13px;
   font-weight: 550;
-}
-.card-deck-hint {
-  color: rgb(255 255 255 / 0.66);
-  font-size: 12.5px;
-}
-@media (max-height: 700px) {
-  .card-deck-hint {
-    display: none;
-  }
 }

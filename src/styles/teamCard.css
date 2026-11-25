@@ -1,22 +1,19 @@
 /*
- * A team's sheet: quieter than a player's «cromo». The club on the
- * masthead's ink with a soft glow behind its crest, then paper with air
- * between sections; the accent only where it means something.
+ * A team's sheet: quieter than a player's «cromo», flat like the rest of the
+ * paper. The club on the masthead's ink, then paper with air between
+ * sections; the accent only where it means something. It takes the deck's
+ * height (its body scrolls inside) and shrinks to its content when short.
  */
-.card-deck.is-team .card-deck-stage {
-  width: min(384px, 100%);
-}
 .team-sheet {
   display: flex;
   flex-direction: column;
-  max-height: calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 168px);
+  max-height: 100%;
+  min-height: 0;
   overflow: hidden;
-  border-radius: 28px;
+  border-radius: 24px;
   background: var(--card);
   color: var(--ink);
-  box-shadow:
-    0 40px 80px -28px rgb(0 0 0 / 0.75),
-    0 0 0 1px rgb(255 255 255 / 0.06);
+  box-shadow: 0 24px 48px -24px rgb(0 0 0 / 0.7);
 }
 .team-sheet-hero {
   position: relative;
@@ -26,23 +23,11 @@
   flex-shrink: 0;
   padding: 22px 20px 18px;
   overflow: hidden;
-  background:
-    radial-gradient(120% 90% at 50% 0%, rgb(255 209 0 / 0.22), transparent 62%),
-    linear-gradient(180deg, #23211b 0%, var(--masthead) 100%);
+  border-bottom: 3px solid var(--accent);
+  background: var(--masthead);
   color: var(--masthead-ink);
   text-align: center;
   touch-action: none;
-}
-.team-sheet-hero::after {
-  content: "";
-  position: absolute;
-  left: 20px;
-  right: 20px;
-  bottom: 0;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0.7;
 }
 .team-sheet-position,
 .team-sheet-points {
@@ -84,9 +69,7 @@
   margin-bottom: 6px;
   border-radius: 50%;
   background: #fff;
-  box-shadow:
-    0 0 0 6px rgb(255 255 255 / 0.06),
-    0 18px 36px -14px rgb(255 209 0 / 0.55);
+  box-shadow: 0 0 0 5px var(--masthead-rule);
   animation: team-crest-in 520ms var(--spring-bouncy) both;
 }
 .team-sheet-crest img,
@@ -111,6 +94,8 @@
 }
 .team-sheet-body {
   display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 18px;
   padding: 16px 18px 14px;
   overflow-y: auto;

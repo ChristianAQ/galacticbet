@@ -166,8 +166,8 @@ export default function CardDeck({
     card.style.setProperty("--mx", `${Math.round(x * 100)}%`);
     card.style.setProperty("--my", `${Math.round(y * 100)}%`);
     if (!prefersReducedMotion()) {
-      card.style.setProperty("--ry", `${((x - 0.5) * 14).toFixed(2)}deg`);
-      card.style.setProperty("--rx", `${((0.5 - y) * 12).toFixed(2)}deg`);
+      card.style.setProperty("--ry", `${((x - 0.5) * 8).toFixed(2)}deg`);
+      card.style.setProperty("--rx", `${((0.5 - y) * 6).toFixed(2)}deg`);
     }
     card.dataset.lit = "";
   }
@@ -312,9 +312,6 @@ export default function CardDeck({
             </button>
           </nav>
         )}
-        <p className="card-deck-hint" aria-hidden="true">
-          {count > 1 ? "Desliza para ver otro · abajo para cerrar" : "Desliza hacia abajo para cerrar"}
-        </p>
       </div>
     </div>,
     document.body,

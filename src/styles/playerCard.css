@@ -1,28 +1,19 @@
 /*
- * A player's «cromo»: a trading card in the paper's colours. Gold foil frame,
- * the masthead's ink for club and portrait, the page's paper for the numbers.
- * The overlay keeps it centred; it moves on the compositor only.
+ * A player's «cromo», flat like the rest of the paper: a solid yellow frame,
+ * the masthead's ink for club and portrait, paper for the numbers. No
+ * gradients or glows. It fills the deck's height; the portrait takes what
+ * is left, so the card never leaves a gap under it.
  */
-/* ---------- The card ---------- */
 .cromo {
-  --foil: linear-gradient(
-    135deg,
-    #ffd100 0%,
-    #fff3b0 18%,
-    #e3aa00 38%,
-    #ffe56a 58%,
-    #c99400 80%,
-    #ffe36b 100%
-  );
   position: relative;
-  display: block;
-  padding: 8px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 6px;
   border-radius: 24px;
-  background: var(--foil);
-  box-shadow:
-    0 34px 70px -24px rgb(0 0 0 / 0.7),
-    0 0 0 1px rgb(0 0 0 / 0.25),
-    inset 0 1px 0 rgb(255 255 255 / 0.6);
+  background: var(--accent);
+  box-shadow: 0 24px 48px -24px rgb(0 0 0 / 0.7);
   transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
   transition: transform 420ms var(--spring-smooth);
 }
@@ -31,13 +22,18 @@
 }
 .cromo-face {
   position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
-  border-radius: 17px;
+  border-radius: 18px;
   background: var(--card);
   color: var(--ink);
 }
 .cromo-top {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 10px;
   min-height: 52px;
@@ -79,36 +75,30 @@
   font-weight: 900;
   line-height: 1;
 }
-/* Halftone on ink with a band of highlighter: the paper's own texture. */
+/* The «photo» of the card: the initials on the masthead's ink. */
 .cromo-portrait {
   position: relative;
   display: grid;
+  flex: 1 1 150px;
   /* Initials to the right, the rank to the left: they never overlap. */
   place-items: center end;
-  height: 150px;
+  min-height: 96px;
   padding-right: 22px;
   overflow: hidden;
-  background:
-    radial-gradient(circle, rgb(255 209 0 / 0.34) 1.1px, transparent 1.7px) 0 0 / 9px 9px,
-    linear-gradient(165deg, #2b2820 0%, var(--masthead) 70%);
-}
-.cromo-portrait::before {
-  content: "";
-  position: absolute;
-  inset: -40% -10%;
-  background: linear-gradient(100deg, transparent 42%, rgb(255 209 0 / 0.9) 42% 56%, transparent 56%);
-  opacity: 0.22;
+  border-top: 1px solid var(--masthead-rule);
+  background: var(--masthead);
+  container-type: size;
 }
 .cromo-initials {
   position: relative;
   color: var(--accent);
   font-family: var(--font-display);
   font-stretch: var(--stretch-condensed);
-  font-size: 104px;
+  /* As tall as the portrait allows. */
+  font-size: clamp(72px, 62cqh, 150px);
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.02em;
-  text-shadow: 0 6px 0 rgb(0 0 0 / 0.35);
 }
 .cromo-rank {
   position: absolute;
@@ -120,7 +110,6 @@
   color: var(--accent-ink);
   font-size: 12px;
   font-weight: 650;
-  box-shadow: 0 6px 14px -6px rgb(0 0 0 / 0.6);
 }
 .cromo-rank b {
   font-family: var(--font-display);
@@ -130,6 +119,7 @@
 }
 .cromo-identity {
   display: grid;
+  flex-shrink: 0;
   gap: 6px;
   padding: 14px 16px 12px;
 }
@@ -154,6 +144,7 @@
 }
 .cromo-stats {
   display: grid;
+  flex-shrink: 0;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   margin: 0;
@@ -165,9 +156,9 @@
   display: flex;
   flex-direction: column-reverse;
   justify-content: flex-end;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
-  padding: 10px 12px 9px;
+  padding: 12px 12px 11px;
   background: var(--card);
   animation: cromo-stat-in 420ms var(--spring-smooth) both;
   animation-delay: calc(var(--i, 0) * 40ms + 80ms);
@@ -183,7 +174,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-stretch: var(--stretch-condensed);
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 900;
   line-height: 1;
 }
@@ -195,6 +186,7 @@
   color: var(--accent-ink);
 }
 .cromo-note {
+  flex-shrink: 0;
   padding: 12px 16px 14px;
   border-top: 1px solid var(--rule);
   color: var(--ink-2);
@@ -202,28 +194,12 @@
   line-height: 1.45;
 }
 .cromo-foot {
-  padding: 9px 16px 11px;
+  flex-shrink: 0;
+  padding: 10px 16px 12px;
   color: var(--ink-3);
   font-size: 11.5px;
   font-weight: 550;
 }
-/* Light on the foil, following the finger. */
-.cromo-shine {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at var(--mx, 30%) var(--my, 18%), rgb(255 255 255 / 0.42), transparent 42%),
-    linear-gradient(115deg, transparent 34%, rgb(255 255 255 / 0.16) 47%, rgb(255 209 0 / 0.12) 53%, transparent 64%);
-  mix-blend-mode: soft-light;
-  opacity: 0.55;
-  transition: opacity 300ms ease;
-}
-.cromo[data-lit] .cromo-shine {
-  opacity: 1;
-}
-
 @keyframes cromo-stat-in {
   from {
     opacity: 0;
@@ -238,14 +214,5 @@
   }
   .cromo-stats > div {
     animation: none;
-  }
-}
-/* Short screens (iPhone SE, landscape): a lower portrait keeps it all in view. */
-@media (max-height: 700px) {
-  .cromo-portrait {
-    height: 104px;
-  }
-  .cromo-initials {
-    font-size: 76px;
   }
 }

@@ -21,7 +21,7 @@ La versión 1 (rankings de SportAPI) ya no se lee. Tenía listas parciales: tarj
 
 ### El cromo de cada jugador
 
-Al pulsar un goleador en Datos, o un jugador de la plantilla en Equipos, se abre su cromo (`PlayerCard.tsx`): una carta con marco dorado, el club y el dorsal sobre la tinta de la cabecera, sus iniciales sobre trama de puntos y el puesto en la tabla de goleadores. Debajo:
+Al pulsar un goleador en Datos, o un jugador de la plantilla en Equipos, se abre su cromo (`PlayerCard.tsx`): una carta plana con los colores de la app: marco amarillo liso, el club y el dorsal sobre la tinta de la cabecera, sus iniciales en grande y el puesto en la tabla de goleadores. No lleva degradados ni brillos. Debajo:
 
 - quién es: posición en español, bandera y país en español (`nations.ts`) y edad;
 - su temporada: goles, asistencias, partidos, goles de penalti, goles por partido y qué parte de los goles de su club son suyos (con los resultados oficiales de esa competición).
@@ -30,14 +30,15 @@ Navegación:
 
 - El cromo crece desde la fila pulsada y, al cerrarlo, el foco vuelve a esa fila.
 - Deslizar a un lado pasa al siguiente o al anterior de la misma lista; deslizar hacia abajo lo cierra. Las flechas, «Anterior/Siguiente», Esc y tocar fuera hacen lo mismo.
-- El brillo del marco sigue al dedo.
-- Con movimiento reducido no hay giros ni brillos.
+- La carta se inclina un poco siguiendo el dedo.
+- Con movimiento reducido no hay giros.
+- La carta ocupa el alto de la pantalla, desde debajo del botón de cerrar hasta las flechas, sin dejar hueco abajo. La zona de las iniciales se estira para llenarlo. En pantallas altas deja de crecer y se centra.
 
 En Equipos, los goles se buscan por el identificador del jugador entre los 20 máximos goleadores de LaLiga, Premier y Champions. Quien no está entre ellos lo dice en vez de mostrar ceros. La sincronización guarda con cada goleador su id, posición, nacionalidad, fecha de nacimiento y dorsal. Las ediciones anteriores, sin esos datos, se renuevan en la siguiente ejecución.
 
 ### La ficha de cada equipo
 
-En Ligas › Tabla, al pulsar un equipo se abre su ficha. En la ficha de un partido, al pulsar el escudo o el nombre de un equipo, se abre la misma ficha, solo de ese equipo y sin pasar a otros (`TeamCard.tsx`, datos en `teamSheet.ts`). Es más sobria que el cromo: escudo, puesto y puntos sobre la tinta de la cabecera y, debajo, sobre papel:
+En Ligas › Tabla, al pulsar un equipo se abre su ficha. En la ficha de un partido, al pulsar el escudo o el nombre de un equipo, se abre la misma ficha, solo de ese equipo y sin pasar a otros (`TeamCard.tsx`, datos en `teamSheet.ts`). Es más sobria que el cromo: escudo, puesto y puntos sobre la tinta lisa de la cabecera, separada con una raya amarilla y, debajo, sobre papel:
 
 - **Distancias:** puntos al líder, o ventaja si es líder. En LaLiga y Premier, también a la Champions (o sobre el 5.º) y al descenso (o sobre él). En la Champions, a los octavos directos o al playoff. Solo con la tabla completa, como las zonas.
 - **Cifras:** partidos, V·E·D, goles y puntos por partido.
