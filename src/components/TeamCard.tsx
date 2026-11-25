@@ -248,7 +248,12 @@ export default function TeamCards({
   onClose: () => void;
 }) {
   // The sheet stays open under the match: going back finds it as it was.
-  const openMatch = (id: string) => go(`/partido/${encodeURIComponent(id)}`);
+  // The match already on screen: just put the sheet away.
+  const openMatch = (id: string) => {
+    const path = `/partido/${encodeURIComponent(id)}`;
+    if (window.location.hash.slice(1).split("?")[0] === path) onClose();
+    else go(path);
+  };
   return (
     <CardDeck
       count={rows.length}
@@ -296,7 +301,12 @@ export function SingleTeamSheet({
   onClose: () => void;
 }) {
   // The sheet stays open under the match: going back finds it as it was.
-  const openMatch = (id: string) => go(`/partido/${encodeURIComponent(id)}`);
+  // The match already on screen: just put the sheet away.
+  const openMatch = (id: string) => {
+    const path = `/partido/${encodeURIComponent(id)}`;
+    if (window.location.hash.slice(1).split("?")[0] === path) onClose();
+    else go(path);
+  };
   return (
     <CardDeck
       count={1}

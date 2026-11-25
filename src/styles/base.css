@@ -14,6 +14,22 @@ html {
   scroll-padding-top: calc(var(--safe-top) + var(--nav-height) + 12px);
   scroll-padding-bottom: var(--tabbar-space);
 }
+/*
+ * iOS 26 home-screen apps (viewport-fit=cover + black-translucent) get a
+ * viewport short by the status bar whenever the document is shorter than the
+ * screen (WebKit 301108). A sheet or card that fixes the page in place makes
+ * it that short, and fixed layers then stop ~54 pt above the bottom. The
+ * document stays at least as tall as the screen; min() keeps it at the
+ * visible height when the viewport is already whole, so nothing scrolls.
+ */
+@media (display-mode: standalone) {
+  html {
+    min-height: min(100lvh, calc(100% + env(safe-area-inset-top)));
+  }
+}
+html.is-standalone {
+  min-height: min(100lvh, calc(100% + env(safe-area-inset-top)));
+}
 body {
   margin: 0;
   min-height: 100dvh;

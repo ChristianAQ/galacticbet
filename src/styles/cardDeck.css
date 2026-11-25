@@ -9,9 +9,8 @@
   top: 0;
   left: 0;
   right: 0;
-  /* To the very bottom of the screen: iOS web apps can lay fixed layers out
-     a few dozen points short of it (--deck-extra, measured on open). */
-  height: calc(100% + var(--deck-extra, 0px));
+  /* To the very bottom of the screen (see the iOS note in base.css). */
+  height: 100%;
   z-index: 90;
   display: flex;
   flex-direction: column;
@@ -121,6 +120,6 @@
 }
 @media (display-mode: standalone) {
   .card-deck {
-    height: max(calc(100% + var(--deck-extra, 0px)), 100lvh);
+    height: max(100%, 100lvh);
   }
 }

@@ -97,6 +97,10 @@ body {
   opacity: calc(1 - var(--swipe, 0));
   transform: none;
 }
+/* Hidden, the compact title takes no room: the back button keeps its name. */
+.nav-bar:not(.is-collapsed) .nav-bar-title {
+  max-width: 0;
+}
 /* Brand and compact title share the middle of the bar. */
 .nav-bar-center {
   display: grid;
@@ -147,6 +151,35 @@ body {
 /* …except on Inicio, where the brand stays and the title never shows. */
 .nav-bar.keeps-brand .nav-bar-title {
   visibility: hidden;
+}
+/* A match page's «×»: out of every match opened one from another. */
+.nav-close {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--masthead-ink);
+  transition: transform 160ms var(--press);
+}
+.nav-close::before {
+  content: "";
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.12);
+}
+.nav-close svg {
+  position: relative;
+}
+.nav-close:active {
+  transform: scale(0.88);
+}
+.nav-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 .nav-avatar {
   position: relative;

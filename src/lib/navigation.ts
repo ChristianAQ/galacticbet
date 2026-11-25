@@ -246,6 +246,32 @@ export function popToRoot() {
   }, "pop");
 }
 
+/**
+ * The match pages' «×»: back past every match page opened one from another
+ * (from a team's sheet, a crest…) to the screen the first one was opened
+ * from, in one step. Opened straight on a match (a link, an aviso): to its
+ * section.
+ */
+export function leaveMatches(steps: number) {
+  if (!navigator) return;
+  const idx = (window.history.state?.idx as number | undefined) ?? 0;
+  if (steps >= 1 && depth > steps && idx >= steps) {
+    transition(async () => {
+      const committed = nextCommit();
+      navigator!(-steps);
+      await committed;
+    }, "pop");
+    return;
+  }
+  const to = parentOf(currentPath);
+  transition(async () => {
+    pendingIntent = { reset: true };
+    const committed = nextCommit(120);
+    flushSync(() => navigator!(to, { replace: true }));
+    await committed;
+  }, "pop");
+}
+
 /** Back gesture finished its own animation: pop without a transition. */
 export function popSilently() {
   if (!navigator) return;

@@ -49,6 +49,8 @@
           document.querySelector('meta[name="theme-color"]').content = "#0a0907";
         }
       } catch (e) {}
+      // Installed on the home screen (iOS also reports it here): see base.css.
+      if (navigator.standalone) document.documentElement.classList.add("is-standalone");
     </script>
     <style>
       /* Ink until the app paints: no white flash between the launch screen and the app. */

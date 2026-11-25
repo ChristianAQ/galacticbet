@@ -155,6 +155,7 @@ export default function StackNavigator({
     chrome.setStack(
       current.map((e) => e.id),
       current[0].location.pathname,
+      current.map((e) => e.location.pathname),
     );
     for (const entry of [...stacks.parked, current[0]])
       if (isTabRoot(entry.location.pathname))

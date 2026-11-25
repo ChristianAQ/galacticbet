@@ -1,11 +1,12 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import type { AppUser as User } from "../lib/session";
-import { useChrome } from "../lib/chrome";
+import { isMatchPage, useChrome } from "../lib/chrome";
 import {
   go,
   goBack,
   isTabRoot,
+  leaveMatches,
   parentOf,
   routeTitle,
 } from "../lib/navigation";
@@ -20,7 +21,7 @@ import BrandMark from "./BrandMark";
  */
 export default function NavBar({ user }: { user: User | null }) {
   const { pathname } = useLocation();
-  const { depth, top, previous } = useChrome();
+  const { depth, top, previous, matchTrail, beforeMatches } = useChrome();
   const root = isTabRoot(pathname);
   const canGoBack = depth > 1 || !root;
   const backLabel =
@@ -34,6 +35,12 @@ export default function NavBar({ user }: { user: User | null }) {
   const branded = root && depth <= 1;
   const keepsBrand = branded && pathname === "/";
   const brandHidden = branded && !keepsBrand && Boolean(top.collapsed);
+  // On a match page: «×» leaves every match opened one from another at once.
+  const closesMatches = isMatchPage(pathname);
+  const closeTo =
+    beforeMatches && depth > matchTrail
+      ? beforeMatches.title || routeTitle(beforeMatches.path) || "Atrás"
+      : routeTitle(parentOf(pathname)) || "Inicio";
   return (
     <header
       className={`nav-bar topbar${top.collapsed ? " is-collapsed" : ""}${branded ? " has-brand" : ""}${keepsBrand ? " keeps-brand" : ""}`}
@@ -84,6 +91,20 @@ export default function NavBar({ user }: { user: User | null }) {
           </div>
         </div>
         <div className="nav-bar-trailing" id="nav-actions">
+          {closesMatches && (
+            <button
+              type="button"
+              className="nav-close"
+              aria-label={`Cerrar y volver a ${closeTo}`}
+              title={`Volver a ${closeTo}`}
+              onClick={() => {
+                haptic();
+                leaveMatches(matchTrail);
+              }}
+            >
+              <X size={20} strokeWidth={2.6} aria-hidden="true" />
+            </button>
+          )}
           {root && (
             <button
               type="button"

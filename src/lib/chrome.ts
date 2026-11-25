@@ -12,6 +12,7 @@ interface EntryChrome {
 }
 let entries = new Map<string, EntryChrome>();
 let stack: string[] = [];
+let paths: string[] = [];
 let rootPath = "/";
 const listeners = new Set<() => void>();
 let version = 0;
@@ -25,9 +26,10 @@ function subscribe(listener: () => void) {
 }
 
 export const chrome = {
-  setStack(ids: string[], root: string) {
-    if (ids.join() === stack.join() && root === rootPath) return;
+  setStack(ids: string[], root: string, entryPaths: string[] = []) {
+    if (ids.join() === stack.join() && root === rootPath && entryPaths.join() === paths.join()) return;
     stack = ids;
+    paths = entryPaths;
     rootPath = root;
     entries = new Map([...entries].filter(([id]) => ids.includes(id)));
     emit();
@@ -47,6 +49,9 @@ export const chrome = {
   },
 };
 
+const MATCH_PAGE = /^\/(partido|competicion\/[^/]+\/partido)\//;
+export const isMatchPage = (pathname: string) => MATCH_PAGE.test(pathname);
+
 export function useChrome() {
   useSyncExternalStore(subscribe, () => version);
   const top = stack[stack.length - 1];
@@ -57,6 +62,18 @@ export function useChrome() {
     rootPath,
     top: chrome.get(top) || {},
     previous: previous ? chrome.get(previous) || {} : undefined,
+    /** Match pages opened one from another on top of the stack… */
+    matchTrail: (() => {
+      let n = 0;
+      while (n < paths.length && isMatchPage(paths[paths.length - 1 - n])) n++;
+      return n;
+    })(),
+    /** …and the screen they were opened from (if it is in the stack). */
+    beforeMatches: (() => {
+      let i = paths.length - 1;
+      while (i >= 0 && isMatchPage(paths[i])) i--;
+      return i >= 0 ? { title: chrome.get(stack[i])?.title, path: paths[i] } : undefined;
+    })(),
   };
 }
 
