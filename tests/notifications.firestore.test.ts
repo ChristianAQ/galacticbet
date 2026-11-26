@@ -6,6 +6,7 @@ import {
   remindPendingRounds,
   type CompletedRound,
 } from "../scripts/notifications";
+import { roundDeadlines } from "../scripts/liveSchedule";
 import { ensureVapidKeys, type PushSend } from "../scripts/push";
 import type { Standing } from "../scripts/standings";
 
@@ -119,5 +120,20 @@ describe.skipIf(!enabled)("Avisos en Firestore: claves, recordatorios y resultad
     const old = { ...round, groupId: "g2", lastKickoff: now - 5 * 86400_000 };
     expect(await announceRoundResults(db, keys, [old], { now, send })).toEqual({ announced: 0 });
     expect(send).not.toHaveBeenCalled();
+  });
+  it("la espera del directo conoce los cierres abiertos de las jornadas oficiales", async () => {
+    await db.doc("rounds/PD-2026-REGULAR_SEASON-12").set({
+      seasonId: "PD-2026",
+      competition: "PD",
+      requiresSubmission: true,
+      submissionDeadline: Timestamp.fromMillis(now - 3600_000),
+    });
+    await db.doc("rounds/CL-2026-LEAGUE_STAGE-6").set({
+      seasonId: "CL-2026",
+      competition: "CL",
+      requiresSubmission: false,
+      submissionDeadline: Timestamp.fromMillis(now + 3600_000),
+    });
+    expect(await roundDeadlines(db, now)).toEqual([now + 2 * 3600_000, now + 7 * 86400_000]);
   });
 });

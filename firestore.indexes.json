@@ -49,6 +49,11 @@
       "indexes": []
     },
     { "collectionGroup": "calendars", "fieldPath": "payload", "indexes": [] },
+    {
+      "collectionGroup": "providerCache",
+      "fieldPath": "payload",
+      "indexes": []
+    },
     { "collectionGroup": "live", "fieldPath": "matches", "indexes": [] },
     { "collectionGroup": "odds", "fieldPath": "matches", "indexes": [] },
     { "collectionGroup": "odds", "fieldPath": "checked", "indexes": [] },

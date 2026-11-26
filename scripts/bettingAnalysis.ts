@@ -54,7 +54,16 @@ import {
   type PlayerStat,
 } from "../src/lib/matchInsightsData";
 import { readCalendars } from "./liveLoop";
-import { BET365, createOddsPapiClient, fetchDayOdds, type OddsPapiClient } from "./oddsPapi";
+import {
+  BET365,
+  createOddsPapiClient,
+  DAY_ODDS_DOC,
+  decodeDayOdds,
+  encodeDayOdds,
+  fetchDayOdds,
+  type DayOdds,
+  type OddsPapiClient,
+} from "./oddsPapi";
 
 /* ---------- What the AI reads ---------- */
 
@@ -796,16 +805,35 @@ export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions
   for (const day of days.slice(0, 2)) {
     const label = `${competitionName(day.competition as AnalysisCompetition, true)} ${day.date}`;
     const pending = day.matches.filter((m) => Date.parse(m.utcDate) > now + 5 * 60_000);
-    let odds;
-    try {
-      odds = await fetchDayOdds(db, client, day.competition, pending, { now, log, debug: options.dryRun });
-    } catch (error) {
-      log(`Análisis ${label}: cuotas no disponibles (${error instanceof Error ? error.message : "error"}).`);
-      continue;
+    // A retry (the AI failed a moment ago) reuses the prices it already paid for.
+    const cached = options.dryRun
+      ? undefined
+      : decodeDayOdds((await db.doc(DAY_ODDS_DOC).get()).data(), day.id, pending.map((m) => m.id), now);
+    let odds: DayOdds;
+    let oddsAt: number;
+    if (cached) {
+      odds = cached;
+      oddsAt = cached.fetchedAt;
+    } else {
+      try {
+        odds = await fetchDayOdds(db, client, day.competition, pending, { now, log, debug: options.dryRun });
+      } catch (error) {
+        log(`Análisis ${label}: cuotas no disponibles (${error instanceof Error ? error.message : "error"}).`);
+        continue;
+      }
+      oddsAt = clock();
+      const stored = options.dryRun || !odds.prices.size ? undefined : encodeDayOdds(day.id, pending.map((m) => m.id), odds, oddsAt);
+      if (stored)
+        await db
+          .doc(DAY_ODDS_DOC)
+          .set(stored)
+          .catch(() => log(`Análisis ${label}: no se pudieron guardar las cuotas para un posible reintento.`));
     }
-    const oddsAt = clock();
     log(
-      `Análisis ${label}: ${odds.prices.size}/${pending.length} partidos con cuotas (${odds.requests} peticiones a OddsPapi).` +
+      `Análisis ${label}: ${odds.prices.size}/${pending.length} partidos con cuotas ` +
+        (cached
+          ? `(las de hace ${Math.round((now - cached.fetchedAt) / 60_000)} min: el reintento no gasta peticiones a OddsPapi).`
+          : `(${odds.requests} peticiones a OddsPapi).`) +
         (odds.unmatched.length ? ` Sin emparejar: ${odds.unmatched.join("; ")}.` : ""),
     );
     if (!odds.prices.size) continue;

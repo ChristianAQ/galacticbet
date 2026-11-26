@@ -30,7 +30,11 @@ no gestiona apuestas ni dinero.
    Si un intento falla (límite de uso del plan de Claude, OddsPapi caído o sin
    cuotas), se repite a los 20 minutos, como mucho 3 veces por día
    (`providerBudgets/analysisAttempts`): nunca en bucle, que gastaría el cupo
-   de OddsPapi.
+   de OddsPapi. Las cuotas leídas se guardan una hora en
+   `providerCache/oddspapiDay` (solo backend) y los reintentos del mismo día
+   las reutilizan, sin peticiones nuevas; el informe dice a qué hora se
+   leyeron. Si el plan de Claude se agota o caduca, cada día gasta así una sola
+   lectura de cuotas, no tres.
 2. **Cuotas.** OddsPapi (plan gratuito, 250 peticiones al mes). Cada análisis
    hace una petición con los partidos del día (para emparejar los nombres) y
    otra por partido. Cada una de estas trae a la vez bet365, varias casas con

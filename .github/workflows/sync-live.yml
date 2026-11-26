@@ -1,29 +1,85 @@
 name: Update live football scores
 on:
+  # GitHub runs schedules hours late (or skips them) on busy days, so this
+  # workflow does not rely on them: its first job waits for the next match (or
+  # a round's reminder) and the workflow starts again on its own while there is
+  # work in the coming hours. The schedule and the full sync only restart it.
   schedule:
     - cron: "3-53/10 * * * *"
       timezone: "UTC"
+  workflow_run:
+    workflows: ["Synchronize football and standings"]
+    types: [completed]
   push:
     branches: [master]
     paths:
       - "scripts/sportApi*.ts"
       - "scripts/syncSportApi.ts"
       - "scripts/sync-live.ts"
+      - "scripts/live-wait.ts"
+      - "scripts/liveSchedule.ts"
       - "scripts/liveLoop.ts"
       - "src/lib/liveBoard.ts"
       - ".github/workflows/sync-live.yml"
   workflow_dispatch:
+    inputs:
+      encadenado:
+        description: "Lo marca el propio workflow al relanzarse para esperar (déjalo sin marcar)"
+        type: boolean
+        default: false
 permissions:
   contents: read
-concurrency:
-  group: football-sync
-  cancel-in-progress: false
+  # To start itself again while it waits for the next match.
+  actions: write
+env:
+  # Automatic runs wait for the work; manual runs and code pushes go straight to it.
+  LIVE_WAIT: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_run' || (github.event_name == 'workflow_dispatch' && inputs.encadenado == true) }}
 jobs:
-  live:
+  wait:
     runs-on: ubuntu-latest
-    # The job stays alive while fixtures are in play (minute-by-minute checks)
-    # and exits after one quick pass when there are none.
-    timeout-minutes: 40
+    # Up to 5 h 15 min until the next kick-off or reminder.
+    timeout-minutes: 330
+    concurrency:
+      # One waiting job at a time; manual runs never queue behind it.
+      group: football-live-wait-${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.encadenado != true)) && 'manual' || 'auto' }}
+      cancel-in-progress: false
+    outputs:
+      go: ${{ steps.now.outputs.go || steps.wait.outputs.go }}
+    steps:
+      - id: now
+        if: env.LIVE_WAIT != 'true'
+        run: echo "go=true" >> "$GITHUB_OUTPUT"
+      - if: env.LIVE_WAIT == 'true'
+        uses: actions/checkout@v4
+      - if: env.LIVE_WAIT == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - if: env.LIVE_WAIT == 'true'
+        run: npm ci
+      - id: wait
+        if: env.LIVE_WAIT == 'true'
+        run: npm run live:wait
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Keep waiting
+        if: steps.wait.outputs.chain == 'true'
+        run: gh workflow run sync-live.yml --ref "${{ github.ref_name }}" -f encadenado=true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+  live:
+    needs: wait
+    if: needs.wait.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    # 50 minutes following the matches (minute by minute while one is in play);
+    # if they go on, the workflow starts again.
+    timeout-minutes: 65
+    concurrency:
+      # It writes the calendars too, like the full sync: never both at once.
+      group: football-sync
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,13 +87,20 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run sync:live
+      - id: live
+        run: npm run sync:live
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           SPORTAPI_KEY: ${{ secrets.SPORTAPI_KEY }}
-          SPORTAPI_VERIFY: ${{ github.event_name != 'schedule' }}
+          SPORTAPI_VERIFY: ${{ env.LIVE_WAIT != 'true' }}
           FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           ESPN_NEWS: ${{ vars.ESPN_NEWS }}
           ESPN_MATCH_DETAILS: ${{ vars.ESPN_MATCH_DETAILS }}
-          LIVE_LOOP_MINUTES: "25"
+          LIVE_LOOP_MINUTES: "50"
+      - name: Keep watching
+        if: ${{ !cancelled() && steps.live.outputs.chain == 'true' }}
+        run: gh workflow run sync-live.yml --ref "${{ github.ref_name }}" -f encadenado=true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}

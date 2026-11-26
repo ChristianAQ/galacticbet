@@ -15,7 +15,7 @@ const HOUR = 60 * MINUTE;
 /** Remind players who have not sealed during the last three hours. */
 export const REMIND_WINDOW = 3 * HOUR;
 /** Too close to the deadline to still be useful. */
-const REMIND_LAST_CALL = 10 * MINUTE;
+export const REMIND_LAST_CALL = 10 * MINUTE;
 /** Re-scored old rounds (e.g. somebody joined) never announce again. */
 const RESULT_RECENT = 48 * HOUR;
 

@@ -51,6 +51,8 @@ import {
   KNOWN_MARKETS,
   MAX_PLAYERS_PER_MARKET,
   chooseBook,
+  decodeDayOdds,
+  encodeDayOdds,
   describePlayerProps,
   describeShotMarkets,
   parsePlayerMarkets,
@@ -807,6 +809,58 @@ describe("the job, end to end with fakes", () => {
     expect((await run(kickoff - 40 * 60_000)).generated).toBe(1);
     expect((await run(kickoff - 30 * 60_000)).generated).toBe(0);
     expect(decodeAnalysisBoard(store.get("analysis/football"))!.analyses).toHaveLength(1);
+  });
+
+  it("a retry after the AI failed reuses the prices it already has", async () => {
+    store.clear();
+    const down = async () => {
+      throw new Error("límite de uso del plan");
+    };
+    const before = spent;
+    expect((await run(kickoff - 45 * 60_000, { claude: down })).generated).toBe(0);
+    const paid = spent - before;
+    expect(paid).toBeGreaterThan(0);
+    // 20 minutes later: same prices, no new requests, and the report says when they were read.
+    expect((await run(kickoff - 25 * 60_000)).generated).toBe(1);
+    expect(spent - before).toBe(paid);
+    const analysis = decodeAnalysisBoard(store.get("analysis/football"))!.analyses[0];
+    // The time of the first read (plus the milliseconds that run took), not of the retry.
+    expect(Date.parse(analysis.oddsAt) - (kickoff - 45 * 60_000)).toBeLessThan(60_000);
+  });
+
+  it("old prices or a test run ask OddsPapi again", async () => {
+    store.clear();
+    const down = async () => {
+      throw new Error("sin respuesta");
+    };
+    await run(kickoff - 3 * 3_600_000, { force: true, claude: down });
+    let before = spent;
+    expect((await run(kickoff - 40 * 60_000)).generated).toBe(1);
+    expect(spent).toBeGreaterThan(before);
+    before = spent;
+    await run(kickoff - 35 * 60_000, { dryRun: true });
+    expect(spent).toBeGreaterThan(before);
+  });
+});
+
+describe("prices kept for a retry", () => {
+  const prices = new Map([["a", [{ market: "1X2" as const, selection: "1", price: 2.1, book: "Winamax" }]]]);
+  const stored = (at: number) => encodeDayOdds("PD-2026-11-27", ["a", "b"], { prices, unmatched: ["X - Y"], requests: 3 }, at)!;
+
+  it("come back for the same day while they are recent", () => {
+    const back = decodeDayOdds(stored(1000), "PD-2026-11-27", ["a", "b"], 1000 + 30 * 60_000)!;
+    expect(back.prices.get("a")).toEqual(prices.get("a"));
+    expect(back).toMatchObject({ unmatched: ["X - Y"], requests: 0, fetchedAt: 1000 });
+    // A match that started meanwhile is simply left out.
+    expect(decodeDayOdds(stored(1000), "PD-2026-11-27", ["b"], 2000)!.prices.size).toBe(0);
+  });
+
+  it("are not used for another day, when old, or when a match was not asked", () => {
+    expect(decodeDayOdds(stored(1000), "CL-2026-11-27", ["a"], 2000)).toBeUndefined();
+    expect(decodeDayOdds(stored(1000), "PD-2026-11-27", ["a"], 1000 + 61 * 60_000)).toBeUndefined();
+    expect(decodeDayOdds(stored(1000), "PD-2026-11-27", ["a", "c"], 2000)).toBeUndefined();
+    expect(decodeDayOdds({ ...stored(1000), payload: "{roto" }, "PD-2026-11-27", ["a"], 2000)).toBeUndefined();
+    expect(decodeDayOdds(undefined, "PD-2026-11-27", ["a"], 2000)).toBeUndefined();
   });
 });
 

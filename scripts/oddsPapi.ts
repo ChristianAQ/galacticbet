@@ -649,3 +649,49 @@ export async function fetchDayOdds(
     if (spent) await budgetRef.set({ month, used: used + spent, updatedAt: now });
   }
 }
+
+/**
+ * The prices of the last analysed day (backend only): when the AI fails, the
+ * retry 20 minutes later uses them instead of asking OddsPapi again.
+ */
+export const DAY_ODDS_DOC = "providerCache/oddspapiDay";
+export const ODDS_REUSE_MS = 60 * 60_000;
+/** Kept well below Firestore's 1 MiB per document. */
+const DAY_ODDS_MAX = 900_000;
+
+export interface CachedDayOdds extends DayOdds {
+  fetchedAt: number;
+}
+
+export function encodeDayOdds(dayId: string, asked: string[], odds: DayOdds, fetchedAt: number) {
+  const payload = JSON.stringify({ prices: [...odds.prices], unmatched: odds.unmatched });
+  return payload.length > DAY_ODDS_MAX ? undefined : { dayId, asked, fetchedAt, payload };
+}
+
+const validPrice = (p: unknown): p is MarketPrice => {
+  const v = p as MarketPrice;
+  return Boolean(v) && typeof v.market === "string" && typeof v.selection === "string" && Number.isFinite(v.price) && v.price > 1;
+};
+
+/** The stored prices, if they are of this day, recent and cover every match still to play. */
+export function decodeDayOdds(data: unknown, dayId: string, matchIds: string[], now: number): CachedDayOdds | undefined {
+  const d = data as { dayId?: unknown; asked?: unknown; fetchedAt?: unknown; payload?: unknown } | undefined;
+  if (!d || d.dayId !== dayId || typeof d.fetchedAt !== "number" || typeof d.payload !== "string") return;
+  if (now - d.fetchedAt > ODDS_REUSE_MS || d.fetchedAt - now > 60_000) return;
+  const asked = new Set(Array.isArray(d.asked) ? d.asked : []);
+  if (!matchIds.length || !matchIds.every((id) => asked.has(id))) return;
+  try {
+    const parsed = JSON.parse(d.payload) as { prices?: unknown; unmatched?: unknown };
+    const wanted = new Set(matchIds);
+    const prices = new Map<string, MarketPrice[]>();
+    for (const entry of Array.isArray(parsed.prices) ? parsed.prices : []) {
+      if (!Array.isArray(entry) || !wanted.has(entry[0]) || !Array.isArray(entry[1])) continue;
+      const list = (entry[1] as unknown[]).filter(validPrice);
+      if (list.length) prices.set(entry[0], list);
+    }
+    const unmatched = Array.isArray(parsed.unmatched) ? parsed.unmatched.filter((s): s is string => typeof s === "string") : [];
+    return { prices, unmatched, requests: 0, fetchedAt: d.fetchedAt };
+  } catch {
+    return;
+  }
+}
