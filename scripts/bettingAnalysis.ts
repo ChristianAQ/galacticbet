@@ -706,10 +706,47 @@ export interface AnalysisOptions {
 }
 
 /** The next analysis to wait for (from the calendar and what is already published). */
+/**
+ * Automatic attempts per match day (backend only): a failed analysis (the
+ * plan's usage limit, the odds provider down…) is tried again 20 minutes
+ * later, three times at most, never in a loop that spends the odds quota.
+ */
+export const ATTEMPTS_DOC = "providerBudgets/analysisAttempts";
+export const MAX_ATTEMPTS = 3;
+export const RETRY_GAP_MS = 20 * 60_000;
+export type Attempts = Record<string, { count: number; last: number }>;
+
+/** The next analysis to wait for, skipping days out of attempts and spacing retries. */
+export function planFrom(
+  matches: Match[],
+  analyses: Pick<BettingAnalysis, "id" | "generatedAt">[],
+  attempts: Attempts,
+  now: number,
+) {
+  const done = analysedDays(matches, analyses, EARLY_MS);
+  for (const [id, a] of Object.entries(attempts)) if (a.count >= MAX_ATTEMPTS) done.add(id);
+  const next = nextDueAt(matches, now, done);
+  const last = next ? attempts[next.id]?.last : undefined;
+  return next && last !== undefined ? { ...next, at: Math.max(next.at, last + RETRY_GAP_MS) } : next;
+}
+
+const readAttempts = async (db: Firestore): Promise<Attempts> =>
+  ((await db.doc(ATTEMPTS_DOC).get()).data()?.days as Attempts | undefined) ?? {};
+
+/** Counts an automatic attempt before it starts (a crash counts too); old days are dropped. */
+export async function recordAttempt(db: Firestore, id: string, now: number) {
+  const days = Object.fromEntries(
+    Object.entries(await readAttempts(db)).filter(([, a]) => now - a.last < 7 * 86_400_000),
+  );
+  days[id] = { count: (days[id]?.count ?? 0) + 1, last: now };
+  await db.doc(ATTEMPTS_DOC).set({ days });
+  return days[id].count;
+}
+
 export async function planNextAnalysis(db: Firestore, now: number) {
   const matches = await readCalendars(db, now);
   const board = decodeAnalysisBoard((await db.doc(ANALYSIS_DOC).get()).data());
-  return nextDueAt(matches, now, analysedDays(matches, board?.analyses ?? [], EARLY_MS));
+  return planFrom(matches, board?.analyses ?? [], await readAttempts(db), now);
 }
 
 export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions) {

@@ -1,6 +1,12 @@
 import { appendFile } from "node:fs/promises";
 import { backendFirestore } from "./backend";
-import { claudeCodeRunner, planNextAnalysis, runBettingAnalysis } from "./bettingAnalysis";
+import {
+  MAX_ATTEMPTS,
+  claudeCodeRunner,
+  planNextAnalysis,
+  recordAttempt,
+  runBettingAnalysis,
+} from "./bettingAnalysis";
 
 /**
  * The AI's betting analysis, 45 minutes before the first LaLiga or Champions
@@ -61,6 +67,8 @@ else {
         console.log(`Análisis: esperando hasta el ${clock.format(plan.at)} (${plan.id}).`);
         await sleep(wait + 15_000);
       }
+      const attempt = await recordAttempt(db, plan.id, Date.now());
+      if (attempt > 1) console.log(`Análisis: intento ${attempt} de ${MAX_ATTEMPTS} para ${plan.id}.`);
       await run();
       // The next match day, if close: keep a job waiting for it.
       const next = await planNextAnalysis(db, Date.now());

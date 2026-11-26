@@ -1108,3 +1108,18 @@ describe("waiting for the next analysis and what the AI reports", () => {
     expect(read({ model: "<script>", searches: -1 })).toBeUndefined();
   });
 });
+
+describe("retries of the automatic analysis", () => {
+  it("spaces failed attempts and gives up after three, without looping", async () => {
+    const { planFrom, RETRY_GAP_MS } = await import("../scripts/bettingAnalysis");
+    const day = [match({ id: "a", utcDate: "2026-11-28T13:00:00Z" }), match({ id: "b", utcDate: "2026-11-28T20:00:00Z" })];
+    const now = Date.parse("2026-11-28T12:20:00Z");
+    // Never tried: due now.
+    expect(planFrom(day, [], {}, now)).toEqual({ id: "PD-2026-11-28", at: now });
+    // Failed 5 minutes ago: not before 20 minutes after that attempt.
+    const last = now - 5 * 60_000;
+    expect(planFrom(day, [], { "PD-2026-11-28": { count: 1, last } }, now)?.at).toBe(last + RETRY_GAP_MS);
+    // Three attempts: that day is left alone.
+    expect(planFrom(day, [], { "PD-2026-11-28": { count: 3, last } }, now)).toBeNull();
+  });
+});
