@@ -12,6 +12,7 @@ import {
   archivedRecord,
   comboLegs,
   comboOf,
+  isPlayerMarket,
   nextAnalysis,
   pickKey,
   pickLabel,
@@ -124,6 +125,13 @@ function Why({
         )}
         {pick?.fair !== undefined && (
           <p className="bet-why-muted">Pinnacle, la casa de referencia, le da un {pct(pick.fair)}.</p>
+        )}
+        {pick && isPlayerMarket(pick.market) && (
+          <p className="bet-why-muted">
+            Apuesta de jugador: Pinnacle no las cotiza, así que no hay valor «según el mercado», solo la estimación de la
+            IA. Se resuelve con el acta del partido (goles, tarjetas y alineaciones de ESPN); si el jugador no llega a
+            jugar, es nula.
+          </p>
         )}
         <dl className="bet-sources">
           <div>

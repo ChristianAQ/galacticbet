@@ -1,6 +1,7 @@
 import type { Firestore } from "firebase-admin/firestore";
 import {
   GOAL_LINES,
+  PLAYER_MARKETS,
   type AnalysisCompetition,
   type BetMarket,
   type MarketPrice,
@@ -57,6 +58,8 @@ const OUTCOME_NAMES: Record<BetMarket, Record<string, string>> = {
   DNB: { "1": "1", "2": "2" },
   BTTS: { yes: "yes", no: "no" },
   OU: { over: "over", under: "under" },
+  SCORER: { yes: "yes" },
+  CARD: { yes: "yes" },
 };
 
 /** The full-time soccer markets the analysis uses, from `/v4/markets`. */
@@ -94,10 +97,13 @@ export function parseMarketDefinitions(value: unknown): MarketDefinition[] {
   return [...unique.values()];
 }
 
-/** A player market of the official list (goalscorer, shots on target…): id → its name. */
+/** A player market of the official list (goalscorer, shots on target…). */
 export interface PlayerMarket {
   marketId: string;
   name: string;
+  /** outcome id → its name («Yes», «Over»…). */
+  outcomes?: Record<string, string>;
+  period?: string;
 }
 /** The soccer player markets of `/v4/markets`, to recognise them in a fixture's prices. */
 export function parsePlayerMarkets(value: unknown): PlayerMarket[] {
@@ -108,9 +114,61 @@ export function parsePlayerMarkets(value: unknown): PlayerMarket[] {
     const id = typeof raw.marketId === "number" || typeof raw.marketId === "string" ? String(raw.marketId) : "";
     if (!/^\d{1,9}$/.test(id)) continue;
     const name = [str(raw.marketName, 120), str(raw.period, 30)].filter(Boolean).join(" · ") || `Mercado ${id}`;
-    found.set(id, { marketId: id, name });
+    const outcomes: Record<string, string> = {};
+    for (const o of Array.isArray(raw.outcomes) ? raw.outcomes : []) {
+      if (!isRow(o)) continue;
+      const oid = typeof o.outcomeId === "number" || typeof o.outcomeId === "string" ? String(o.outcomeId) : "";
+      const label = str(o.outcomeName, 40);
+      if (/^\d{1,9}$/.test(oid) && label) outcomes[oid] = label;
+    }
+    const period = str(raw.period, 30);
+    found.set(id, { marketId: id, name, outcomes, ...(period ? { period } : {}) });
   }
   return [...found.values()].slice(0, 600);
+}
+
+/** The player markets the analysis uses: scores at any time, and is booked. */
+export function playerMarketKind(m: PlayerMarket): BetMarket | null {
+  if (m.period && !["fulltime", "result"].includes(m.period)) return null;
+  if (/anytime goal ?scorer/i.test(m.name)) return "SCORER";
+  if (/to be (carded|booked)/i.test(m.name)) return "CARD";
+  return null;
+}
+/** Players per market offered to the AI: the shortest prices (long shots are rarely value). */
+export const MAX_PLAYERS_PER_MARKET = 20;
+/**
+ * Prices of the players' «yes» for goalscorer and booking at the chosen
+ * bookmaker (the one of the rest of the match), from the same answer.
+ */
+export function playerPrices(value: unknown, catalog: PlayerMarket[], slug: string, book: string): MarketPrice[] {
+  const raw = list(value).find(isRow);
+  const odds = raw && isRow(raw.bookmakerOdds) ? raw.bookmakerOdds[slug] : undefined;
+  if (!isRow(odds) || odds.bookmakerIsActive !== true || odds.suspended === true || !isRow(odds.markets)) return [];
+  const result: MarketPrice[] = [];
+  for (const kind of PLAYER_MARKETS) {
+    const byPlayer = new Map<string, MarketPrice>();
+    for (const definition of catalog) {
+      if (playerMarketKind(definition) !== kind) continue;
+      const market = odds.markets[definition.marketId];
+      if (!isRow(market) || market.marketActive === false || !isRow(market.outcomes)) continue;
+      const ids = Object.keys(market.outcomes);
+      const yes =
+        Object.entries(definition.outcomes ?? {}).find(([, label]) => /^yes$/i.test(label))?.[0] ??
+        (ids.length === 1 ? ids[0] : undefined);
+      const outcome = yes ? market.outcomes[yes] : undefined;
+      if (!isRow(outcome) || !isRow(outcome.players)) continue;
+      for (const p of Object.values(outcome.players)) {
+        if (!isRow(p) || p.active === false) continue;
+        const player = str(p.playerName, 60);
+        const price = p.price;
+        if (!player || typeof price !== "number" || !Number.isFinite(price) || price < 1.01 || price > 1000) continue;
+        const key = player.toLowerCase();
+        if (!byPlayer.has(key)) byPlayer.set(key, { market: kind, selection: "yes", player, price, book });
+      }
+    }
+    result.push(...[...byPlayer.values()].sort((a, b) => a.price - b.price).slice(0, MAX_PLAYERS_PER_MARKET));
+  }
+  return result;
 }
 
 export interface PlayerPropSummary {
@@ -392,7 +450,9 @@ async function marketList(
     now - Number(cached.fetchedAt) < MARKETS_REFRESH &&
     Array.isArray(cached.markets) &&
     cached.markets.length &&
-    (!players || Array.isArray(cached.playerMarkets))
+    // Player markets with their outcomes (a list cached before them is read again once).
+    (!players ||
+      (Array.isArray(cached.playerMarkets) && cached.playerMarkets.every((m: PlayerMarket) => isRow(m.outcomes))))
   )
     return {
       markets: cached.markets as MarketDefinition[],
@@ -460,7 +520,7 @@ export async function fetchDayOdds(
     throw new OddsPapiError("presupuesto mensual alcanzado", 429, "MONTH_BUDGET");
   const before = client.spent;
   try {
-    const { markets, playerMarkets } = await marketList(db, client, now, log, { players: debug });
+    const { markets, playerMarkets } = await marketList(db, client, now, log, { players: true });
     const tournament = ODDSPAPI_TOURNAMENTS[competition];
     const first = Math.min(...matches.map((m) => Date.parse(m.utcDate)));
     const lastKick = Math.max(...matches.map((m) => Date.parse(m.utcDate)));
@@ -483,6 +543,8 @@ export async function fetchDayOdds(
         continue;
       }
       const list = marketPrices(markets, books.get(slug)!, books.get(PINNACLE), BOOK_NAMES[slug] ?? slug);
+      // Goalscorer and booking, at the same bookmaker (Pinnacle doesn't price them).
+      list.push(...playerPrices(answer, playerMarkets, slug, BOOK_NAMES[slug] ?? slug));
       prices.set(match.id, list);
       if (debug || slug !== BET365)
         log(

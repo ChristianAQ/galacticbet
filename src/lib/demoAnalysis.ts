@@ -47,6 +47,18 @@ export function demoAnalysisBoard(): AnalysisBoard {
     reason: "Siete victorias en ocho partidos en casa y un Betis con tres bajas en el centro del campo.",
     risk: "El Betis ya sorprendió en este estadio la temporada pasada.",
   };
+  // A player's bet: no Pinnacle price for these, only the bookmaker's.
+  const scorer: AnalysisPick = {
+    matchId: derbi.id,
+    market: "SCORER",
+    selection: "yes",
+    player: "Mikel Oyarzabal",
+    price: 3.6,
+    probability: 0.31,
+    confidence: "baja",
+    reason: "Lanza los penaltis y ha marcado en cuatro de sus seis últimos derbis; llega descansado tras no jugar entre semana.",
+    risk: "Si el partido se cierra, apenas le llegarán balones.",
+  };
   const at = new Date(Date.now() - 18 * 60_000).toISOString();
   return {
     formatVersion: 1,
@@ -90,7 +102,7 @@ export function demoAnalysisBoard(): AnalysisBoard {
             risk: "Si hay un gol pronto, el partido puede abrirse.",
           }, { home: 0.38, draw: 0.32, away: 0.3, over25: 0.42, btts: 0.47, source: "Pinnacle" }, []),
         ],
-        picks: [btts, atletiWin],
+        picks: [btts, atletiWin, scorer],
         // Two jugosas of different matches: the day's combinada.
         combo: [pickKey(btts), pickKey(atletiWin)],
       },

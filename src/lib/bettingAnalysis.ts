@@ -1,5 +1,6 @@
 import type { CompetitionCode } from "./competitions";
 import { hasPublishedResult, type Match } from "./domain";
+import type { MatchInsight } from "./matchInsightsData";
 
 /**
  * The AI's betting analysis: before the first match of each day of LaLiga or
@@ -32,14 +33,22 @@ export const ANALYSIS_LEAD_MS = 45 * 60_000;
 /** …and is skipped once even the last match of the day is about to start. */
 const LAST_CALL_MS = 10 * 60_000;
 
-export type BetMarket = "1X2" | "DC" | "DNB" | "BTTS" | "OU";
+export type BetMarket = "1X2" | "DC" | "DNB" | "BTTS" | "OU" | "SCORER" | "CARD";
 export const MARKET_SELECTIONS: Record<BetMarket, readonly string[]> = {
   "1X2": ["1", "X", "2"],
   DC: ["1X", "12", "X2"],
   DNB: ["1", "2"],
   BTTS: ["yes", "no"],
   OU: ["over", "under"],
+  SCORER: ["yes"],
+  CARD: ["yes"],
 };
+/**
+ * A player's bet: scores at any time (SCORER) or is booked (CARD). Pinnacle
+ * doesn't price them, so they have no market reference, only the AI's.
+ */
+export const PLAYER_MARKETS: readonly BetMarket[] = ["SCORER", "CARD"];
+export const isPlayerMarket = (market: BetMarket) => PLAYER_MARKETS.includes(market);
 /** Goal lines offered to the AI (half goals: no pushes, easy to read). */
 export const GOAL_LINES = [1.5, 2.5, 3.5] as const;
 export const CONFIDENCE = ["alta", "media", "baja"] as const;
@@ -54,6 +63,8 @@ export interface MarketPrice {
   selection: string;
   /** Goal line (OU only). */
   line?: number;
+  /** The player, as the bookmaker names them (SCORER and CARD only). */
+  player?: string;
   /** Decimal price of `book`. */
   price: number;
   /** The bookmaker of `price` («bet365», «Winamax»…). */
@@ -69,6 +80,8 @@ export interface AnalysisPick {
   market: BetMarket;
   selection: string;
   line?: number;
+  /** The player (SCORER and CARD only). */
+  player?: string;
   /** Price when the analysis was made… */
   price: number;
   /** …at this bookmaker (bet365 when absent). */
@@ -80,6 +93,8 @@ export interface AnalysisPick {
   confidence: Confidence;
   reason: string;
   risk?: string;
+  /** A player's bet as the job settled it from the match report (ESPN). */
+  result?: PickResult;
 }
 export interface AnalysisMatch {
   matchId: string;
@@ -221,8 +236,8 @@ export const isJuicy = (p: Pick<AnalysisPick, "probability" | "price">) =>
 export const marketValue = (p: Pick<AnalysisPick, "fair" | "price">) =>
   p.fair === undefined ? null : edge(p.fair, p.price);
 
-export const pickKey = (p: { matchId: string; market: BetMarket; selection: string; line?: number }) =>
-  `${p.matchId}|${p.market}|${p.selection}|${p.line ?? ""}`;
+export const pickKey = (p: { matchId: string; market: BetMarket; selection: string; line?: number; player?: string }) =>
+  `${p.matchId}|${p.market}|${p.selection}|${p.line ?? ""}${p.player ? `|${p.player}` : ""}`;
 
 const goals = new Intl.NumberFormat("es", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 export const MARKET_NAMES: Record<BetMarket, string> = {
@@ -231,9 +246,11 @@ export const MARKET_NAMES: Record<BetMarket, string> = {
   DNB: "Empate no válido",
   BTTS: "Ambos marcan",
   OU: "Goles",
+  SCORER: "Goleador",
+  CARD: "Tarjeta a jugador",
 };
-/** «Gana el Betis», «Más de 2,5 goles»: the bet in words. */
-export function pickLabel(pick: Pick<AnalysisPick, "market" | "selection" | "line">, home: string, away: string) {
+/** «Gana el Betis», «Más de 2,5 goles», «Marca Lewandowski»: the bet in words. */
+export function pickLabel(pick: Pick<AnalysisPick, "market" | "selection" | "line" | "player">, home: string, away: string) {
   const side = (s: string) => (s === "1" ? home : away);
   switch (pick.market) {
     case "1X2":
@@ -250,16 +267,27 @@ export function pickLabel(pick: Pick<AnalysisPick, "market" | "selection" | "lin
       return pick.selection === "yes" ? "Marcan los dos" : "No marcan los dos";
     case "OU":
       return `${pick.selection === "over" ? "Más" : "Menos"} de ${goals.format(pick.line ?? 0)} goles`;
+    case "SCORER":
+      return `Marca ${pick.player ?? "un jugador"}`;
+    case "CARD":
+      return `Tarjeta para ${pick.player ?? "un jugador"}`;
   }
 }
 
 /* ---------- Results ---------- */
 
 export type PickResult = "won" | "lost" | "void";
-/** Regular time (the official score in the app is always the 90 minutes). */
-export function settlePick(pick: Pick<AnalysisPick, "matchId" | "market" | "selection" | "line">, match: Match | undefined): PickResult | null {
+/**
+ * Regular time (the official score in the app is always the 90 minutes). A
+ * player's bet carries the result the job settled from the match report.
+ */
+export function settlePick(
+  pick: Pick<AnalysisPick, "matchId" | "market" | "selection" | "line" | "result">,
+  match: Match | undefined,
+): PickResult | null {
   if (!match || match.id !== pick.matchId) return null;
   if (["POSTPONED", "CANCELLED", "SUSPENDED"].includes(match.status)) return "void";
+  if (isPlayerMarket(pick.market)) return pick.result ?? null;
   if (!hasPublishedResult(match)) return null;
   const h = match.homeScore!;
   const a = match.awayScore!;
@@ -281,7 +309,63 @@ export function settlePick(pick: Pick<AnalysisPick, "matchId" | "market" | "sele
       if (total === line) return "void";
       return win(pick.selection === "over" ? total > line : total < line);
     }
+    default:
+      return null;
   }
+}
+
+/* ---------- Players' bets, from the match report ---------- */
+
+/** What a player's bet needs from the match report: who scored, who was booked, who played. */
+export interface PlayerFacts {
+  /** Scorers (own goals left out)… */
+  scorers: string[];
+  /** …and whether every goal of the score is there. */
+  goalsComplete: boolean;
+  booked: string[];
+  /** Starters and players brought on; null without line-ups. */
+  played: string[] | null;
+}
+export function playerFacts(insight: Pick<MatchInsight, "goals" | "incidents" | "lineups">, match: Match): PlayerFacts {
+  const goals = insight.goals || [];
+  const incidents = insight.incidents || [];
+  const starters = (insight.lineups || []).flatMap((l) => l.players.filter((p) => p.starter).map((p) => p.name));
+  return {
+    scorers: goals.filter((g) => g.kind !== "own-goal").map((g) => g.scorer),
+    goalsComplete: goals.length === (match.homeScore ?? -1) + (match.awayScore ?? -1),
+    booked: incidents.filter((i) => i.kind !== "substitution").map((i) => i.player),
+    played: starters.length ? [...starters, ...incidents.filter((i) => i.kind === "substitution").map((i) => i.player)] : null,
+  };
+}
+const playerKey = (name: string) =>
+  name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+/** The same player under two spellings: «Vinícius Júnior» and «Vinicius Junior», «R. Lewandowski». */
+export function samePlayer(a: string, b: string) {
+  const x = playerKey(a);
+  const y = playerKey(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const xs = x.split(" ");
+  const ys = y.split(" ");
+  return xs.length > 1 && ys.length > 1 && xs.at(-1) === ys.at(-1) && xs[0][0] === ys[0][0];
+}
+/**
+ * Scores / is booked: won. Didn't, and played: lost. Didn't play: void (as
+ * the bookmakers settle it). Not enough in the report yet: null.
+ */
+export function settlePlayerPick(pick: Pick<AnalysisPick, "market" | "player">, facts: PlayerFacts): PickResult | null {
+  const name = pick.player;
+  if (!name || !isPlayerMarket(pick.market)) return null;
+  const done = pick.market === "SCORER" ? facts.scorers : facts.booked;
+  if (done.some((n) => samePlayer(n, name))) return "won";
+  if (!facts.played || (pick.market === "SCORER" && !facts.goalsComplete)) return null;
+  return facts.played.some((n) => samePlayer(n, name)) ? "lost" : "void";
 }
 
 export interface TrackRecord {
@@ -546,17 +630,19 @@ const probability = (v: unknown): v is number => typeof v === "number" && Number
 const ID = /^[a-zA-Z0-9_-]{1,100}$/;
 const CREST = (v: unknown) => v === undefined || (text(v, 500) && /^https:\/\//.test(v));
 
-export function validMarketChoice(market: unknown, selection: unknown, line: unknown): market is BetMarket {
+export function validMarketChoice(market: unknown, selection: unknown, line: unknown, player?: unknown): market is BetMarket {
   if (typeof market !== "string" || !(market in MARKET_SELECTIONS)) return false;
   if (typeof selection !== "string" || !MARKET_SELECTIONS[market as BetMarket].includes(selection)) return false;
+  if (isPlayerMarket(market as BetMarket) !== (typeof player === "string" && player.trim().length > 0 && player.length <= 60))
+    return false;
   return market === "OU" ? (GOAL_LINES as readonly unknown[]).includes(line) : line === undefined;
 }
 
 function decodePick(raw: unknown, matchIds: Set<string>): AnalysisPick | null {
   if (!isRow(raw)) return null;
-  const { matchId, market, selection, line, price, confidence, reason, risk, fair, book } = raw;
+  const { matchId, market, selection, line, price, confidence, reason, risk, fair, book, player, result } = raw;
   if (typeof matchId !== "string" || !matchIds.has(matchId)) return null;
-  if (!validMarketChoice(market, selection, line ?? undefined)) return null;
+  if (!validMarketChoice(market, selection, line ?? undefined, player ?? undefined)) return null;
   if (!decimalPrice(price) || !probability(raw.probability)) return null;
   if (!(CONFIDENCE as readonly unknown[]).includes(confidence) || !text(reason, 600)) return null;
   return {
@@ -564,6 +650,7 @@ function decodePick(raw: unknown, matchIds: Set<string>): AnalysisPick | null {
     market,
     selection: selection as string,
     ...(market === "OU" ? { line: line as number } : {}),
+    ...(isPlayerMarket(market) ? { player: (player as string).trim() } : {}),
     price,
     ...(text(book, 40) ? { book } : {}),
     probability: raw.probability,
@@ -571,6 +658,7 @@ function decodePick(raw: unknown, matchIds: Set<string>): AnalysisPick | null {
     confidence: confidence as Confidence,
     reason,
     ...(text(risk, 400) ? { risk } : {}),
+    ...(isPlayerMarket(market) && (result === "won" || result === "lost" || result === "void") ? { result } : {}),
   };
 }
 
