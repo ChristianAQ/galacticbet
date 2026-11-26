@@ -5,17 +5,33 @@
  * - goals against: the loss red of each theme, always below the baseline;
  * - muted: context marks, one step off the surface.
  */
+/*
+ * 1 · X · 2 is a diverging split: two hued poles (amber home, blue away)
+ * and a neutral grey draw; the share is printed on each part (amber is under
+ * 3:1 on the light card, so the label is the relief). Validated in both themes.
+ */
 :root {
   --chart-emph: var(--ink);
   --chart-muted: #cfc9b9;
   --chart-against: var(--loss);
   --chart-grid: #e4dfd2;
   --chart-surface: var(--card);
+  --chart-home: #f2a600;
+  --chart-home-ink: #15140f;
+  --chart-draw: #d9d4c7;
+  --chart-draw-ink: #15140f;
+  --chart-away: #257de0;
+  --chart-away-ink: #ffffff;
 }
 :root[data-theme="dark"] {
   --chart-emph: var(--accent);
   --chart-muted: #4a473e;
   --chart-grid: #2c2a24;
+  --chart-home: #d28e05;
+  --chart-draw: #3a3832;
+  --chart-draw-ink: #f1ede2;
+  --chart-away: #338ced;
+  --chart-away-ink: #15140f;
 }
 .chart {
   display: grid;

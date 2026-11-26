@@ -83,6 +83,68 @@ export interface AnalysisMatch {
    * it is, even negative). The «jugosas» are in `picks`.
    */
   pick?: AnalysisPick;
+  /** What the market expects, for the charts. */
+  market?: MatchMarket;
+  /** Websites the AI read for this match (host names only). */
+  sources?: string[];
+}
+
+/** The market's chances for a match, margin removed (0–1). */
+export interface MatchMarket {
+  home: number;
+  draw: number;
+  away: number;
+  /** More than 2.5 goals. */
+  over25?: number;
+  /** Both teams score. */
+  btts?: number;
+  /** Whose prices: «Pinnacle», or the bookmaker's when Pinnacle is missing. */
+  source: string;
+}
+
+const round4 = (n: number) => Math.round(n * 10_000) / 10_000;
+/**
+ * Chances of one market from its prices: Pinnacle's fair ones when it priced
+ * every outcome, otherwise the bookmaker's with its margin removed.
+ */
+function chances(prices: MarketPrice[], market: BetMarket, selections: readonly string[], line?: number) {
+  const own = selections.map((sel) => prices.find((p) => p.market === market && p.selection === sel && p.line === line));
+  if (own.some((p) => !p)) return null;
+  if (own.every((p) => p!.fair !== undefined)) return { values: own.map((p) => p!.fair!), sharp: true };
+  const total = own.reduce((sum, p) => sum + 1 / p!.price, 0);
+  return { values: own.map((p) => round4(1 / p!.price / total)), sharp: false };
+}
+export function marketView(prices: MarketPrice[] | undefined): MatchMarket | null {
+  if (!prices?.length) return null;
+  const result = chances(prices, "1X2", ["1", "X", "2"]);
+  if (!result) return null;
+  const over = chances(prices, "OU", ["over", "under"], 2.5);
+  const btts = chances(prices, "BTTS", ["yes", "no"]);
+  return {
+    home: result.values[0],
+    draw: result.values[1],
+    away: result.values[2],
+    ...(over ? { over25: over.values[0] } : {}),
+    ...(btts ? { btts: btts.values[0] } : {}),
+    source: result.sharp ? "Pinnacle" : prices[0].book ?? "bet365",
+  };
+}
+
+/** Host names only, never links: what the AI read, shown as plain text. */
+export function sourceHosts(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const hosts = value.flatMap((raw) => {
+    if (typeof raw !== "string" || raw.length > 300) return [];
+    let host = raw.trim().toLowerCase();
+    try {
+      if (/^https?:\/\//.test(host)) host = new URL(host).hostname;
+    } catch {
+      return [];
+    }
+    host = host.replace(/^www\./, "").replace(/\/.*$/, "");
+    return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) && host.length <= 80 ? [host] : [];
+  });
+  return [...new Set(hosts)].slice(0, 5);
 }
 export interface BettingAnalysis {
   /** Competition and day in Madrid: `PD-2026-11-28`. */
@@ -315,6 +377,20 @@ function decodePick(raw: unknown, matchIds: Set<string>): AnalysisPick | null {
   };
 }
 
+const chance = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
+function decodeMarket(raw: unknown): MatchMarket | null {
+  if (!isRow(raw) || !chance(raw.home) || !chance(raw.draw) || !chance(raw.away) || !text(raw.source, 40)) return null;
+  if (Math.abs(raw.home + raw.draw + raw.away - 1) > 0.03) return null;
+  return {
+    home: raw.home,
+    draw: raw.draw,
+    away: raw.away,
+    ...(chance(raw.over25) ? { over25: raw.over25 } : {}),
+    ...(chance(raw.btts) ? { btts: raw.btts } : {}),
+    source: raw.source,
+  };
+}
+
 export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
   if (!isRow(raw)) return null;
   const { id, competition, generatedAt, oddsAt, bookmaker, headline, summary } = raw;
@@ -328,6 +404,8 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
     if (!text(m.home, 100) || !text(m.away, 100) || !date(m.utcDate) || !text(m.preview, 600)) return [];
     if (!CREST(m.homeCrest) || !CREST(m.awayCrest)) return [];
     const pick = decodePick(m.pick, new Set([m.matchId]));
+    const market = decodeMarket(m.market);
+    const sources = sourceHosts(m.sources);
     return [
       {
         matchId: m.matchId,
@@ -338,6 +416,8 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
         ...(m.awayCrest ? { awayCrest: m.awayCrest as string } : {}),
         preview: m.preview,
         ...(pick ? { pick } : {}),
+        ...(market ? { market } : {}),
+        ...(sources.length ? { sources } : {}),
       },
     ];
   });

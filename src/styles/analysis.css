@@ -220,52 +220,6 @@
   color: var(--live);
 }
 
-/* Two bars: the AI's chance and the one the price pays. */
-.bet-bars {
-  display: grid;
-  gap: 7px;
-}
-.bet-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 9.6em) minmax(0, 1fr) 3.2em;
-  align-items: center;
-  gap: 10px;
-  font-size: var(--text-xs);
-}
-.bet-bar > span {
-  color: var(--ink-2);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.bet-bar > i {
-  position: relative;
-  height: 8px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: var(--paper-2);
-}
-.bet-bar > i::after {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: calc(var(--p) * 100%);
-  border-radius: inherit;
-  background: var(--ink-3);
-  transform-origin: left;
-  animation: bet-grow 700ms var(--spring-smooth) both;
-}
-.bet-bar.is-ai > i::after {
-  background: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent-line);
-}
-.bet-bar > b {
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-.bet-sharp {
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
 .bet-reason {
   font-size: var(--text-sm);
   line-height: 1.5;
@@ -568,6 +522,431 @@
   font-size: var(--text-sm);
 }
 
+/* ---------- Charts ---------- */
+.bet-chart {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  min-width: 0;
+}
+.bet-chart figcaption,
+.bet-form > .bet-chart-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bet-chart-title {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.bet-chart-note {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 550;
+  text-align: right;
+}
+.bet-chart-note.is-good {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* ¿Quién gana?: one segmented bar, 2px gaps, the share on each part. */
+.bet-outcome {
+  display: flex;
+  gap: 2px;
+  height: 26px;
+}
+.bet-outcome i {
+  display: grid;
+  flex-basis: 0;
+  place-items: center;
+  min-width: 6px;
+  border-radius: 4px;
+  transform-origin: left;
+  animation: bet-grow 700ms var(--spring-smooth) both;
+}
+.bet-outcome b {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 14px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.bet-outcome .is-home {
+  background: var(--chart-home);
+  color: var(--chart-home-ink);
+}
+.bet-outcome .is-draw {
+  background: var(--chart-draw);
+  color: var(--chart-draw-ink);
+}
+.bet-outcome .is-away {
+  background: var(--chart-away);
+  color: var(--chart-away-ink);
+}
+.bet-outcome-legend {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bet-outcome-legend li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 5px;
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.bet-outcome-legend li:nth-child(2) {
+  justify-items: center;
+  text-align: center;
+}
+.bet-outcome-legend li:last-child {
+  text-align: right;
+}
+.bet-outcome-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+.bet-outcome-legend .is-home i {
+  background: var(--chart-home);
+}
+.bet-outcome-legend .is-draw i {
+  background: var(--chart-draw);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+.bet-outcome-legend .is-away i {
+  background: var(--chart-away);
+}
+.bet-outcome-legend span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bet-outcome-legend strong {
+  display: none;
+}
+
+/* Goals: a name, a bar against 100 % with the 50 % tick, the figure. */
+.bet-meter {
+  display: grid;
+  grid-template-columns: minmax(0, 8.4em) minmax(0, 1fr) 3em;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.bet-meter > span:first-child {
+  color: var(--ink-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.bet-meter > strong {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.bet-meter-track,
+.bet-even-track,
+.bet-overview-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+.bet-meter-track i,
+.bet-even-track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--chart-emph);
+  transform-origin: left;
+  animation: bet-grow 700ms var(--spring-smooth) both;
+}
+.bet-even-track em {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--ink-3);
+}
+
+/* ¿Compensa?: the AI's chance and the mark the price needs. */
+.bet-even {
+  display: grid;
+  gap: 7px;
+}
+.bet-even-track {
+  height: 10px;
+}
+.bet-even-track i {
+  background: var(--chart-muted);
+}
+.bet-even.is-pays .bet-even-track i {
+  background: var(--chart-emph);
+}
+.bet-even-track em {
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--ink);
+  box-shadow: 0 0 0 2px var(--chart-surface);
+}
+.bet-best .bet-even-track em {
+  box-shadow: 0 0 0 2px var(--paper-2);
+}
+.bet-best .bet-even-track {
+  background: var(--card);
+}
+.bet-even-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.bet-even-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.bet-even-legend strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.bet-even-legend i {
+  width: 10px;
+  height: 8px;
+  border-radius: 999px;
+}
+.bet-even-legend .is-ai {
+  background: var(--chart-muted);
+}
+.bet-even.is-pays .bet-even-legend .is-ai {
+  background: var(--chart-emph);
+}
+.bet-even-legend .is-need {
+  width: 3px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--ink);
+}
+
+/* Form: two rows of the last five results. */
+.bet-form {
+  display: grid;
+  gap: 5px;
+}
+.bet-form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.bet-form-row > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The day at a glance: value around zero, the «jugosa» line at +3 %. */
+.bet-overview {
+  padding: 12px 14px 10px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.bet-overview-axis {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.bet-overview-axis span:last-child {
+  text-align: right;
+}
+.bet-overview-rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Two lines per match: its name and value, then the bar on the full width. */
+.bet-overview-rows button {
+  display: grid;
+  grid-template-areas:
+    "name value"
+    "track track";
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px 10px;
+  width: 100%;
+  padding: 7px 0 8px;
+  text-align: left;
+  border-radius: var(--r-sm);
+  transition: background-color 160ms ease;
+}
+.bet-overview-rows li + li button {
+  border-top: 1px solid var(--rule);
+}
+.bet-overview-name {
+  grid-area: name;
+}
+.bet-overview-track {
+  grid-area: track;
+}
+.bet-overview-rows strong {
+  grid-area: value;
+}
+.bet-overview-rows button:active {
+  background: var(--paper-2);
+}
+.bet-overview-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bet-overview-track {
+  height: 10px;
+  background: transparent;
+}
+/* Zero, then the «jugosa» line. */
+.bet-overview-track::before,
+.bet-overview-track::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 1px;
+}
+.bet-overview-track::before {
+  left: 50%;
+  background: var(--ink-3);
+}
+.bet-overview-track::after {
+  left: var(--line);
+  border-left: 1px dashed var(--ink-2);
+}
+.bet-overview-track i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  animation: bet-grow 600ms var(--spring-smooth) both;
+}
+.bet-overview-track i.is-up {
+  background: var(--chart-emph);
+  transform-origin: left;
+}
+.bet-overview-track i.is-down {
+  background: var(--chart-against);
+  transform-origin: right;
+}
+.bet-overview-rows strong {
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.bet-overview-rows strong.is-good {
+  color: var(--ink);
+}
+.bet-overview-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.bet-overview-key i {
+  width: 0;
+  height: 12px;
+  border-left: 1px dashed var(--ink-2);
+}
+
+/* ---------- The words, folded: why and where from ---------- */
+.bet-why {
+  border-top: 1px solid var(--rule);
+}
+.bet-why > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+}
+.bet-why > summary::-webkit-details-marker {
+  display: none;
+}
+.bet-why > summary svg {
+  margin-left: auto;
+  color: var(--ink-3);
+  transition: transform var(--spring-smooth-ms) var(--spring-smooth);
+}
+.bet-why[open] > summary svg {
+  transform: rotate(180deg);
+}
+.bet-why-body {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 4px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.bet-why-muted {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.bet-sources {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+  font-size: var(--text-xs);
+}
+.bet-pick .bet-sources,
+.bet-game .bet-sources {
+  background: var(--paper-2);
+}
+.bet-sources > div {
+  display: grid;
+  grid-template-columns: 5.6em minmax(0, 1fr);
+  gap: 8px;
+}
+.bet-sources dt {
+  color: var(--ink-3);
+  font-weight: 650;
+}
+.bet-sources dd {
+  margin: 0;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Responsible gambling ---------- */
 .bet-disclaimer {
   display: flex;
@@ -611,11 +990,17 @@
     transform: scaleX(0);
   }
 }
+.bet-game {
+  scroll-margin-top: calc(var(--nav-height, 56px) + var(--safe-top, 0px) + 12px);
+}
 @media (prefers-reduced-motion: reduce) {
   .bet-pick,
   .bet-game,
   .bet-past-picks,
-  .bet-bar > i::after {
+  .bet-outcome i,
+  .bet-meter-track i,
+  .bet-even-track i,
+  .bet-overview-track i {
     animation: none;
   }
 }

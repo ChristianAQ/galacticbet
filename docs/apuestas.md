@@ -57,6 +57,27 @@ apuestas ni dinero.
    `analysis/football`, un documento público de solo lectura que guarda los
    24 últimos análisis.
 
+## En la app
+
+Lo importante se ve de un vistazo, con gráficas:
+
+- **De un vistazo:** el valor de la mejor opción de cada partido alrededor de
+  cero, con la línea de «jugosa» (+3 %). Tocar un partido lleva a su ficha
+  dentro del análisis.
+- **¿Quién gana?:** las probabilidades de 1, X y 2 sin margen, de Pinnacle o,
+  si no hay, de la casa.
+- **Goles:** probabilidad de más de 2,5 goles y de que marquen los dos.
+- **Forma:** los últimos cinco resultados de cada equipo.
+- **¿Compensa?:** la probabilidad que da la IA frente a la que necesita la
+  cuota para compensar (1 / cuota). Si la barra pasa la marca, paga de más.
+
+El texto queda en segundo plano, plegado en «Por qué y de dónde sale»: la
+previa, el motivo, el riesgo y el origen de cada dato (cuotas, casa y hora;
+resultados oficiales; las webs que leyó la IA, solo el nombre del sitio y sin
+enlace; la hora del análisis). Los colores de 1 · X · 2 (ámbar, gris y azul)
+están validados para daltonismo en los dos temas y son los mismos en Ligas ›
+Datos.
+
 La app resuelve cada apuesta con el resultado oficial a 90 minutos y lleva
 dos historiales a una unidad por apuesta, sin reescribir nada: el de las
 jugosas y el de la mejor opción de cada partido.

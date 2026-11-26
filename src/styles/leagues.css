@@ -550,20 +550,21 @@ tr.is-tappable:active > * {
   font-size: 15px;
   font-weight: 900;
 }
+/* Same validated 1 · X · 2 colours as every chart (charts.css). */
 .outcome-bar .is-home,
 .outcome-legend .is-home .outcome-sign {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--chart-home, #f2a600);
+  color: var(--chart-home-ink, #15140f);
 }
 .outcome-bar .is-draw,
 .outcome-legend .is-draw .outcome-sign {
-  background: var(--ink-3);
-  color: var(--paper);
+  background: var(--chart-draw, #d9d4c7);
+  color: var(--chart-draw-ink, #15140f);
 }
 .outcome-bar .is-away,
 .outcome-legend .is-away .outcome-sign {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--chart-away, #257de0);
+  color: var(--chart-away-ink, #ffffff);
 }
 .outcome-legend {
   display: grid;

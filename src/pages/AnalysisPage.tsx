@@ -23,7 +23,10 @@ import {
 } from "../lib/bettingAnalysis";
 import { competitionName } from "../lib/competitions";
 import type { Match } from "../lib/domain";
+import { BreakEven, GoalChances, OutcomeChances, ValueOverview } from "../components/BetCharts";
+import TeamForm from "../components/TeamForm";
 import { demoAnalysisBoard } from "../lib/demoAnalysis";
+import { prefersReducedMotion } from "../lib/motion";
 import { useAnalysisBoard } from "../lib/useAnalysisBoard";
 import "../styles/analysis.css";
 
@@ -75,31 +78,82 @@ function ResultBadge({ pick, match }: { pick: AnalysisPick; match?: Match }) {
   return null;
 }
 
-/** IA's chance against the one the price implies: the gap is the value. */
-function ValueBars({ pick }: { pick: AnalysisPick }) {
-  const implied = 1 / pick.price;
+/**
+ * Secondary text, folded: the AI's words (preview, reason, risk) and where
+ * every figure comes from.
+ */
+function Why({
+  analysis,
+  game,
+  pick,
+  preview = true,
+}: {
+  analysis: BettingAnalysis;
+  game?: AnalysisMatch;
+  pick?: AnalysisPick;
+  preview?: boolean;
+}) {
+  const book = pick?.book ?? game?.pick?.book ?? analysis.bookmaker;
+  const sharp = game?.market?.source === "Pinnacle" || pick?.fair !== undefined;
   return (
-    <div className="bet-bars" role="img" aria-label={`Estimación de la IA ${pct(pick.probability)}; la cuota paga como si fuera ${pct(implied)}`}>
-      <div className="bet-bar is-ai" style={{ "--p": pick.probability } as CSSProperties}>
-        <span>Estimación IA</span>
-        <i aria-hidden="true" />
-        <b>{pct(pick.probability)}</b>
+    <details className="bet-why">
+      <summary>
+        Por qué y de dónde sale
+        <ChevronDown size={16} aria-hidden="true" />
+      </summary>
+      <div className="bet-why-body">
+        {preview && game?.preview && <p>{game.preview}</p>}
+        {pick && <p>{pick.reason}</p>}
+        {pick?.risk && (
+          <p className="bet-risk">
+            <AlertTriangle size={15} aria-hidden="true" />
+            {pick.risk}
+          </p>
+        )}
+        {pick?.fair !== undefined && (
+          <p className="bet-why-muted">Pinnacle, la casa de referencia, le da un {pct(pick.fair)}.</p>
+        )}
+        <dl className="bet-sources">
+          <div>
+            <dt>Cuotas</dt>
+            <dd>
+              {book}
+              {sharp ? " y Pinnacle (precio justo)" : ""}, vía OddsPapi, a las {hour.format(new Date(analysis.oddsAt))}
+            </dd>
+          </div>
+          <div>
+            <dt>Temporada</dt>
+            <dd>resultados oficiales de Football-Data</dd>
+          </div>
+          {game?.sources?.length ? (
+            <div>
+              <dt>Noticias</dt>
+              <dd>{game.sources.join(" · ")}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt>Análisis</dt>
+            <dd>IA (Claude), {relative(analysis.generatedAt)}</dd>
+          </div>
+        </dl>
       </div>
-      <div className="bet-bar is-price" style={{ "--p": implied } as CSSProperties}>
-        <span>Lo que paga la cuota</span>
-        <i aria-hidden="true" />
-        <b>{pct(implied)}</b>
-      </div>
-      {pick.fair !== undefined && (
-        <p className="bet-sharp">
-          Pinnacle, la casa de referencia, le da un {pct(pick.fair)}
-        </p>
-      )}
-    </div>
+    </details>
   );
 }
 
-function PickCard({ pick, game, match, index }: { pick: AnalysisPick; game?: AnalysisMatch; match?: Match; index: number }) {
+function PickCard({
+  analysis,
+  pick,
+  game,
+  match,
+  index,
+}: {
+  analysis: BettingAnalysis;
+  pick: AnalysisPick;
+  game?: AnalysisMatch;
+  match?: Match;
+  index: number;
+}) {
   const home = game?.home ?? match?.home ?? "Local";
   const away = game?.away ?? match?.away ?? "Visitante";
   return (
@@ -127,14 +181,8 @@ function PickCard({ pick, game, match, index }: { pick: AnalysisPick; game?: Ana
         <span className={`bet-confidence is-${pick.confidence}`}>Confianza {pick.confidence}</span>
         <ResultBadge pick={pick} match={match} />
       </div>
-      <ValueBars pick={pick} />
-      <p className="bet-reason">{pick.reason}</p>
-      {pick.risk && (
-        <p className="bet-risk">
-          <AlertTriangle size={15} aria-hidden="true" />
-          {pick.risk}
-        </p>
-      )}
+      <BreakEven pick={pick} />
+      <Why analysis={analysis} game={game} pick={pick} preview={false} />
     </li>
   );
 }
@@ -151,11 +199,25 @@ function ValueChip({ pick }: { pick: AnalysisPick }) {
   );
 }
 
-/** One match: the preview and, always, the AI's best option for it. */
-function GameCard({ game, match, index, juicy }: { game: AnalysisMatch; match?: Match; index: number; juicy: boolean }) {
+/** One match at a glance: who wins, goals, form and the best option; the words, folded. */
+function GameCard({
+  analysis,
+  game,
+  match,
+  matches,
+  index,
+  juicy,
+}: {
+  analysis: BettingAnalysis;
+  game: AnalysisMatch;
+  match?: Match;
+  matches: Match[];
+  index: number;
+  juicy: boolean;
+}) {
   const pick = game.pick;
   return (
-    <li className="bet-game" style={{ "--i": index } as CSSProperties}>
+    <li className="bet-game" id={`bet-game-${game.matchId}`} style={{ "--i": index } as CSSProperties}>
       <Link to={`/partido/${encodeURIComponent(game.matchId)}`} className="bet-game-head">
         <Crest src={game.homeCrest} />
         <Crest src={game.awayCrest} />
@@ -164,7 +226,21 @@ function GameCard({ game, match, index, juicy }: { game: AnalysisMatch; match?: 
         </strong>
         <time dateTime={game.utcDate}>{hour.format(new Date(game.utcDate))}</time>
       </Link>
-      <p className="bet-game-preview">{game.preview}</p>
+      {game.market && <OutcomeChances market={game.market} home={game.home} away={game.away} />}
+      {game.market && <GoalChances market={game.market} />}
+      {match && (
+        <div className="bet-form">
+          <span className="bet-chart-title">Forma</span>
+          <span className="bet-form-row">
+            <span>{game.home}</span>
+            <TeamForm match={match} side="home" matches={matches} />
+          </span>
+          <span className="bet-form-row">
+            <span>{game.away}</span>
+            <TeamForm match={match} side="away" matches={matches} />
+          </span>
+        </div>
+      )}
       {pick && (
         <div className="bet-best">
           <div className="bet-best-main">
@@ -179,29 +255,37 @@ function GameCard({ game, match, index, juicy }: { game: AnalysisMatch; match?: 
           </div>
           <div className="bet-pick-tags">
             <ValueChip pick={pick} />
-            <span className="bet-confidence is-plain">IA {pct(pick.probability)}</span>
             {juicy ? (
-              <span className="bet-confidence is-plain">Está entre las jugosas, arriba</span>
+              <span className="bet-confidence is-plain">Está entre las jugosas</span>
             ) : (
               <span className={`bet-confidence is-${pick.confidence}`}>Confianza {pick.confidence}</span>
             )}
             <ResultBadge pick={pick} match={match} />
           </div>
-          {!juicy && <p className="bet-reason">{pick.reason}</p>}
-          {!juicy && pick.risk && (
-            <p className="bet-risk">
-              <AlertTriangle size={15} aria-hidden="true" />
-              {pick.risk}
-            </p>
-          )}
+          <BreakEven pick={pick} />
         </div>
       )}
+      <Why analysis={analysis} game={game} pick={juicy ? undefined : pick} />
     </li>
   );
 }
 
-function AnalysisDay({ analysis, byId, latest }: { analysis: BettingAnalysis; byId: Map<string, Match>; latest: boolean }) {
+function AnalysisDay({
+  analysis,
+  byId,
+  matches,
+  latest,
+}: {
+  analysis: BettingAnalysis;
+  byId: Map<string, Match>;
+  matches: Match[];
+  latest: boolean;
+}) {
   const games = new Map(analysis.matches.map((m) => [m.matchId, m]));
+  const open = (matchId: string) =>
+    document
+      .getElementById(`bet-game-${matchId}`)
+      ?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
   return (
     <article className={`bet-day${latest ? " is-latest" : ""}`} aria-labelledby={`bet-${analysis.id}`}>
       <header className="bet-day-head">
@@ -214,6 +298,7 @@ function AnalysisDay({ analysis, byId, latest }: { analysis: BettingAnalysis; by
         </small>
       </header>
       <h2 id={`bet-${analysis.id}`}>{analysis.headline}</h2>
+      <ValueOverview matches={analysis.matches} onOpen={open} />
       <p className="bet-summary">{analysis.summary}</p>
       <h3 className="bet-subhead">
         Las más jugosas <small>{analysis.picks.length || "ninguna hoy"}</small>
@@ -221,7 +306,14 @@ function AnalysisDay({ analysis, byId, latest }: { analysis: BettingAnalysis; by
       {analysis.picks.length ? (
         <ol className="bet-picks">
           {analysis.picks.map((pick, i) => (
-            <PickCard key={pickKey(pick)} pick={pick} game={games.get(pick.matchId)} match={byId.get(pick.matchId)} index={i} />
+            <PickCard
+              key={pickKey(pick)}
+              analysis={analysis}
+              pick={pick}
+              game={games.get(pick.matchId)}
+              match={byId.get(pick.matchId)}
+              index={i}
+            />
           ))}
         </ol>
       ) : (
@@ -237,8 +329,10 @@ function AnalysisDay({ analysis, byId, latest }: { analysis: BettingAnalysis; by
         {analysis.matches.map((m, i) => (
           <GameCard
             key={m.matchId}
+            analysis={analysis}
             game={m}
             match={byId.get(m.matchId)}
+            matches={matches}
             index={i}
             juicy={Boolean(m.pick && analysis.picks.some((p) => pickKey(p) === pickKey(m.pick!)))}
           />
@@ -404,7 +498,7 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
             </p>
           )}
           {latest && fresh ? (
-            <AnalysisDay analysis={latest} byId={byId} latest />
+            <AnalysisDay analysis={latest} byId={byId} matches={matches} latest />
           ) : (
             !latest && (
               <Empty art="net" title="Aún no hay análisis">

@@ -8,6 +8,8 @@ import {
   ANALYSIS_FORMAT,
   CONFIDENCE,
   analysisDays,
+  marketView,
+  sourceHosts,
   MAX_ANALYSES,
   MAX_PICKS,
   MIN_VALUE,
@@ -156,7 +158,7 @@ Reglas:
 - bestPick de cada partido: entre las apuestas a las que das al menos un 40 % de probabilidad, la de mayor valor esperado según tu estimación (aunque sea negativo). Puede coincidir con una de picks. No lo dejes vacío salvo que el partido no tenga cuotas.
 - confidence: "alta", "media" o "baja", según lo sólido de tus motivos.
 - reason: 1 o 2 frases en español con datos concretos (de la temporada o de lo que hayas encontrado). risk: el principal riesgo en una frase.
-- Para cada partido, una previa de 1 o 2 frases (matches). headline: un titular de menos de 90 caracteres. summary: 2 o 3 frases sobre el día.
+- Para cada partido, una previa de 1 o 2 frases (matches) y en sources las direcciones web que hayas leído para ese partido (vacío si ninguna). headline: un titular de menos de 90 caracteres. summary: 2 o 3 frases sobre el día, sin fuentes (van en sources).
 - Tono sobrio de analista: nunca prometas resultados ni animes a apostar.`;
 
 /** Shape the CLI validates the answer against (lengths are enforced afterwards). */
@@ -172,10 +174,11 @@ export const ANALYSIS_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["matchId", "preview", "bestPick"],
+        required: ["matchId", "preview", "bestPick", "sources"],
         properties: {
           matchId: { type: "string" },
           preview: { type: "string" },
+          sources: { type: "array", items: { type: "string" } },
           bestPick: {
             type: ["object", "null"],
             additionalProperties: false,
@@ -271,10 +274,12 @@ export function acceptAnalysis(
   for (const [matchId, list] of prices) for (const p of list) offered.set(pickKey({ ...p, matchId }), p);
   const previews = new Map<string, string>();
   const best = new Map<string, AnalysisPick>();
+  const read = new Map<string, string[]>();
   if (Array.isArray(a.matches))
     for (const m of a.matches)
       if (m && typeof m === "object" && typeof m.matchId === "string") {
         previews.set(m.matchId, clip(m.preview, 360));
+        read.set(m.matchId, sourceHosts(m.sources));
         // The best option of the match: any value, but at least a 40 % chance by the AI's estimate.
         const pick = realPick(m.bestPick, m.matchId, offered);
         if (pick && pick.probability >= 0.4) best.set(m.matchId, pick);
@@ -290,6 +295,8 @@ export function acceptAnalysis(
       ...(m.awayCrest ? { awayCrest: m.awayCrest } : {}),
       preview: previews.get(m.id) || "Sin previa.",
       ...(best.has(m.id) ? { pick: best.get(m.id)! } : {}),
+      ...(marketView(prices.get(m.id)) ? { market: marketView(prices.get(m.id))! } : {}),
+      ...(read.get(m.id)?.length ? { sources: read.get(m.id)! } : {}),
     }));
   if (!matches.length) return null;
   const perMatch = new Map<string, number>();

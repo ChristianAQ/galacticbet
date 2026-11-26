@@ -6,7 +6,9 @@ import {
   dueAnalysisDays,
   edge,
   madridDate,
+  marketView,
   nextAnalysis,
+  sourceHosts,
   pickLabel,
   settlePick,
   trackRecord,
@@ -330,5 +332,67 @@ describe("the job, end to end with fakes", () => {
     expect((await run(kickoff - 40 * 60_000)).generated).toBe(1);
     expect((await run(kickoff - 30 * 60_000)).generated).toBe(0);
     expect(decodeAnalysisBoard(store.get("analysis/football"))!.analyses).toHaveLength(1);
+  });
+});
+
+describe("what the charts read", () => {
+  const book = (over: Partial<MarketPrice>[]) =>
+    over.map((o) => ({ market: "1X2", selection: "1", price: 2, book: "Winamax", ...o }) as MarketPrice);
+  it("takes Pinnacle's fair chances when it priced every outcome, the bookmaker's otherwise", () => {
+    const sharp = marketView(
+      book([
+        { selection: "1", price: 2, fair: 0.4645 },
+        { selection: "X", price: 3.9, fair: 0.2385 },
+        { selection: "2", price: 3.05, fair: 0.297 },
+        { market: "OU", selection: "over", line: 2.5, price: 1.47, fair: 0.6532 },
+        { market: "OU", selection: "under", line: 2.5, price: 2.6, fair: 0.3468 },
+      ]),
+    )!;
+    expect(sharp).toEqual({ home: 0.4645, draw: 0.2385, away: 0.297, over25: 0.6532, source: "Pinnacle" });
+    const soft = marketView(book([{ selection: "1", price: 2 }, { selection: "X", price: 4 }, { selection: "2", price: 4 }]))!;
+    expect(soft.source).toBe("Winamax");
+    expect(soft.home + soft.draw + soft.away).toBeCloseTo(1, 3);
+    expect(soft.home).toBeCloseTo(0.5, 3);
+    expect(marketView(book([{ selection: "1" }]))).toBeNull();
+    expect(marketView(undefined)).toBeNull();
+  });
+
+  it("keeps only plain host names from what the AI read", () => {
+    expect(
+      sourceHosts(["https://www.marca.com/futbol/levante.html", "as.com", "AS.com", "javascript:alert(1)", "http://intranet", "  ", 7]),
+    ).toEqual(["marca.com", "as.com"]);
+    expect(sourceHosts("marca.com")).toEqual([]);
+  });
+
+  it("stores and reads back the market and the sources of a match", () => {
+    const analysis = {
+      id: "PD-2026-11-27",
+      competition: "PD",
+      date: "2026-11-27",
+      generatedAt: "2026-11-26T10:29:33.235Z",
+      oddsAt: "2026-11-26T10:29:33.235Z",
+      bookmaker: "Winamax",
+      headline: "Levante-Santander",
+      summary: "Sin valor claro.",
+      matches: [
+        {
+          matchId: "564765",
+          home: "Levante",
+          away: "Santander",
+          utcDate: "2026-11-27T20:00:00Z",
+          preview: "Partido abierto.",
+          market: { home: 0.4645, draw: 0.2385, away: 0.297, over25: 0.6532, source: "Pinnacle" },
+          sources: ["marca.com"],
+        },
+      ],
+      picks: [],
+    };
+    const board = decodeAnalysisBoard({ formatVersion: ANALYSIS_FORMAT, updatedAt: analysis.generatedAt, analyses: [analysis] })!;
+    expect(board.analyses[0]).toEqual(analysis);
+    // Chances that do not add up are dropped, the rest of the match stays.
+    const broken = { ...analysis, matches: [{ ...analysis.matches[0], market: { home: 0.9, draw: 0.5, away: 0.4, source: "Pinnacle" } }] };
+    const read = decodeAnalysisBoard({ formatVersion: ANALYSIS_FORMAT, updatedAt: analysis.generatedAt, analyses: [broken] })!;
+    expect(read.analyses[0].matches[0].market).toBeUndefined();
+    expect(read.analyses[0].matches[0].preview).toBe("Partido abierto.");
   });
 });

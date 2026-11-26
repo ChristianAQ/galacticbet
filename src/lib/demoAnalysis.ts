@@ -1,4 +1,4 @@
-import type { AnalysisBoard, AnalysisPick } from "./bettingAnalysis";
+import type { AnalysisBoard, AnalysisPick, MatchMarket } from "./bettingAnalysis";
 import { demoMatches } from "./demo";
 
 /**
@@ -7,7 +7,13 @@ import { demoMatches } from "./demo";
  */
 export function demoAnalysisBoard(): AnalysisBoard {
   const [clasico, atleti, derbi] = demoMatches;
-  const game = (m: (typeof demoMatches)[number], preview: string, pick?: AnalysisPick) => ({
+  const game = (
+    m: (typeof demoMatches)[number],
+    preview: string,
+    pick: AnalysisPick,
+    market: MatchMarket,
+    sources: string[],
+  ) => ({
     matchId: m.id,
     home: m.home,
     away: m.away,
@@ -15,7 +21,9 @@ export function demoAnalysisBoard(): AnalysisBoard {
     ...(m.homeCrest ? { homeCrest: m.homeCrest } : {}),
     ...(m.awayCrest ? { awayCrest: m.awayCrest } : {}),
     preview,
-    ...(pick ? { pick } : {}),
+    pick,
+    market,
+    sources,
   });
   const btts: AnalysisPick = {
     matchId: clasico.id,
@@ -55,8 +63,20 @@ export function demoAnalysisBoard(): AnalysisBoard {
         summary:
           "Así se ve un análisis en la demo. Con datos reales, la IA compara cada cuota de bet365 con la probabilidad justa de Pinnacle y con la temporada de cada equipo: destaca las que pagan de más y da la mejor opción de cada partido.",
         matches: [
-          game(clasico, "Los dos llegan con la defensa adelantada y marcan en casi todos sus partidos: todo apunta a un partido abierto.", btts),
-          game(atleti, "El Atleti es muy fiable en casa; el Betis viene de rotar y suma bajas en el centro del campo.", atletiWin),
+          game(
+            clasico,
+            "Los dos llegan con la defensa adelantada y marcan en casi todos sus partidos: todo apunta a un partido abierto.",
+            btts,
+            { home: 0.45, draw: 0.25, away: 0.3, over25: 0.62, btts: 0.6, source: "Pinnacle" },
+            ["marca.com", "as.com"],
+          ),
+          game(
+            atleti,
+            "El Atleti es muy fiable en casa; el Betis viene de rotar y suma bajas en el centro del campo.",
+            atletiWin,
+            { home: 0.5, draw: 0.27, away: 0.23, over25: 0.44, btts: 0.45, source: "Pinnacle" },
+            ["mundodeportivo.com"],
+          ),
           game(derbi, "Derbi vasco igualado y de pocos goles: el mercado lo ve parejo y no hay valor claro.", {
             matchId: derbi.id,
             market: "OU",
@@ -68,7 +88,7 @@ export function demoAnalysisBoard(): AnalysisBoard {
             confidence: "media",
             reason: "Siete de los últimos ocho derbis acabaron con menos de tres goles y los dos llegan con bajas en ataque.",
             risk: "Si hay un gol pronto, el partido puede abrirse.",
-          }),
+          }, { home: 0.38, draw: 0.32, away: 0.3, over25: 0.42, btts: 0.47, source: "Pinnacle" }, []),
         ],
         picks: [btts, atletiWin],
       },
