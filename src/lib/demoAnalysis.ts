@@ -95,8 +95,7 @@ export function demoAnalysisBoard(): AnalysisBoard {
         oddsAt: at,
         bookmaker: "bet365",
         headline: "Ejemplo: goles en el Clásico y un Atleti algo infravalorado",
-        summary:
-          "Así se ve un análisis en la demo. Con datos reales, la IA compara cada cuota de bet365 con la probabilidad justa de Pinnacle y con la temporada de cada equipo: destaca las que pagan de más y da la recomendación de cada partido.",
+        summary: "El Clásico apunta a goles y el Atleti llega fuerte en casa; el derbi vasco, sin valor claro.",
         matches: [
           game(
             clasico,

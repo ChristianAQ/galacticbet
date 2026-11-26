@@ -2,7 +2,6 @@ import type { CSSProperties } from "react";
 import {
   edge,
   hasValue,
-  marketValue,
   MIN_VALUE,
   priceVerdict,
   type AnalysisMatch,
@@ -23,7 +22,6 @@ const signed = (v: number) => {
   return n > 0 ? `+${n} %` : n < 0 ? `−${Math.abs(n)} %` : "0 %";
 };
 const decimal = new Intl.NumberFormat("es", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const euros = new Intl.NumberFormat("es", { style: "currency", currency: "EUR" });
 
 /** «¿Quién gana?»: the market's chances of 1, X and 2 as one segmented bar. */
 export function OutcomeChances({ market, home, away }: { market: MatchMarket; home: string; away: string }) {
@@ -94,12 +92,10 @@ export function GoalChances({ market }: { market: MatchMarket }) {
  */
 export function BreakEven({ pick }: { pick: Pick<AnalysisPick, "price" | "probability" | "fair"> }) {
   const needed = 1 / pick.price;
-  const value = edge(pick.probability, pick.price);
   const pays = pick.probability >= needed;
   const verdict = priceVerdict(pick);
   // Pinnacle's fair chance, when it priced it: where the market puts the bet.
   const fair = pick.fair;
-  const market = marketValue(pick);
   return (
     <figure className="bet-chart">
       <figcaption>
@@ -135,12 +131,6 @@ export function BreakEven({ pick }: { pick: Pick<AnalysisPick, "price" | "probab
           </span>
         </span>
       </div>
-      {/* The value in euros: what 10 € bet many times would bring back on average. */}
-      <p className="bet-even-text">
-        A {decimal.format(pick.price)} hay que acertar {Math.round(needed * 100)} de cada 100 para no perder. Apostada
-        muchas veces, de cada 10 € volverían de media {euros.format(10 * (1 + value))} según la IA
-        {market !== null && <> y {euros.format(10 * (1 + market))} según el mercado</>}.
-      </p>
     </figure>
   );
 }

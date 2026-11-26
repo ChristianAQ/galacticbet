@@ -1,4 +1,16 @@
-import { AlertTriangle, CalendarClock, Check, ChevronDown, Minus, Sparkles, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUp,
+  CalendarClock,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CircleHelp,
+  Minus,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { flushSync } from "react-dom";
 import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import CompetitionLogo from "../components/CompetitionLogo";
@@ -8,7 +20,6 @@ import { Crest, Empty, PageTitle } from "../components/ui";
 import {
   ANALYSIS_COMPETITIONS,
   MARKET_NAMES,
-  MIN_VALUE,
   archivedRecord,
   comboLegs,
   comboOf,
@@ -33,6 +44,7 @@ import type { Match } from "../lib/domain";
 import { BreakEven, GoalChances, OutcomeChances, ValueOverview } from "../components/BetCharts";
 import { ComboCard, ComboPanel, ComboResult, ComboToggle, ValueChip } from "../components/BetCombo";
 import { ConfidenceChip, MatchOptions } from "../components/BetOptions";
+import BetGuide from "../components/BetGuide";
 import TeamForm from "../components/TeamForm";
 import { demoAnalysisBoard } from "../lib/demoAnalysis";
 import { haptic, prefersReducedMotion } from "../lib/motion";
@@ -47,9 +59,6 @@ const shortDay = new Intl.DateTimeFormat("es", { weekday: "short", day: "numeric
 const hour = new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit" });
 const when = new Intl.DateTimeFormat("es", { weekday: "long", hour: "2-digit", minute: "2-digit" });
 const ago = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
-const pct = (p: number) => `${Math.round(p * 100)} %`;
-/** The value threshold as the texts say it. */
-const VALUE_LINE = pct(MIN_VALUE);
 /** The day of an analysis, at noon in Spain so no time zone moves it. */
 const dayOf = (a: BettingAnalysis) => new Date(`${a.date}T12:00:00`);
 
@@ -95,18 +104,20 @@ function ResultBadge({ pick, match }: { pick: AnalysisPick; match?: Match }) {
 
 /**
  * Secondary text, folded: the AI's words (preview, reason, risk) and where
- * every figure comes from.
+ * this match's figures come from. What each figure means is in the guide.
  */
 function Why({
   analysis,
   game,
   pick,
   preview = true,
+  onHelp,
 }: {
   analysis: BettingAnalysis;
   game?: AnalysisMatch;
   pick?: AnalysisPick;
   preview?: boolean;
+  onHelp: () => void;
 }) {
   const book = pick?.book ?? game?.pick?.book ?? analysis.bookmaker;
   const sharp = game?.market?.source === "Pinnacle" || pick?.fair !== undefined;
@@ -125,40 +136,13 @@ function Why({
             {pick.risk}
           </p>
         )}
-        {pick?.fair !== undefined && (
-          <p className="bet-why-muted">Pinnacle, la casa de referencia, le da un {pct(pick.fair)}.</p>
-        )}
-        {pick && (
-          <p className="bet-why-muted">
-            Solidez de los argumentos, según la IA: {pick.confidence}. La confianza de la etiqueta es otra cosa: la
-            probabilidad de ganarla.
-          </p>
-        )}
-        {pick && isPlayerMarket(pick.market) && (
-          <p className="bet-why-muted">
-            Apuesta de jugador: Pinnacle no las cotiza, así que no hay valor «según el mercado», solo la estimación de la
-            IA. Se resuelve con el acta del partido de ESPN (goles, tarjetas, alineaciones y tiros de cada jugador, con la
-            prórroga si la hay); si el jugador no llega a jugar, es nula.
-          </p>
-        )}
         <dl className="bet-sources">
           <div>
             <dt>Cuotas</dt>
             <dd>
               {book}
-              {sharp ? " y Pinnacle (precio justo)" : ""}, vía OddsPapi, a las {hour.format(new Date(analysis.oddsAt))}
+              {sharp ? " y Pinnacle" : ""}, a las {hour.format(new Date(analysis.oddsAt))}
             </dd>
-          </div>
-          <div>
-            <dt>Paga bien / poco</dt>
-            <dd>
-              la cuota frente a la probabilidad que da la IA: +5 % es que, apostada muchas veces, de cada 10 € volverían
-              10,50 €. Paga bien desde +3 % y poco desde −3 %. El mercado es Pinnacle sin su margen
-            </dd>
-          </div>
-          <div>
-            <dt>Temporada</dt>
-            <dd>resultados oficiales de Football-Data</dd>
           </div>
           {game?.sources?.length ? (
             <div>
@@ -166,11 +150,23 @@ function Why({
               <dd>{game.sources.join(" · ")}</dd>
             </div>
           ) : null}
+          {pick && (
+            <div>
+              <dt>Solidez</dt>
+              <dd>
+                {pick.confidence}
+                {isPlayerMarket(pick.market) ? " · apuesta de jugador, sin cuota de Pinnacle" : ""}
+              </dd>
+            </div>
+          )}
           <div>
             <dt>Análisis</dt>
             <dd>IA (Claude), {relative(analysis.generatedAt)}</dd>
           </div>
         </dl>
+        <button type="button" className="text-button bet-why-help" onClick={onHelp}>
+          <CircleHelp size={15} aria-hidden="true" /> Qué significa cada dato
+        </button>
       </div>
     </details>
   );
@@ -183,6 +179,11 @@ interface Slip {
   clear: () => void;
 }
 
+/** Where a bet with value sits on the page (a match can have two). */
+const pickAnchor = (pick: AnalysisPick) => `bet-pick-${pickKey(pick).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+const scrollTo = (id: string) =>
+  document.getElementById(id)?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+
 function PickCard({
   analysis,
   pick,
@@ -190,6 +191,7 @@ function PickCard({
   match,
   index,
   slip,
+  onHelp,
 }: {
   analysis: BettingAnalysis;
   pick: AnalysisPick;
@@ -197,11 +199,12 @@ function PickCard({
   match?: Match;
   index: number;
   slip?: Slip;
+  onHelp: () => void;
 }) {
   const home = game?.home ?? match?.home ?? "Local";
   const away = game?.away ?? match?.away ?? "Visitante";
   return (
-    <li className="bet-pick" style={{ "--i": index } as CSSProperties}>
+    <li className="bet-pick" id={pickAnchor(pick)} style={{ "--i": index } as CSSProperties}>
       <Link className="bet-pick-match" to={`/partido/${encodeURIComponent(pick.matchId)}`}>
         <Crest src={game?.homeCrest} />
         <Crest src={game?.awayCrest} />
@@ -227,12 +230,16 @@ function PickCard({
         {slip && <ComboToggle pick={pick} inSlip={slip.has(pick)} onToggle={slip.toggle} />}
       </div>
       <BreakEven pick={pick} />
-      <Why analysis={analysis} game={game} pick={pick} preview={false} />
+      <Why analysis={analysis} game={game} pick={pick} preview={false} onHelp={onHelp} />
     </li>
   );
 }
 
-/** One match at a glance: who wins, goals, form and the best option; the words, folded. */
+/**
+ * One match, folded to a line: the teams and the recommendation with its
+ * price. Open, the charts, the recommendation in full (or where it already
+ * is, among the bets with value), every price and the words.
+ */
 function GameCard({
   analysis,
   game,
@@ -241,6 +248,9 @@ function GameCard({
   index,
   valued,
   slip,
+  open,
+  onToggle,
+  onHelp,
 }: {
   analysis: BettingAnalysis;
   game: AnalysisMatch;
@@ -249,59 +259,97 @@ function GameCard({
   index: number;
   valued: boolean;
   slip?: Slip;
+  open: boolean;
+  onToggle: () => void;
+  onHelp: () => void;
 }) {
   const pick = game.pick;
+  const bodyId = `bet-game-body-${game.matchId}`;
   return (
-    <li className="bet-game" id={`bet-game-${game.matchId}`} style={{ "--i": index } as CSSProperties}>
-      <Link to={`/partido/${encodeURIComponent(game.matchId)}`} className="bet-game-head">
-        <Crest src={game.homeCrest} />
-        <Crest src={game.awayCrest} />
-        <strong>
-          {game.home} – {game.away}
-        </strong>
-        <time dateTime={game.utcDate}>{hour.format(new Date(game.utcDate))}</time>
-      </Link>
-      {game.market && <OutcomeChances market={game.market} home={game.home} away={game.away} />}
-      {game.market && <GoalChances market={game.market} />}
-      {match && (
-        <div className="bet-form">
-          <span className="bet-chart-title">Forma</span>
-          <span className="bet-form-row">
-            <span>{game.home}</span>
-            <TeamForm match={match} side="home" matches={matches} />
-          </span>
-          <span className="bet-form-row">
-            <span>{game.away}</span>
-            <TeamForm match={match} side="away" matches={matches} />
-          </span>
-        </div>
-      )}
-      {pick && (
-        <div className="bet-best">
-          <div className="bet-best-main">
+    <li className={`bet-game${open ? " is-open" : ""}`} id={`bet-game-${game.matchId}`} style={{ "--i": index } as CSSProperties}>
+      <button type="button" className="bet-game-toggle" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
+        <span className="bet-game-head">
+          <Crest src={game.homeCrest} />
+          <Crest src={game.awayCrest} />
+          <strong>
+            {game.home} – {game.away}
+          </strong>
+          <time dateTime={game.utcDate}>{hour.format(new Date(game.utcDate))}</time>
+          <ChevronDown className="bet-game-chevron" size={18} aria-hidden="true" />
+        </span>
+        {pick && !open && (
+          <span className="bet-game-summary">
             <span>
-              <span className="eyebrow">Recomendación · {MARKET_NAMES[pick.market]}</span>
+              <small>{valued ? "Con valor" : "Recomendación"}</small>
               <strong>{pickLabel(pick, game.home, game.away)}</strong>
             </span>
-            <span className="bet-best-price">
-              <b className="numeral">{odds.format(pick.price)}</b>
-              <small>{pick.book ?? "bet365"}</small>
+            <b className="numeral">{odds.format(pick.price)}</b>
+            <span className="bet-game-summary-tags">
+              <ValueChip pick={pick} />
+              <ResultBadge pick={pick} match={match} />
             </span>
-          </div>
-          <div className="bet-pick-tags">
-            <ValueChip pick={pick} />
-            <ConfidenceChip chance={winChance(pick)} />
-            {valued && <span className="bet-confidence is-plain">Apuesta con valor</span>}
-            <ResultBadge pick={pick} match={match} />
-            {slip && <ComboToggle pick={pick} inSlip={slip.has(pick)} onToggle={slip.toggle} />}
-          </div>
-          <BreakEven pick={pick} />
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="bet-game-body" id={bodyId}>
+          {game.market && <OutcomeChances market={game.market} home={game.home} away={game.away} />}
+          {game.market && <GoalChances market={game.market} />}
+          {match && (
+            <div className="bet-form">
+              <span className="bet-chart-title">Forma</span>
+              <span className="bet-form-row">
+                <span>{game.home}</span>
+                <TeamForm match={match} side="home" matches={matches} />
+              </span>
+              <span className="bet-form-row">
+                <span>{game.away}</span>
+                <TeamForm match={match} side="away" matches={matches} />
+              </span>
+            </div>
+          )}
+          {pick &&
+            (valued ? (
+              // Already in full among the bets with value: a way there, not a copy.
+              <button type="button" className="bet-best-link" onClick={() => scrollTo(pickAnchor(pick))}>
+                <span>
+                  <span className="eyebrow">Con valor</span>
+                  <strong>{pickLabel(pick, game.home, game.away)}</strong>
+                </span>
+                <b className="numeral">{odds.format(pick.price)}</b>
+                <ArrowUp size={18} aria-label="Ver en apuestas con valor" />
+              </button>
+            ) : (
+              <div className="bet-best">
+                <div className="bet-best-main">
+                  <span>
+                    <span className="eyebrow">Recomendación · {MARKET_NAMES[pick.market]}</span>
+                    <strong>{pickLabel(pick, game.home, game.away)}</strong>
+                  </span>
+                  <span className="bet-best-price">
+                    <b className="numeral">{odds.format(pick.price)}</b>
+                    <small>{pick.book ?? "bet365"}</small>
+                  </span>
+                </div>
+                <div className="bet-pick-tags">
+                  <ValueChip pick={pick} />
+                  <ConfidenceChip chance={winChance(pick)} />
+                  <ResultBadge pick={pick} match={match} />
+                  {slip && <ComboToggle pick={pick} inSlip={slip.has(pick)} onToggle={slip.toggle} />}
+                </div>
+                <BreakEven pick={pick} />
+              </div>
+            ))}
+          {game.options?.length ? (
+            <MatchOptions options={game.options} home={game.home} away={game.away} recommended={pick} />
+          ) : null}
+          <Why analysis={analysis} game={game} pick={valued ? undefined : pick} onHelp={onHelp} />
+          <Link to={`/partido/${encodeURIComponent(game.matchId)}`} className="bet-game-link">
+            Ficha del partido
+            <ChevronRight size={16} aria-hidden="true" />
+          </Link>
         </div>
       )}
-      {game.options?.length ? (
-        <MatchOptions options={game.options} home={game.home} away={game.away} recommended={pick} />
-      ) : null}
-      <Why analysis={analysis} game={game} pick={valued ? undefined : pick} />
     </li>
   );
 }
@@ -313,6 +361,7 @@ function AnalysisDay({
   latest,
   slip,
   slipLegs = [],
+  onHelp,
 }: {
   analysis: BettingAnalysis;
   byId: Map<string, Match>;
@@ -320,13 +369,32 @@ function AnalysisDay({
   latest: boolean;
   slip?: Slip;
   slipLegs?: AnalysisPick[];
+  onHelp: () => void;
 }) {
   const games = new Map(analysis.matches.map((m) => [m.matchId, m]));
   const combo = comboLegs(analysis);
-  const open = (matchId: string) =>
-    document
-      .getElementById(`bet-game-${matchId}`)
-      ?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+  // Folded matches: a short list to scan; a single match opens on its own.
+  const [opened, setOpened] = useState<{ id: string; ids: Set<string> }>(() => ({
+    id: analysis.id,
+    ids: new Set(analysis.matches.length === 1 ? [analysis.matches[0].matchId] : []),
+  }));
+  const openIds = opened.id === analysis.id ? opened.ids : new Set<string>();
+  const toggle = (matchId: string) => {
+    const ids = new Set(openIds);
+    if (!ids.delete(matchId)) ids.add(matchId);
+    setOpened({ id: analysis.id, ids });
+  };
+  // From «De un vistazo»: open that match and go to it.
+  const open = (matchId: string) => {
+    flushSync(() => setOpened({ id: analysis.id, ids: new Set(openIds).add(matchId) }));
+    scrollTo(`bet-game-${matchId}`);
+  };
+  const sections = [
+    { id: "bet-sec-valor", label: "Con valor", count: analysis.picks.length },
+    ...(combo.length >= 2 ? [{ id: "bet-sec-combo", label: "Combinada", count: combo.length }] : []),
+    { id: "bet-sec-partidos", label: "Partidos", count: analysis.matches.length },
+    { id: "bet-historial", label: "Historial" },
+  ];
   return (
     <article className={`bet-day${latest ? " is-latest" : ""}`} aria-labelledby={`bet-${analysis.id}`}>
       <header className="bet-day-head">
@@ -339,12 +407,20 @@ function AnalysisDay({
         </small>
       </header>
       <h2 id={`bet-${analysis.id}`}>{analysis.headline}</h2>
+      <nav className="bet-jump" aria-label="Ir a una parte del análisis">
+        {sections.map((section) => (
+          <button key={section.id} type="button" onClick={() => scrollTo(section.id)}>
+            {section.label}
+            {"count" in section && <small>{section.count}</small>}
+          </button>
+        ))}
+      </nav>
       {slip && slipLegs.length > 0 && (
         <ComboPanel legs={slipLegs} games={games} onRemove={slip.toggle} onClear={slip.clear} />
       )}
       <ValueOverview matches={analysis.matches} onOpen={open} />
       <p className="bet-summary">{analysis.summary}</p>
-      <h3 className="bet-subhead">
+      <h3 className="bet-subhead" id="bet-sec-valor">
         Apuestas con valor <small>{analysis.picks.length || "ninguna hoy"}</small>
       </h3>
       {analysis.picks.length ? (
@@ -358,17 +434,19 @@ function AnalysisDay({
               match={byId.get(pick.matchId)}
               index={i}
               slip={slip}
+              onHelp={onHelp}
             />
           ))}
         </ol>
       ) : (
-        <p className="bet-note">
-          Ninguna cuota supera hoy en un {VALUE_LINE} la probabilidad estimada. Debajo, la recomendación de cada partido con su
-          valor real y todas sus cuotas.
-        </p>
+        <p className="bet-note">Hoy ninguna cuota paga bien según la IA. Abajo, la recomendación de cada partido.</p>
       )}
-      {combo.length >= 2 && <ComboCard legs={combo} games={games} byId={byId} />}
-      <h3 className="bet-subhead">
+      {combo.length >= 2 && (
+        <div id="bet-sec-combo" className="bet-anchor">
+          <ComboCard legs={combo} games={games} byId={byId} />
+        </div>
+      )}
+      <h3 className="bet-subhead" id="bet-sec-partidos">
         Partido a partido <small>{analysis.matches.length}</small>
       </h3>
       <ul className="bet-games">
@@ -382,6 +460,9 @@ function AnalysisDay({
             index={i}
             valued={Boolean(m.pick && analysis.picks.some((p) => pickKey(p) === pickKey(m.pick!)))}
             slip={slip}
+            open={openIds.has(m.matchId)}
+            onToggle={() => toggle(m.matchId)}
+            onHelp={onHelp}
           />
         ))}
       </ul>
@@ -514,6 +595,11 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
   const board = demo ? sample : live.board;
   const { loading: boardLoading, error, retry } = live;
   const [filter, setFilter] = useState<Filter>("all");
+  const [guide, setGuide] = useState(false);
+  const help = () => {
+    haptic();
+    setGuide(true);
+  };
   const competitions = useMemo(() => (filter === "all" ? ANALYSIS_COMPETITIONS : [filter]), [filter]);
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
   const analyses = useMemo(
@@ -558,8 +644,14 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
       <PageTitle
         eyebrow="Análisis IA · cuotas de bet365"
         title="Apuestas"
-        description="Antes del primer partido de cada día de LaLiga y Champions, la IA compara las cuotas de bet365 (u otra casa española si bet365 no está al día) con las de Pinnacle y con los datos de la temporada, y señala las que pagan más de lo que deberían."
+        description="Las cuotas que pagan de más según la IA, antes de cada día de LaLiga y Champions."
+        titleControl={
+          <button type="button" className="masthead-search" aria-label="Cómo leer el análisis" onClick={help}>
+            <CircleHelp size={21} strokeWidth={2.3} aria-hidden="true" />
+          </button>
+        }
       />
+      {guide && <BetGuide onClose={() => setGuide(false)} />}
       <Segmented<Filter>
         label="Competición"
         className="bet-filter"
@@ -571,7 +663,7 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
         ]}
         onChange={setFilter}
       />
-      {demo && <p className="bet-note">Ejemplo con los partidos de la demo: el análisis real usa cuotas reales de bet365.</p>}
+      {demo && <p className="bet-note">Ejemplo con los partidos de la demo.</p>}
       {!demo && (boardLoading || (loading && !board)) ? (
         <SkeletonRows rows={3} label="Cargando el análisis" />
       ) : !demo && error ? (
@@ -597,7 +689,16 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
             </p>
           )}
           {latest && fresh ? (
-            <AnalysisDay analysis={latest} byId={byId} matches={matches} latest slip={slip} slipLegs={slipLegs} />
+            <AnalysisDay
+              key={latest.id}
+              analysis={latest}
+              byId={byId}
+              matches={matches}
+              latest
+              slip={slip}
+              slipLegs={slipLegs}
+              onHelp={help}
+            />
           ) : (
             !latest && (
               <Empty art="net" title="Aún no hay análisis">
@@ -606,7 +707,7 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
             )
           )}
           {(analyses.length > 0 || archivedRecord(board?.archive, competitions, "best")) && (
-            <section aria-labelledby="bet-record-title">
+            <section aria-labelledby="bet-record-title" id="bet-historial" className="bet-anchor">
               <div className="section-heading">
                 <h2 id="bet-record-title">Historial</h2>
               </div>

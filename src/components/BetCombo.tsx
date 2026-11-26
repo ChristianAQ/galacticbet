@@ -55,9 +55,6 @@ export function ComboToggle({ pick, inSlip, onToggle }: { pick: AnalysisPick; in
   );
 }
 
-const MARGIN_NOTE =
-  "Las cuotas se multiplican y el margen de la casa también: una combinada solo tiene valor si lo tiene cada apuesta, y se acierta pocas veces.";
-
 /** The legs, the combined price, the real chance of landing it and its value. */
 function ComboSummary({
   legs,
@@ -110,7 +107,6 @@ function ComboSummary({
         <ConfidenceChip chance={winChance(combo)} />
       </div>
       <BreakEven pick={combo} />
-      <p className="bet-combo-note">{MARGIN_NOTE}</p>
     </>
   );
 }

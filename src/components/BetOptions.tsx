@@ -116,11 +116,6 @@ export function MatchOptions({
           {all ? "Ver menos" : `Ver las ${options.length} opciones`}
         </button>
       ) : null}
-      <p className="bet-chart-note">
-        «Mercado»: lo que paga la cuota frente a la probabilidad sin margen {sharp ? "de Pinnacle" : "de la propia casa"},
-        no frente a la de la IA (esa es la de «Paga bien» y «¿Compensa?»). 0 % es lo justo; −5 % quiere decir que,
-        apostada muchas veces, de cada 10 € volverían 9,50 €. Las casas suelen pagar algo por debajo: su margen.
-      </p>
     </figure>
   );
 }

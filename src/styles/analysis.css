@@ -280,8 +280,6 @@
 }
 .bet-game {
   display: grid;
-  gap: 10px;
-  padding: 14px 16px 16px;
   border-radius: var(--r-lg);
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--rule);
@@ -757,12 +755,6 @@
   border-radius: 1px;
   background: var(--ink);
 }
-.bet-even-text {
-  margin-top: 8px;
-  color: var(--ink-2);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
 /* Where the market (Pinnacle, no margin) puts the bet: a dot on the track. */
 .bet-even-track b {
   position: absolute;
@@ -1036,8 +1028,12 @@
     transform: scaleX(0);
   }
 }
-.bet-game {
-  scroll-margin-top: calc(var(--nav-height, 56px) + var(--safe-top, 0px) + 12px);
+/* Jumps land under the bar (and under «Tu combinada» when it is pinned). */
+.bet-game,
+.bet-pick,
+.bet-anchor,
+.bet-subhead[id] {
+  scroll-margin-top: calc(var(--sticky-top) + 68px);
 }
 @media (prefers-reduced-motion: reduce) {
   .bet-pick,
@@ -1324,4 +1320,196 @@
 .bet-options-more {
   justify-self: start;
   min-height: 40px;
+}
+
+/* ---------- Navigation: jump to a part, fold the matches ---------- */
+.bet-jump {
+  display: flex;
+  gap: 6px;
+  margin: 2px calc(-1 * var(--pad-r)) 0 calc(-1 * var(--pad-l));
+  padding: 2px var(--pad-r) 4px var(--pad-l);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+/* More to the right: the row fades out at the edge while it can scroll. */
+.bet-jump {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+.bet-jump::-webkit-scrollbar {
+  display: none;
+}
+.bet-jump button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+  transition:
+    transform 160ms var(--press),
+    background-color 160ms ease;
+}
+.bet-jump button:active {
+  transform: scale(0.95);
+  background: var(--paper-3);
+}
+.bet-jump small {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+
+/* A match folded to one line; the whole head opens it. */
+.bet-game-toggle {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: inherit;
+  text-align: left;
+  transition: background-color 160ms ease;
+}
+.bet-game-toggle:active {
+  background: var(--paper-2);
+}
+.bet-game.is-open .bet-game-toggle {
+  padding-bottom: 8px;
+}
+.bet-game-chevron {
+  flex-shrink: 0;
+  margin-left: 4px;
+  color: var(--ink-3);
+  transition: transform var(--spring-smooth-ms) var(--spring-smooth);
+}
+.bet-game.is-open .bet-game-chevron {
+  transform: rotate(180deg);
+}
+.bet-game-summary {
+  display: grid;
+  grid-template-areas:
+    "bet price"
+    "tags tags";
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+}
+.bet-game-summary > span:first-child {
+  display: grid;
+  grid-area: bet;
+  gap: 3px;
+  min-width: 0;
+}
+.bet-game-summary small {
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.bet-game-summary strong,
+.bet-best-link strong {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-condensed);
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.bet-game-summary > b {
+  grid-area: price;
+  font-size: 26px;
+}
+.bet-game-summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  grid-area: tags;
+  gap: 6px;
+}
+.bet-game-summary .bet-value.is-flat,
+.bet-game-summary .bet-result:not(.is-won):not(.is-lost) {
+  background: var(--card);
+}
+.bet-game-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 14px;
+  animation: bet-in 320ms var(--spring-smooth) both;
+}
+/* The recommendation that is already above, among the bets with value. */
+.bet-best-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  text-align: left;
+  transition: transform 160ms var(--press);
+}
+.bet-best-link:active {
+  transform: scale(0.98);
+}
+.bet-best-link > span {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+.bet-best-link > b {
+  font-size: 26px;
+}
+.bet-best-link > svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.bet-game-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 4px;
+  min-height: 40px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.bet-why-help {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+
+/* ---------- The guide: every explanation, once ---------- */
+.bet-guide-list {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+.bet-guide-list dt {
+  margin-bottom: 3px;
+  font-size: var(--text-md);
+  font-weight: 750;
+}
+.bet-guide-list dd {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bet-game-body {
+    animation: none;
+  }
 }

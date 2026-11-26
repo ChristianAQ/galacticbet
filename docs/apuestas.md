@@ -128,6 +128,13 @@ Lo importante se ve de un vistazo, con gráficas:
   IA. «Paga bien · +5 %» desde +3 % (de cada 10 €, volverían 10,50 € de
   media), «Paga lo justo» entre −2 % y +2 % y «Paga poco · −4 %» desde −3 %.
 
+Para moverse: bajo el titular, accesos a «Con valor», «Combinada»,
+«Partidos» e «Historial». Cada partido aparece plegado en una línea (su
+recomendación, cuota y valor); al tocarlo se abre con sus gráficas, todas
+sus cuotas y el «Por qué». Si su recomendación ya está entre las apuestas
+con valor, no se repite: un acceso lleva hasta ella. Lo que significa cada
+dato está una sola vez, en «Cómo leer el análisis» (el «?» de arriba).
+
 El texto queda en segundo plano, plegado en «Por qué y de dónde sale»: la
 previa, el motivo, el riesgo y el origen de cada dato (cuotas, casa y hora;
 resultados oficiales; las webs que leyó la IA, solo el nombre del sitio y sin
