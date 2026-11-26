@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SourceTag } from "./BetCharts";
 import {
   confidenceOf,
   optionValue,
@@ -72,8 +73,10 @@ export function MatchOptions({
   return (
     <figure className="bet-chart bet-options">
       <figcaption>
-        <span className="bet-chart-title">Cuotas del partido</span>
-        <span className="bet-chart-note">{sharp ? "probabilidad según Pinnacle" : "probabilidad sin margen"}</span>
+        <span className="bet-chart-title">
+          Cuotas del partido <SourceTag kind="datos" />
+        </span>
+        <span className="bet-chart-note">{sharp ? "según Pinnacle" : "sin margen"}</span>
       </figcaption>
       <table className="bet-options-table">
         <thead>

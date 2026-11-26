@@ -1,3 +1,4 @@
+import { Database, Sparkles } from "lucide-react";
 import type { CSSProperties } from "react";
 import {
   edge,
@@ -23,6 +24,24 @@ const signed = (v: number) => {
 };
 const decimal = new Intl.NumberFormat("es", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/**
+ * Who made a figure: «IA» (the AI's estimate, choice or words) or «Datos»
+ * (real prices, the market and official results). Every block says it.
+ */
+export function SourceTag({ kind }: { kind: "ia" | "datos" }) {
+  return kind === "ia" ? (
+    <span className="bet-tag is-ia" title="Lo ha hecho la IA: estimación, elección o texto">
+      <Sparkles size={11} strokeWidth={2.6} aria-hidden="true" />
+      IA
+    </span>
+  ) : (
+    <span className="bet-tag is-data" title="Datos reales: cuotas, mercado o resultados oficiales">
+      <Database size={11} strokeWidth={2.6} aria-hidden="true" />
+      Datos
+    </span>
+  );
+}
+
 /** «¿Quién gana?»: the market's chances of 1, X and 2 as one segmented bar. */
 export function OutcomeChances({ market, home, away }: { market: MatchMarket; home: string; away: string }) {
   const parts = [
@@ -33,7 +52,9 @@ export function OutcomeChances({ market, home, away }: { market: MatchMarket; ho
   return (
     <figure className="bet-chart">
       <figcaption>
-        <span className="bet-chart-title">¿Quién gana?</span>
+        <span className="bet-chart-title">
+          ¿Quién gana? <SourceTag kind="datos" />
+        </span>
         <span className="bet-chart-note">según {market.source}</span>
       </figcaption>
       <div
@@ -70,7 +91,9 @@ export function GoalChances({ market }: { market: MatchMarket }) {
   return (
     <figure className="bet-chart">
       <figcaption>
-        <span className="bet-chart-title">Goles</span>
+        <span className="bet-chart-title">
+          Goles <SourceTag kind="datos" />
+        </span>
         <span className="bet-chart-note">probabilidad</span>
       </figcaption>
       {rows.map((r) => (
@@ -99,7 +122,9 @@ export function BreakEven({ pick }: { pick: Pick<AnalysisPick, "price" | "probab
   return (
     <figure className="bet-chart">
       <figcaption>
-        <span className="bet-chart-title">¿Compensa?</span>
+        <span className="bet-chart-title">
+          ¿Compensa? <SourceTag kind="ia" />
+        </span>
         <span className={`bet-chart-note${verdict === "good" ? " is-good" : ""}`}>
           {verdict === "good" ? "Sí, paga bien" : verdict === "fair" ? "Más o menos" : "No, paga poco"}
         </span>
@@ -149,7 +174,9 @@ export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; o
   return (
     <figure className="bet-chart bet-overview">
       <figcaption>
-        <span className="bet-chart-title">De un vistazo: cuánto paga cada recomendación</span>
+        <span className="bet-chart-title">
+          Valor de cada recomendación <SourceTag kind="ia" />
+        </span>
         <span className={`bet-chart-note${valued ? " is-good" : ""}`}>
           {valued ? `${valued} ${valued === 1 ? "paga" : "pagan"} bien` : "ninguna paga bien"}
         </span>

@@ -1,26 +1,35 @@
 name: AI betting analysis
 on:
+  # GitHub runs schedules hours late on busy days, so the job does not rely
+  # on them: it waits for the right minute itself (automatic mode) and starts
+  # again on its own when the next match day is close. Any finished sync or
+  # deploy also starts it, and so does this light schedule.
   schedule:
-    # Every ten minutes while matches can be close (08:00–22:00 UTC). The job
-    # exits in seconds unless a LaLiga or Champions day starts within 45 min.
-    - cron: "6-56/10 8-21 * * *"
+    - cron: "23 */3 * * *"
       timezone: "UTC"
+  workflow_run:
+    workflows: ["Synchronize football and standings", "Update live football scores", "Deploy frontend"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       modo:
-        description: "prueba: cuotas y datos sin IA ni guardar · completo: análisis del próximo día ya, con IA, y se publica"
+        description: "automático: espera a la hora y lo hace · prueba: cuotas y datos sin IA ni guardar · completo: análisis del próximo día ya"
         type: choice
-        options: [prueba, completo]
-        default: prueba
+        options: [automatico, prueba, completo]
+        default: automatico
 permissions:
   contents: read
+  # To start itself again while it waits for the next match day.
+  actions: write
 concurrency:
-  group: betting-analysis
+  # One automatic job at a time (it may be waiting); manual tests never queue behind it.
+  group: betting-analysis-${{ github.event_name == 'workflow_dispatch' && inputs.modo != 'automatico' && 'manual' || 'auto' }}
   cancel-in-progress: false
 jobs:
   analysis:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Up to 5 h 15 min of waiting, then the analysis itself.
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,7 +37,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run analysis
+      - id: analysis
+        run: npm run analysis
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           # The OddsPapi key (bet365 and Pinnacle prices).
@@ -38,3 +48,9 @@ jobs:
           CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
           ANALYSIS_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'prueba' }}
           ANALYSIS_FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'completo' }}
+          ANALYSIS_WAIT: ${{ github.event_name != 'workflow_dispatch' || inputs.modo == 'automatico' }}
+      - name: Keep waiting for the next match day
+        if: steps.analysis.outputs.chain == 'true'
+        run: gh workflow run analysis.yml --ref "${{ github.ref_name }}" -f modo=automatico
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -9,6 +9,7 @@ import {
   CONFIDENCE,
   analysedDays,
   analysisDays,
+  nextDueAt,
   archiveAnalyses,
   hasValue,
   valueCombo,
@@ -457,6 +458,28 @@ export interface ClaudeAnswer {
   output: unknown;
   turns?: number;
   durationMs?: number;
+  /** The model that did most of the work, and the web searches it made. */
+  model?: string;
+  searches?: number;
+}
+
+/** Model and web searches from Claude Code's result (`modelUsage`, `usage`). */
+export function runDetails(result: Record<string, unknown>): { model?: string; searches?: number } {
+  const usage = (result.modelUsage && typeof result.modelUsage === "object" ? result.modelUsage : {}) as Record<
+    string,
+    Record<string, unknown>
+  >;
+  const models = Object.entries(usage).filter(([id]) => /^[a-z0-9][a-z0-9.-]{1,79}$/.test(id));
+  models.sort(([, a], [, b]) => (Number(b?.outputTokens) || 0) - (Number(a?.outputTokens) || 0));
+  const server = (result.usage as { server_tool_use?: { web_search_requests?: unknown } } | undefined)?.server_tool_use;
+  const fromUsage = Number(server?.web_search_requests);
+  const fromModels = models.reduce((sum, [, m]) => sum + (Number(m?.webSearchRequests) || 0), 0);
+  // No usage at all: unknown, not «0 searches».
+  const searches = Number.isFinite(fromUsage) ? fromUsage : models.length ? fromModels : undefined;
+  return {
+    ...(models[0] ? { model: models[0][0] } : {}),
+    ...(searches !== undefined && Number.isInteger(searches) && searches >= 0 ? { searches } : {}),
+  };
 }
 export type ClaudeRunner = (prompt: string) => Promise<ClaudeAnswer>;
 
@@ -559,6 +582,7 @@ export function claudeCodeRunner(options: { token: string; model?: string; timeo
         output,
         turns: typeof result.num_turns === "number" ? result.num_turns : undefined,
         durationMs: typeof result.duration_ms === "number" ? result.duration_ms : undefined,
+        ...runDetails(result),
       };
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -681,6 +705,13 @@ export interface AnalysisOptions {
   matches?: Match[];
 }
 
+/** The next analysis to wait for (from the calendar and what is already published). */
+export async function planNextAnalysis(db: Firestore, now: number) {
+  const matches = await readCalendars(db, now);
+  const board = decodeAnalysisBoard((await db.doc(ANALYSIS_DOC).get()).data());
+  return nextDueAt(matches, now, analysedDays(matches, board?.analyses ?? [], EARLY_MS));
+}
+
 export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions) {
   const now = options.now ?? Date.now();
   // The clock of this run: `now` plus the time spent (the AI takes minutes).
@@ -769,11 +800,18 @@ export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions
       continue;
     }
     // Matches already started keep what was published for them.
-    const analysis = mergeAnalysis(
+    const merged = mergeAnalysis(
       analyses.find((a) => a.id === accepted.id),
       accepted,
       clock(),
     );
+    // How the AI ran, for the report's technical sheet.
+    const run = {
+      ...(answer.model ? { model: answer.model } : {}),
+      ...(answer.searches !== undefined ? { searches: answer.searches } : {}),
+      ...(answer.durationMs !== undefined ? { seconds: Math.round(answer.durationMs / 1000) } : {}),
+    };
+    const analysis = Object.keys(run).length ? { ...merged, ai: run } : merged;
     const all = [analysis, ...analyses.filter((a) => a.id !== analysis.id)];
     // What leaves the board is counted in the archive first: the record never forgets a pick.
     const dropped = all.slice(MAX_ANALYSES);

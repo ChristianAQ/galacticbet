@@ -24,6 +24,7 @@ import {
   comboLegs,
   comboOf,
   isPlayerMarket,
+  modelName,
   winChance,
   nextAnalysis,
   pickKey,
@@ -41,7 +42,7 @@ import {
 } from "../lib/bettingAnalysis";
 import { competitionName } from "../lib/competitions";
 import type { Match } from "../lib/domain";
-import { BreakEven, GoalChances, OutcomeChances, ValueOverview } from "../components/BetCharts";
+import { BreakEven, GoalChances, OutcomeChances, SourceTag, ValueOverview } from "../components/BetCharts";
 import { ComboCard, ComboPanel, ComboResult, ComboToggle, ValueChip } from "../components/BetCombo";
 import { ConfidenceChip, MatchOptions } from "../components/BetOptions";
 import BetGuide from "../components/BetGuide";
@@ -58,6 +59,7 @@ const day = new Intl.DateTimeFormat("es", { weekday: "long", day: "numeric", mon
 const shortDay = new Intl.DateTimeFormat("es", { weekday: "short", day: "numeric", month: "short" });
 const hour = new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit" });
 const when = new Intl.DateTimeFormat("es", { weekday: "long", hour: "2-digit", minute: "2-digit" });
+const stamp = new Intl.DateTimeFormat("es", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const ago = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
 /** The day of an analysis, at noon in Spain so no time zone moves it. */
 const dayOf = (a: BettingAnalysis) => new Date(`${a.date}T12:00:00`);
@@ -120,7 +122,7 @@ function Why({
   onHelp: () => void;
 }) {
   const book = pick?.book ?? game?.pick?.book ?? analysis.bookmaker;
-  const sharp = game?.market?.source === "Pinnacle" || pick?.fair !== undefined;
+  const words = [preview && game?.preview, pick?.reason].filter(Boolean) as string[];
   return (
     <details className="bet-why">
       <summary>
@@ -128,25 +130,33 @@ function Why({
         <ChevronDown size={16} aria-hidden="true" />
       </summary>
       <div className="bet-why-body">
-        {preview && game?.preview && <p>{game.preview}</p>}
-        {pick && <p>{pick.reason}</p>}
-        {pick?.risk && (
-          <p className="bet-risk">
-            <AlertTriangle size={15} aria-hidden="true" />
-            {pick.risk}
-          </p>
+        {(words.length > 0 || pick?.risk) && (
+          <div className="bet-why-ai">
+            <span className="bet-why-label">
+              Según la IA <SourceTag kind="ia" />
+            </span>
+            {words.map((w) => (
+              <p key={w}>{w}</p>
+            ))}
+            {pick?.risk && (
+              <p className="bet-risk">
+                <AlertTriangle size={15} aria-hidden="true" />
+                {pick.risk}
+              </p>
+            )}
+          </div>
         )}
         <dl className="bet-sources">
           <div>
             <dt>Cuotas</dt>
             <dd>
               {book}
-              {sharp ? " y Pinnacle" : ""}, a las {hour.format(new Date(analysis.oddsAt))}
+              {game?.market?.source === "Pinnacle" || pick?.fair !== undefined ? "; mercado, Pinnacle" : ""}
             </dd>
           </div>
           {game?.sources?.length ? (
             <div>
-              <dt>Noticias</dt>
+              <dt>Leído por la IA</dt>
               <dd>{game.sources.join(" · ")}</dd>
             </div>
           ) : null}
@@ -159,14 +169,79 @@ function Why({
               </dd>
             </div>
           )}
-          <div>
-            <dt>Análisis</dt>
-            <dd>IA (Claude), {relative(analysis.generatedAt)}</dd>
-          </div>
         </dl>
         <button type="button" className="text-button bet-why-help" onClick={onHelp}>
           <CircleHelp size={15} aria-hidden="true" /> Qué significa cada dato
         </button>
+      </div>
+    </details>
+  );
+}
+
+/**
+ * «Ficha técnica»: that the report is the AI's, which model, when, with
+ * what. Folded to one line; the details on demand.
+ */
+function ReportSheet({ analysis }: { analysis: BettingAnalysis }) {
+  const ai = analysis.ai;
+  const model = ai?.model ? modelName(ai.model) : "Claude";
+  const options = analysis.matches.reduce((n, m) => n + (m.options?.length ?? 0), 0);
+  const sharp = analysis.matches.some((m) => m.market?.source === "Pinnacle");
+  const work = [
+    ai?.searches !== undefined && `${ai.searches} ${ai.searches === 1 ? "búsqueda web" : "búsquedas web"}`,
+    ai?.seconds !== undefined && `${ai.seconds} s`,
+  ].filter(Boolean);
+  return (
+    <details className="bet-sheet">
+      <summary>
+        <SourceTag kind="ia" />
+        <span>
+          Informe elaborado por IA · <b>{model}</b>
+        </span>
+        <ChevronDown size={16} aria-hidden="true" />
+      </summary>
+      <div className="bet-sheet-body">
+        <p>
+          La IA estima la probabilidad de cada apuesta, elige las recomendaciones y escribe los textos: lo verás marcado
+          con <SourceTag kind="ia" />. Las cuotas, el mercado y las estadísticas son datos reales: <SourceTag kind="datos" />.
+        </p>
+        <dl>
+          <div>
+            <dt>Modelo</dt>
+            <dd>
+              {model}
+              {work.length ? ` · ${work.join(" · ")}` : ""}
+            </dd>
+          </div>
+          <div>
+            <dt>Hecho</dt>
+            <dd>
+              {stamp.format(new Date(analysis.generatedAt))} ({relative(analysis.generatedAt)})
+            </dd>
+          </div>
+          <div>
+            <dt>Cuotas</dt>
+            <dd>
+              {analysis.bookmaker}, a las {hour.format(new Date(analysis.oddsAt))}
+              {/bet365/i.test(analysis.bookmaker) ? "" : " (bet365 no estaba al día)"}
+            </dd>
+          </div>
+          <div>
+            <dt>Mercado</dt>
+            <dd>{sharp ? "Pinnacle, sin su margen" : "sin Pinnacle: la propia casa, sin su margen"}</dd>
+          </div>
+          <div>
+            <dt>Estadísticas</dt>
+            <dd>resultados oficiales de Football-Data</dd>
+          </div>
+          <div>
+            <dt>Alcance</dt>
+            <dd>
+              {analysis.matches.length} {analysis.matches.length === 1 ? "partido" : "partidos"}
+              {options ? ` · ${options} cuotas evaluadas` : ""}
+            </dd>
+          </div>
+        </dl>
       </div>
     </details>
   );
@@ -280,7 +355,9 @@ function GameCard({
         {pick && !open && (
           <span className="bet-game-summary">
             <span>
-              <small>{valued ? "Con valor" : "Recomendación"}</small>
+              <small>
+                {valued ? "Con valor" : "Recomendación"} <SourceTag kind="ia" />
+              </small>
               <strong>{pickLabel(pick, game.home, game.away)}</strong>
             </span>
             <b className="numeral">{odds.format(pick.price)}</b>
@@ -297,7 +374,9 @@ function GameCard({
           {game.market && <GoalChances market={game.market} />}
           {match && (
             <div className="bet-form">
-              <span className="bet-chart-title">Forma</span>
+              <span className="bet-chart-title">
+                Forma <SourceTag kind="datos" />
+              </span>
               <span className="bet-form-row">
                 <span>{game.home}</span>
                 <TeamForm match={match} side="home" matches={matches} />
@@ -323,7 +402,7 @@ function GameCard({
               <div className="bet-best">
                 <div className="bet-best-main">
                   <span>
-                    <span className="eyebrow">Recomendación · {MARKET_NAMES[pick.market]}</span>
+                    <span className="eyebrow">Recomendación IA · {MARKET_NAMES[pick.market]}</span>
                     <strong>{pickLabel(pick, game.home, game.away)}</strong>
                   </span>
                   <span className="bet-best-price">
@@ -407,6 +486,10 @@ function AnalysisDay({
         </small>
       </header>
       <h2 id={`bet-${analysis.id}`}>{analysis.headline}</h2>
+      <p className="bet-summary">
+        <SourceTag kind="ia" /> {analysis.summary}
+      </p>
+      <ReportSheet analysis={analysis} />
       <nav className="bet-jump" aria-label="Ir a una parte del análisis">
         {sections.map((section) => (
           <button key={section.id} type="button" onClick={() => scrollTo(section.id)}>
@@ -419,9 +502,8 @@ function AnalysisDay({
         <ComboPanel legs={slipLegs} games={games} onRemove={slip.toggle} onClear={slip.clear} />
       )}
       <ValueOverview matches={analysis.matches} onOpen={open} />
-      <p className="bet-summary">{analysis.summary}</p>
       <h3 className="bet-subhead" id="bet-sec-valor">
-        Apuestas con valor <small>{analysis.picks.length || "ninguna hoy"}</small>
+        Apuestas con valor <SourceTag kind="ia" /> <small>{analysis.picks.length || "ninguna hoy"}</small>
       </h3>
       {analysis.picks.length ? (
         <ol className="bet-picks">
@@ -642,9 +724,9 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
   return (
     <>
       <PageTitle
-        eyebrow="Análisis IA · cuotas de bet365"
+        eyebrow="Análisis con IA"
         title="Apuestas"
-        description="Las cuotas que pagan de más según la IA, antes de cada día de LaLiga y Champions."
+        description="Informe previo a cada día de LaLiga y Champions: las cuotas que pagan de más según la IA, con el mercado y los datos al lado."
         titleControl={
           <button type="button" className="masthead-search" aria-label="Cómo leer el análisis" onClick={help}>
             <CircleHelp size={21} strokeWidth={2.3} aria-hidden="true" />

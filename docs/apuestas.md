@@ -9,16 +9,23 @@ no gestiona apuestas ni dinero.
 
 ## Cómo funciona
 
-1. **Cuándo.** El workflow `AI betting analysis` se ejecuta cada diez
-   minutos entre las 08:00 y las 22:00 UTC. Sale en segundos salvo que el
-   primer partido aún por jugar de un día de LaLiga o Champions empiece en
-   menos de 45 minutos. El análisis llega así entre 35 y 45 minutos antes. Si
-   GitHub se salta esa ventana, se hace antes del siguiente partido de ese
-   día. Hay un análisis por competición y día en hora de España
-   (`PD-2026-11-28`), y se hace una sola vez: cuenta como hecho desde 3 horas
-   antes del primer partido del día, aunque ese partido ya haya empezado. Si
-   un análisis se rehace (uno manual de mucho antes), los partidos que ya han
-   empezado conservan lo que se publicó y siguen contando en el historial.
+1. **Cuándo.** El análisis se hace 45 minutos antes del primer partido aún
+   por jugar de cada día de LaLiga o Champions, y llega entre 35 y 45 minutos
+   antes. Hay uno por competición y día en hora de España (`PD-2026-11-28`).
+   GitHub ejecuta las tareas programadas con horas de retraso, o no las ejecuta,
+   en días de mucha carga: el 26/11/2026 las de cada 10 minutos solo corrían unas
+   3 veces al día. Por eso el workflow `AI betting analysis` no depende de su
+   horario:
+   - en modo automático calcula cuándo toca el próximo análisis, espera dentro
+     del propio job hasta esa hora (hasta 5 h 15 min) y lo hace;
+   - si falta más y el día de partidos está a menos de 18 horas, espera ese tiempo
+     y se vuelve a lanzar él mismo (`gh workflow run`, con el permiso
+     `actions: write` del propio workflow);
+   - también arranca al terminar cualquier sincronización o despliegue
+     (`workflow_run`) y con un horario ligero cada 3 horas.
+
+   Si GitHub se salta la ventana, el análisis se hace antes del siguiente
+   partido de ese día.
 2. **Cuotas.** OddsPapi (plan gratuito, 250 peticiones al mes). Cada análisis
    hace una petición con los partidos del día (para emparejar los nombres) y
    otra por partido. Cada una de estas trae a la vez bet365, varias casas con
@@ -93,6 +100,17 @@ no gestiona apuestas ni dinero.
    cuotas es la de su lectura, no la de la respuesta de la IA. El resultado se
    publica en `analysis/football`, un documento público de solo lectura con
    los 24 últimos análisis y, en `archive`, los totales de los anteriores.
+
+## IA y datos, siempre separados
+
+Cada bloque lleva una etiqueta: **IA** si lo ha hecho la IA (la probabilidad
+estimada, el valor que sale de ella, las recomendaciones y los textos) o
+**Datos** si son datos reales (cuotas, el mercado de Pinnacle, la forma y los
+resultados oficiales). Bajo el titular, la **ficha técnica** («Informe elaborado
+por IA») dice el modelo de Claude que lo hizo, las búsquedas web que hizo y
+cuánto tardó (lo que devuelve Claude Code en `modelUsage` y `usage`, guardado en
+`ai` del análisis), la hora del análisis y de las cuotas, la casa, el mercado de
+referencia, la fuente de las estadísticas y cuántas cuotas se evaluaron.
 
 ## En la app
 

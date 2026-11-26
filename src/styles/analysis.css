@@ -1513,3 +1513,142 @@
     animation: none;
   }
 }
+
+/* ---------- Who made each figure: «IA» or «Datos» ---------- */
+.bet-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-family: var(--font-text);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+.bet-tag.is-ia {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.bet-tag.is-data {
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  color: var(--ink-2);
+}
+.bet-chart-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.bet-form > .bet-chart-title {
+  justify-content: flex-start;
+}
+/* The title keeps its line; the short note gives way on narrow phones. */
+.bet-chart figcaption .bet-chart-title {
+  white-space: nowrap;
+}
+.bet-subhead .bet-tag {
+  align-self: center;
+}
+.bet-summary .bet-tag {
+  margin-right: 2px;
+}
+.bet-game-summary small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- «Ficha técnica»: the report is the AI's, with what and when ---------- */
+.bet-sheet {
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.bet-sheet > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  list-style: none;
+}
+.bet-sheet > summary::-webkit-details-marker {
+  display: none;
+}
+.bet-sheet > summary > span:not(.bet-tag) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bet-sheet > summary b {
+  color: var(--ink);
+  font-weight: 700;
+}
+.bet-sheet > summary svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  transition: transform var(--spring-smooth-ms) var(--spring-smooth);
+}
+.bet-sheet[open] > summary svg {
+  transform: rotate(180deg);
+}
+.bet-sheet-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 14px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.bet-sheet-body dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+  font-size: var(--text-xs);
+}
+.bet-sheet-body dl > div {
+  display: grid;
+  grid-template-columns: 6.4em minmax(0, 1fr);
+  gap: 8px;
+}
+.bet-sheet-body dt {
+  color: var(--ink-3);
+  font-weight: 650;
+}
+.bet-sheet-body dd {
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* The AI's words in «Por qué», labelled as such. */
+.bet-why-ai {
+  display: grid;
+  gap: 8px;
+}
+.bet-why-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.bet-sources > div {
+  grid-template-columns: 7.6em minmax(0, 1fr);
+}

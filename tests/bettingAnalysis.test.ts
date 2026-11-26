@@ -1061,3 +1061,50 @@ describe("the record never forgets and the day is analysed once", () => {
     expect(board.archive?.PD).toMatchObject({ since: "2026-09-01", value: { picks: 1, lost: 1, units: -1 } });
   });
 });
+
+describe("waiting for the next analysis and what the AI reports", () => {
+  it("knows when the next analysis is due, even hours ahead", async () => {
+    const { nextDueAt } = await import("../src/lib/bettingAnalysis");
+    const day = [
+      match({ id: "a", utcDate: "2026-11-28T13:00:00Z" }),
+      match({ id: "b", utcDate: "2026-11-28T20:00:00Z" }),
+      match({ id: "c", competition: "CL", utcDate: "2026-12-01T20:00:00Z" }),
+    ];
+    const at = (iso: string, done: string[] = []) => nextDueAt(day, Date.parse(iso), new Set(done));
+    expect(at("2026-11-28T06:00:00Z")).toEqual({ id: "PD-2026-11-28", at: Date.parse("2026-11-28T12:15:00Z") });
+    // Already due: now.
+    expect(at("2026-11-28T12:30:00Z")).toEqual({ id: "PD-2026-11-28", at: Date.parse("2026-11-28T12:30:00Z") });
+    // Done: the next match day.
+    expect(at("2026-11-28T12:30:00Z", ["PD-2026-11-28"])?.id).toBe("CL-2026-12-01");
+    expect(at("2026-12-02T00:00:00Z")).toBeNull();
+  });
+
+  it("names the model and reads the searches from Claude Code's result", async () => {
+    const { modelName } = await import("../src/lib/bettingAnalysis");
+    const { runDetails } = await import("../scripts/bettingAnalysis");
+    expect(modelName("claude-sonnet-4-5-20250929")).toBe("Claude Sonnet 4.5");
+    expect(modelName("claude-opus-5")).toBe("Claude Opus 5");
+    expect(modelName("otro-modelo")).toBe("otro-modelo");
+    expect(
+      runDetails({
+        usage: { server_tool_use: { web_search_requests: 4 } },
+        modelUsage: { "claude-haiku-4-5": { outputTokens: 30 }, "claude-sonnet-4-5": { outputTokens: 900, webSearchRequests: 4 } },
+      }),
+    ).toEqual({ model: "claude-sonnet-4-5", searches: 4 });
+    expect(runDetails({})).toEqual({});
+  });
+
+  it("keeps the run details of a stored analysis", () => {
+    const base = {
+      id: "PD-2026-11-27", competition: "PD", date: "2026-11-27",
+      generatedAt: "2026-11-26T10:29:33.235Z", oddsAt: "2026-11-26T10:29:33.235Z", bookmaker: "Winamax",
+      headline: "Titular", summary: "Resumen.",
+      matches: [{ matchId: "1", home: "A", away: "B", utcDate: "2026-11-27T20:00:00Z", preview: "Previa." }],
+      picks: [],
+    };
+    const read = (ai: unknown) =>
+      decodeAnalysisBoard({ formatVersion: ANALYSIS_FORMAT, updatedAt: base.generatedAt, analyses: [{ ...base, ai }] })!.analyses[0].ai;
+    expect(read({ model: "claude-sonnet-4-5", searches: 3, seconds: 41 })).toEqual({ model: "claude-sonnet-4-5", searches: 3, seconds: 41 });
+    expect(read({ model: "<script>", searches: -1 })).toBeUndefined();
+  });
+});

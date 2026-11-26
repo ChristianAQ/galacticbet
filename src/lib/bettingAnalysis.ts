@@ -268,6 +268,36 @@ export interface BettingAnalysis {
    * keys (pickKey) of its legs, all among `picks`, from different matches.
    */
   combo?: string[];
+  /** How the AI ran: the model, its web searches and how long it took. */
+  ai?: AnalysisRun;
+}
+/** Details of the AI's work on one analysis, as Claude Code reported them. */
+export interface AnalysisRun {
+  /** Model id as reported («claude-…»). */
+  model?: string;
+  searches?: number;
+  seconds?: number;
+}
+
+/** «claude-sonnet-4-5-20250929» → «Claude Sonnet 4.5»; anything else as it came. */
+export function modelName(id: string) {
+  const m = /^claude-([a-z]+)-(\d{1,2})(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(id);
+  if (!m) return id;
+  return `Claude ${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}${m[3] ? `.${m[3]}` : ""}`;
+}
+
+function decodeRun(raw: unknown): AnalysisRun | null {
+  if (!isRow(raw)) return null;
+  const run: AnalysisRun = {
+    ...(typeof raw.model === "string" && /^[a-z0-9][a-z0-9.-]{1,79}$/.test(raw.model) ? { model: raw.model } : {}),
+    ...(Number.isInteger(raw.searches) && (raw.searches as number) >= 0 && (raw.searches as number) <= 100
+      ? { searches: raw.searches as number }
+      : {}),
+    ...(Number.isInteger(raw.seconds) && (raw.seconds as number) >= 0 && (raw.seconds as number) <= 7200
+      ? { seconds: raw.seconds as number }
+      : {}),
+  };
+  return Object.keys(run).length ? run : null;
 }
 /** Settled totals of one kind of pick (see TrackRecord). */
 export interface RecordTotals {
@@ -657,6 +687,15 @@ export function analysisDays(matches: Match[], now: number): AnalysisDay[] {
  * GitHub missed the first match, the next one of the day takes its place;
  * never with the last match about to start.
  */
+/**
+ * When the next analysis will be due (now, if one is due already), for the
+ * job that waits for it: GitHub's schedules can run hours late.
+ */
+export function nextDueAt(matches: Match[], now: number, done: ReadonlySet<string>) {
+  const day = analysisDays(matches, now).find((d) => !done.has(d.id) && now < d.lastKickoff - LAST_CALL_MS);
+  return day ? { id: day.id, at: Math.max(now, day.firstKickoff - ANALYSIS_LEAD_MS) } : null;
+}
+
 export function dueAnalysisDays(matches: Match[], now: number, done: ReadonlySet<string>) {
   return analysisDays(matches, now).filter(
     (day) => !done.has(day.id) && now >= day.firstKickoff - ANALYSIS_LEAD_MS && now < day.lastKickoff - LAST_CALL_MS,
@@ -881,6 +920,7 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
     matches,
     picks,
     ...(combo ? { combo } : {}),
+    ...(decodeRun(raw.ai) ? { ai: decodeRun(raw.ai)! } : {}),
   };
 }
 
