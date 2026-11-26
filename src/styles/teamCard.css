@@ -218,9 +218,10 @@
   font-size: 12px;
   font-weight: 800;
 }
+/* Paper on the result colours: they turn light in the dark theme. */
 .team-sheet-game.is-win .team-sheet-result {
   background: var(--win);
-  color: #fff;
+  color: var(--paper);
 }
 .team-sheet-game.is-draw .team-sheet-result {
   background: var(--ink-3);
@@ -228,7 +229,7 @@
 }
 .team-sheet-game.is-loss .team-sheet-result {
   background: var(--loss);
-  color: #fff;
+  color: var(--paper);
 }
 .team-sheet-streak {
   display: flex;

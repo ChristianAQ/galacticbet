@@ -203,13 +203,14 @@ function MatchView({
     [matches, match.competition, match.seasonId],
   );
   const sheetIndex = (side: "home" | "away") => season.findIndex((r) => r.key === teamKey(match, side));
-  const [sheet, setSheet] = useState<{ index: number; origin: HTMLElement } | null>(null);
+  // The side, not the row: the table re-sorts when results come in.
+  const [sheet, setSheet] = useState<{ side: "home" | "away"; origin: HTMLElement } | null>(null);
+  const sheetAt = sheet ? sheetIndex(sheet.side) : -1;
   const sheetStats = useLeagueStats(sheet ? match.seasonId : "", demo);
   const openSheet = (side: "home" | "away", origin: HTMLElement) => {
-    const index = sheetIndex(side);
-    if (index < 0) return;
+    if (sheetIndex(side) < 0) return;
     haptic();
-    setSheet({ index, origin });
+    setSheet({ side, origin });
   };
   const scorers = useScorers(match, demo ? null : insight);
   const tie = knockoutContext(match, matches);
@@ -371,11 +372,11 @@ function MatchView({
           </Link>
         )}
       </header>
-      {sheet && (
+      {sheet && sheetAt >= 0 && (
         <Suspense fallback={null}>
           <SingleTeamSheet
             rows={season}
-            index={sheet.index}
+            index={sheetAt}
             origin={sheet.origin}
             matches={seasonMatches}
             scorers={sheetStats.data?.scorers || []}

@@ -6,6 +6,8 @@ import type { Scorer } from "../lib/leagueStats";
 import { haptic } from "../lib/motion";
 import {
   goalsByMatchday,
+  goalsLabel,
+  matchesLabel,
   perMatch,
   seasonFigures,
   teamBoards,
@@ -67,7 +69,7 @@ function SeasonFigures({ matches }: { matches: Match[] }) {
           <span className="figure-value">
             <strong className="numeral">{f.goals}</strong>
           </span>
-          <small>en {f.played} partidos</small>
+          <small>en {matchesLabel(f.played)}</small>
         </div>
         <div className="figure-tile">
           <span className="figure-label">Goles por partido</span>
@@ -82,7 +84,7 @@ function SeasonFigures({ matches }: { matches: Match[] }) {
             <strong className="numeral">{percent(f.bothScored, f.played)}</strong>
             <small>%</small>
           </span>
-          <small>{f.bothScored} partidos</small>
+          <small>{matchesLabel(f.bothScored)}</small>
         </div>
         <div className="figure-tile">
           <span className="figure-label">Más de 2,5 goles</span>
@@ -90,13 +92,13 @@ function SeasonFigures({ matches }: { matches: Match[] }) {
             <strong className="numeral">{percent(f.overTwoAndHalf, f.played)}</strong>
             <small>%</small>
           </span>
-          <small>{f.overTwoAndHalf} partidos</small>
+          <small>{matchesLabel(f.overTwoAndHalf)}</small>
         </div>
       </div>
       <div className="outcome-split">
         <div className="outcome-split-head">
           <h3>Resultados 1 · X · 2</h3>
-          <small>{f.played} partidos</small>
+          <small>{matchesLabel(f.played)}</small>
         </div>
         <div className="outcome-bar" aria-hidden="true">
           {outcomes.map((o) =>
@@ -128,7 +130,7 @@ function SeasonFigures({ matches }: { matches: Match[] }) {
               label: `J${d.day}`,
               value: d.average,
               display: oneDecimal.format(d.average),
-              detail: `jornada ${d.day} · ${d.goals} goles en ${d.played} partidos`,
+              detail: `jornada ${d.day} · ${goalsLabel(d.goals)} en ${matchesLabel(d.played)}`,
             }))}
           />
         </div>

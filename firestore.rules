@@ -184,7 +184,9 @@ service cloud.firestore {
    // matches a slip must cover. The organisers' app keeps them in step.
    match /rounds/{rk} {
     allow read: if true;
+    // A closed round never reopens: its slips were sealed against it.
     allow create, update: if runs(competition()) && rk.matches('[A-Za-z0-9_]{1,20}')
+      && (resource == null || resource.data.deadline > request.time)
       && request.resource.data.keys().hasOnly(['deadline','matchIds','updatedAt'])
       && request.resource.data.deadline is timestamp
       && request.resource.data.matchIds is list && request.resource.data.matchIds.size() >= 1

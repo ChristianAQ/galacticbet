@@ -36,8 +36,14 @@ export default function RankingCard({
   /** The first board of each block highlights its leader(s). */
   featured?: boolean;
 }) {
-  // Equal values share the position: 1, 1, 3…
-  const position = (i: number) => (rows ? rows.findIndex((p) => p.value === rows[i].value) + 1 : i + 1);
+  // Equal values side by side share the position: 1, 1, 3… (a board sorted by
+  // something else, like goals per match, can have equal totals apart).
+  const position = (i: number) => {
+    if (!rows) return i + 1;
+    let first = i;
+    while (first > 0 && rows[first - 1].value === rows[i].value) first--;
+    return first + 1;
+  };
   return (
     <section
       className={`league-ranking-card${featured ? " is-featured" : ""}`}

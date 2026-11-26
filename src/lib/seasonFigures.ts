@@ -101,7 +101,8 @@ export function teamLines(matches: Match[]): TeamLine[] {
 
 const decimal = new Intl.NumberFormat("es", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 export const perMatch = (value: number, played: number) => decimal.format(played ? value / played : 0);
-const matchesLabel = (n: number) => `${n} ${n === 1 ? "partido" : "partidos"}`;
+export const matchesLabel = (n: number) => `${n} ${n === 1 ? "partido" : "partidos"}`;
+export const goalsLabel = (n: number) => `${n} ${n === 1 ? "gol" : "goles"}`;
 const record = (s: Split) => `${s.wins}V ${s.draws}E ${s.losses}D`;
 const points = (s: Split) => s.wins * 3 + s.draws;
 const byName = (a: TeamLine, b: TeamLine) => a.name.localeCompare(b.name, "es") || a.key.localeCompare(b.key);

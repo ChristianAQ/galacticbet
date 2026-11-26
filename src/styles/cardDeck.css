@@ -54,6 +54,11 @@
   gap: 12px;
   min-height: 0;
   width: 100%;
+  /* Taps around the card reach the backdrop (and close it). */
+  pointer-events: none;
+}
+.card-deck-center > * {
+  pointer-events: auto;
 }
 .card-deck-stage {
   display: flex;

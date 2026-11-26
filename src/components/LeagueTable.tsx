@@ -148,7 +148,12 @@ export default function LeagueTable({
                     .join(" ") || undefined
                 }
                 aria-current={marked || undefined}
-                onClick={onTeam ? (event) => onTeam(i, event.currentTarget) : undefined}
+                // Focus comes back to the row's button when the card closes.
+                onClick={
+                  onTeam
+                    ? (event) => onTeam(i, event.currentTarget.querySelector("button") ?? event.currentTarget)
+                    : undefined
+                }
               >
                 <td>
                   <span className="league-pos">{position}</span>

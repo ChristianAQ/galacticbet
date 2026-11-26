@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   ANALYSIS_FORMAT,
+  MAX_ANALYSES,
+  analysedDays,
+  archiveAnalyses,
+  archivedRecord,
   analysisDays,
+  isJuicy,
+  marketValue,
+  mergeAnalysis,
   decodeAnalysisBoard,
   dueAnalysisDays,
   edge,
@@ -394,5 +401,150 @@ describe("what the charts read", () => {
     const read = decodeAnalysisBoard({ formatVersion: ANALYSIS_FORMAT, updatedAt: analysis.generatedAt, analyses: [broken] })!;
     expect(read.analyses[0].matches[0].market).toBeUndefined();
     expect(read.analyses[0].matches[0].preview).toBe("Partido abierto.");
+  });
+});
+
+describe("the record never forgets and the day is analysed once", () => {
+  // A LaLiga Saturday: 14:00, 16:15, 18:30 and 21:00 in Madrid.
+  const saturday = [
+    match({ id: "a", utcDate: "2026-11-28T13:00:00Z" }),
+    match({ id: "b", utcDate: "2026-11-28T15:15:00Z" }),
+    match({ id: "c", utcDate: "2026-11-28T17:30:00Z" }),
+    match({ id: "d", utcDate: "2026-11-28T20:00:00Z" }),
+  ];
+  const made = (generatedAt: string) => [{ id: "PD-2026-11-28", generatedAt }];
+
+  it("counts the day as done from its first kick-off, even once that match has started", () => {
+    const done = analysedDays(saturday, made("2026-11-28T12:20:00Z"), 3 * 3_600_000);
+    for (const t of ["2026-11-28T14:35:00Z", "2026-11-28T16:50:00Z", "2026-11-28T19:20:00Z"])
+      expect(dueAnalysisDays(saturday, Date.parse(t), done)).toEqual([]);
+    // A manual run the evening before is still redone in the usual window.
+    const early = analysedDays(saturday, made("2026-11-27T19:00:00Z"), 3 * 3_600_000);
+    expect(dueAnalysisDays(saturday, Date.parse("2026-11-28T12:20:00Z"), early).map((d) => d.id)).toEqual(["PD-2026-11-28"]);
+  });
+
+  const game = (matchId: string, utcDate: string) => ({ matchId, home: "H", away: "A", utcDate, preview: "P" });
+  const tip = (matchId: string, price = 2) =>
+    ({ matchId, market: "1X2", selection: "1", price, probability: 0.55, confidence: "media", reason: "R" }) as const;
+  const analysis = (over: Partial<BettingAnalysis>): BettingAnalysis => ({
+    id: "PD-2026-11-28",
+    competition: "PD",
+    date: "2026-11-28",
+    generatedAt: "2026-11-28T12:20:00Z",
+    oddsAt: "2026-11-28T12:19:00Z",
+    bookmaker: "bet365",
+    headline: "H",
+    summary: "S",
+    matches: [],
+    picks: [],
+    ...over,
+  });
+
+  it("a later analysis of the day keeps what was published for matches already started", () => {
+    const before = analysis({
+      matches: [game("a", "2026-11-28T13:00:00Z"), game("c", "2026-11-28T17:30:00Z")],
+      picks: [tip("a"), tip("c")],
+    });
+    const after = analysis({ generatedAt: "2026-11-28T16:50:00Z", matches: [game("c", "2026-11-28T17:30:00Z")], picks: [] });
+    const merged = mergeAnalysis(before, after, Date.parse("2026-11-28T16:50:00Z"));
+    expect(merged.matches.map((m) => m.matchId)).toEqual(["a", "c"]);
+    expect(merged.picks.map((p) => p.matchId)).toEqual(["a"]);
+    expect(mergeAnalysis(undefined, after, 0)).toBe(after);
+  });
+
+  it("archives what leaves the board and keeps counting it", () => {
+    const old = analysis({ id: "PD-2026-10-04", date: "2026-10-04", matches: [{ ...game("a", "2026-10-04T13:00:00Z"), pick: tip("a", 1.8) }], picks: [tip("a", 2.5)] });
+    const archive = archiveAnalyses(undefined, [old], [finished("a", 2, 0)]);
+    expect(archive.PD).toEqual({
+      since: "2026-10-04",
+      value: { picks: 1, settled: 1, won: 1, lost: 0, void: 0, units: 1.5 },
+      best: { picks: 1, settled: 1, won: 1, lost: 0, void: 0, units: 0.8 },
+    });
+    // Added to, never replaced; the board reads it back.
+    const later = analysis({ id: "PD-2026-10-05", date: "2026-10-05", picks: [tip("b")], matches: [game("b", "2026-10-05T13:00:00Z")] });
+    const next = archiveAnalyses(archive, [later], [finished("b", 0, 1)]);
+    expect(next.PD!.value).toMatchObject({ picks: 2, won: 1, lost: 1, units: 0.5 });
+    expect(next.PD!.since).toBe("2026-10-04");
+    const board = decodeAnalysisBoard({ formatVersion: ANALYSIS_FORMAT, updatedAt: "2026-10-06T00:00:00Z", analyses: [], archive: next })!;
+    expect(board.archive).toEqual(next);
+    const base = archivedRecord(board.archive, ["PD", "CL"], "value")!;
+    expect(trackRecord([], [], "value", base.totals)).toMatchObject({ picks: 2, won: 1, lost: 1, units: 0.5, yield: 0.25 });
+    expect(archivedRecord(board.archive, ["CL"], "value")).toBeNull();
+  });
+
+  it("«jugosa» means +3 % as shown, and never far above the market", () => {
+    expect(isJuicy({ probability: 0.513, price: 2 })).toBe(true); // +2,6 % → «+3 %»
+    expect(isJuicy({ probability: 0.512, price: 2 })).toBe(false); // +2,4 % → «+2 %»
+    expect(marketValue({ fair: 0.45, price: 2 })).toBeCloseTo(-0.1);
+    expect(marketValue({ price: 2 })).toBeNull();
+    const day = analysisDays([match({ id: "a" })], 0)[0];
+    const prices = new Map<string, MarketPrice[]>([["a", [{ market: "1X2", selection: "1", price: 2.2, sharp: 2.3, fair: 0.42 }]]]);
+    const answer = (probability: number) => ({
+      headline: "H",
+      summary: "S",
+      matches: [{ matchId: "a", preview: "P" }],
+      picks: [{ matchId: "a", market: "1X2", selection: "1", line: null, probability, confidence: "media", reason: "R", risk: "" }],
+    });
+    // 0,50 is 8 points over Pinnacle's 0,42: kept. 0,56 is 14 points over: an overconfident guess.
+    expect(acceptAnalysis(day, answer(0.5), prices, 0)!.picks).toHaveLength(1);
+    expect(acceptAnalysis(day, answer(0.56), prices, 0)!.picks).toHaveLength(0);
+    // The time of the prices is when they were read, not when the AI finished.
+    const accepted = acceptAnalysis(day, answer(0.5), prices, Date.parse("2026-11-28T12:30:00Z"), Date.parse("2026-11-28T12:20:00Z"))!;
+    expect([accepted.oddsAt, accepted.generatedAt]).toEqual(["2026-11-28T12:20:00.000Z", "2026-11-28T12:30:00.000Z"]);
+  });
+
+  it("the job keeps the newest analyses on the board and archives the rest", async () => {
+    const { runBettingAnalysis } = await import("../scripts/bettingAnalysis");
+    const fixture = match({ id: "lev", home: "Levante UD", away: "Racing Santander", utcDate: "2026-11-27T20:00:00Z" });
+    // A full board of past days, each with one «jugosa» that lost.
+    const past = Array.from({ length: MAX_ANALYSES }, (_, i) => {
+      const date = new Date(Date.parse("2026-09-01T12:00:00Z") + i * 86_400_000).toISOString().slice(0, 10);
+      return analysis({
+        id: `PD-${date}`,
+        date,
+        generatedAt: `${date}T12:00:00.000Z`,
+        matches: [game(`old${i}`, `${date}T13:00:00Z`)],
+        picks: [tip(`old${i}`)],
+      });
+    });
+    const store = new Map<string, unknown>([
+      ["analysis/football", JSON.parse(JSON.stringify({ formatVersion: ANALYSIS_FORMAT, updatedAt: "2026-11-01T00:00:00Z", analyses: past }))],
+    ]);
+    const db = {
+      doc: (path: string) => ({
+        get: async () => ({ data: () => store.get(path) }),
+        set: async (value: unknown) => void store.set(path, value),
+      }),
+    } as unknown as import("firebase-admin/firestore").Firestore;
+    const one = (p: number) => ({ players: { "0": { active: true, price: p } } });
+    const client = {
+      remaining: async () => null,
+      markets: async () => {
+        throw new Error("sin lista");
+      },
+      fixtures: async () => [{ fixtureId: "f1", startTime: "2026-11-27T20:00:00Z", participant1Name: "Levante UD", participant2Name: "Racing Santander" }],
+      fixtureOdds: async () => ({
+        fixtureId: "f1",
+        statusId: 0,
+        bookmakerOdds: { bet365: { bookmakerIsActive: true, markets: { "101": { outcomes: { "101": one(2), "102": one(3.5), "103": one(3.6) } } } } },
+      }),
+      spent: 0,
+    };
+    const claude = async () => ({ output: { headline: "H", summary: "S", matches: [{ matchId: "lev", preview: "P" }], picks: [] } });
+    const results = [fixture, ...past.map((_, i) => finished(`old${i}`, 0, 1))];
+    const { generated } = await runBettingAnalysis(db, {
+      oddsKey: "k",
+      claude,
+      client,
+      matches: results,
+      now: Date.parse("2026-11-27T19:20:00Z"),
+      log: () => {},
+    });
+    expect(generated).toBe(1);
+    const board = decodeAnalysisBoard(store.get("analysis/football"))!;
+    expect(board.analyses).toHaveLength(MAX_ANALYSES);
+    expect(board.analyses[0].id).toBe("PD-2026-11-27");
+    // The oldest day left the board, and its lost pick is still on the record.
+    expect(board.archive?.PD).toMatchObject({ since: "2026-09-01", value: { picks: 1, lost: 1, units: -1 } });
   });
 });

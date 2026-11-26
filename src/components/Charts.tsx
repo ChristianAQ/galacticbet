@@ -136,7 +136,8 @@ export function PositionChart({ points }: { points: PositionPoint[] }) {
             Jornada {points[shown].day}: <strong>{points[shown].position}.º</strong> · {points[shown].points} pts
           </>
         ) : last ? (
-          `${last.position}.º ahora`
+          // After the last matchday played (the header counts teams yet to play too).
+          `${last.position}.º tras la J${last.day}`
         ) : undefined
       }
       table={{ head: ["Jornada", "Puesto", "Puntos"], rows: points.map((p) => [p.day, `${p.position}.º`, p.points]) }}

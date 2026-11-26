@@ -11,11 +11,22 @@ export const ANALYSIS_FORMAT = 1;
 export const ANALYSIS_DOC = "analysis/football";
 export const ANALYSIS_COMPETITIONS = ["PD", "CL"] as const satisfies readonly CompetitionCode[];
 export type AnalysisCompetition = (typeof ANALYSIS_COMPETITIONS)[number];
-/** The newest ones the app keeps (about a month of match days). */
+/** The newest ones the board keeps (about a month of match days); older ones live on in `archive`. */
 export const MAX_ANALYSES = 24;
 export const MAX_PICKS = 6;
-/** «Jugosa»: at least this much over the fair price by the AI's estimate (it is asked for 3 %). */
-export const MIN_VALUE = 0.02;
+/** Picks a stored analysis may hold: the AI's, plus those of matches kept from an earlier run of the day. */
+export const MAX_STORED_PICKS = 12;
+/**
+ * «Jugosa»: pays at least 3 % over the fair price by the AI's estimate, as
+ * shown (rounded to a whole percent). The same rule everywhere: the job, the
+ * chips, the chart line and the texts.
+ */
+export const MIN_VALUE = 0.03;
+/**
+ * The AI may not see much more than the market: a «jugosa» it rates more than
+ * 10 points above Pinnacle's fair chance is an overconfident guess, not value.
+ */
+export const MAX_MARKET_GAP = 0.1;
 /** The analysis runs from this long before the day's first kick-off… */
 export const ANALYSIS_LEAD_MS = 45 * 60_000;
 /** …and is skipped once even the last match of the day is about to start. */
@@ -159,10 +170,25 @@ export interface BettingAnalysis {
   matches: AnalysisMatch[];
   picks: AnalysisPick[];
 }
+/** Settled totals of one kind of pick (see TrackRecord). */
+export interface RecordTotals {
+  picks: number;
+  settled: number;
+  won: number;
+  lost: number;
+  void: number;
+  units: number;
+}
+/** Per competition: the record of analyses that no longer fit on the board. */
+export type RecordArchive = Partial<
+  Record<AnalysisCompetition, { since: string; value: RecordTotals; best: RecordTotals }>
+>;
 export interface AnalysisBoard {
   formatVersion: typeof ANALYSIS_FORMAT;
   updatedAt: string;
   analyses: BettingAnalysis[];
+  /** Older analyses, already counted: the record never forgets a pick. */
+  archive?: RecordArchive;
 }
 
 /* ---------- Small helpers ---------- */
@@ -180,6 +206,14 @@ export const analysisId = (competition: AnalysisCompetition, date: string) => `$
 
 /** What the price pays over the estimated chance: 0.08 = 8 % of value. */
 export const edge = (probability: number, price: number) => probability * price - 1;
+/** Value as the app shows it, in whole percent. */
+export const valuePercent = (probability: number, price: number) => Math.round(edge(probability, price) * 100);
+/** A «jugosa» by the AI's estimate (see MIN_VALUE). */
+export const isJuicy = (p: Pick<AnalysisPick, "probability" | "price">) =>
+  valuePercent(p.probability, p.price) >= Math.round(MIN_VALUE * 100);
+/** What the market (Pinnacle without its margin) says the price is worth, when it priced it. */
+export const marketValue = (p: Pick<AnalysisPick, "fair" | "price">) =>
+  p.fair === undefined ? null : edge(p.fair, p.price);
 
 export const pickKey = (p: { matchId: string; market: BetMarket; selection: string; line?: number }) =>
   `${p.matchId}|${p.market}|${p.selection}|${p.line ?? ""}`;
@@ -259,10 +293,18 @@ export interface TrackRecord {
 export const picksOf = (analysis: BettingAnalysis, kind: "value" | "best") =>
   kind === "value" ? analysis.picks : analysis.matches.flatMap((m) => (m.pick ? [m.pick] : []));
 
-/** Honest scoreboard of every pick of a kind on the board, one unit each. */
-export function trackRecord(analyses: BettingAnalysis[], matches: Match[], kind: "value" | "best" = "value"): TrackRecord {
+/**
+ * Honest scoreboard of every pick of a kind on the board, one unit each,
+ * on top of what older analyses already settled (`base`).
+ */
+export function trackRecord(
+  analyses: BettingAnalysis[],
+  matches: Match[],
+  kind: "value" | "best" = "value",
+  base?: RecordTotals,
+): TrackRecord {
   const byId = new Map(matches.map((m) => [m.id, m]));
-  const record: TrackRecord = { picks: 0, settled: 0, won: 0, lost: 0, void: 0, units: 0, yield: null };
+  const record: TrackRecord = { picks: 0, settled: 0, won: 0, lost: 0, void: 0, units: 0, yield: null, ...base };
   for (const analysis of analyses)
     for (const pick of picksOf(analysis, kind)) {
       record.picks++;
@@ -330,6 +372,84 @@ export function dueAnalysisDays(matches: Match[], now: number, done: ReadonlySet
   return analysisDays(matches, now).filter(
     (day) => !done.has(day.id) && now >= day.firstKickoff - ANALYSIS_LEAD_MS && now < day.lastKickoff - LAST_CALL_MS,
   );
+}
+
+/** When the first match of each day started or starts, whatever its state now. */
+function dayStarts(matches: Match[]) {
+  const starts = new Map<string, number>();
+  for (const m of matches) {
+    if (!(ANALYSIS_COMPETITIONS as readonly string[]).includes(m.competition)) continue;
+    const id = analysisId(m.competition as AnalysisCompetition, madridDate(m.utcDate));
+    const kickoff = Date.parse(m.utcDate);
+    if (Number.isFinite(kickoff)) starts.set(id, Math.min(starts.get(id) ?? Infinity, kickoff));
+  }
+  return starts;
+}
+
+/**
+ * Days already analysed. An analysis counts from 3 hours before the day's
+ * first kick-off (a manual run earlier than that is redone with fresher
+ * prices). Measured from the first match of the day even once it has
+ * started: otherwise a day with matches at 14:00 and 21:00 would be analysed
+ * again before the evening one.
+ */
+export function analysedDays(matches: Match[], analyses: Pick<BettingAnalysis, "id" | "generatedAt">[], early: number) {
+  const starts = dayStarts(matches);
+  return new Set(
+    analyses.flatMap((a) => {
+      const start = starts.get(a.id);
+      return start === undefined || Date.parse(a.generatedAt) >= start - early ? [a.id] : [];
+    }),
+  );
+}
+
+/**
+ * A new analysis of a day that had one: matches that have already started
+ * keep what was published for them (and count in the record); the rest is
+ * the new analysis.
+ */
+export function mergeAnalysis(previous: BettingAnalysis | undefined, next: BettingAnalysis, now: number): BettingAnalysis {
+  if (!previous) return next;
+  const fresh = new Set(next.matches.map((m) => m.matchId));
+  const kept = previous.matches.filter((m) => !fresh.has(m.matchId) && Date.parse(m.utcDate) <= now);
+  if (!kept.length) return next;
+  const keptIds = new Set(kept.map((m) => m.matchId));
+  return {
+    ...next,
+    matches: [...kept, ...next.matches].sort((a, b) => a.utcDate.localeCompare(b.utcDate)),
+    picks: [...previous.picks.filter((p) => keptIds.has(p.matchId)), ...next.picks].slice(0, MAX_STORED_PICKS),
+  };
+}
+
+/** Archived totals of a kind for some competitions (summed), and since when. */
+export function archivedRecord(archive: RecordArchive | undefined, competitions: readonly AnalysisCompetition[], kind: "value" | "best") {
+  const entries = competitions.flatMap((c) => (archive?.[c] ? [archive[c]!] : []));
+  if (!entries.length) return null;
+  const totals: RecordTotals = { picks: 0, settled: 0, won: 0, lost: 0, void: 0, units: 0 };
+  for (const e of entries)
+    for (const key of Object.keys(totals) as (keyof RecordTotals)[]) totals[key] += e[kind][key];
+  return { totals, since: entries.map((e) => e.since).sort()[0] };
+}
+
+/** Adds the settled picks of analyses leaving the board to the archive. */
+export function archiveAnalyses(archive: RecordArchive | undefined, dropped: BettingAnalysis[], matches: Match[]): RecordArchive {
+  const next: RecordArchive = { ...archive };
+  for (const competition of ANALYSIS_COMPETITIONS) {
+    const own = dropped.filter((a) => a.competition === competition);
+    if (!own.length) continue;
+    const before = next[competition];
+    const totals = (kind: "value" | "best"): RecordTotals => {
+      const { yield: _yield, ...r } = trackRecord(own, matches, kind, before?.[kind]);
+      return r;
+    };
+    const oldest = own.map((a) => a.date).sort()[0];
+    next[competition] = {
+      since: before && before.since < oldest ? before.since : oldest,
+      value: totals("value"),
+      best: totals("best"),
+    };
+  }
+  return next;
 }
 
 /** When the next analysis should appear (for the app), or null. */
@@ -423,7 +543,7 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
   });
   if (!matches.length) return null;
   const ids = new Set(matches.map((m) => m.matchId));
-  const picks = raw.picks.slice(0, MAX_PICKS).flatMap((p) => decodePick(p, ids) ?? []);
+  const picks = raw.picks.slice(0, MAX_STORED_PICKS).flatMap((p) => decodePick(p, ids) ?? []);
   return {
     id: id as string,
     competition: competition as AnalysisCompetition,
@@ -438,6 +558,27 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
   };
 }
 
+const count = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 1_000_000;
+function decodeTotals(raw: unknown): RecordTotals | null {
+  if (!isRow(raw)) return null;
+  const { picks, settled, won, lost, units } = raw;
+  const voided = raw.void;
+  if (![picks, settled, won, lost, voided].every(count) || typeof units !== "number" || !Number.isFinite(units)) return null;
+  return { picks, settled, won, lost, void: voided, units } as RecordTotals;
+}
+function decodeArchive(raw: unknown): RecordArchive | undefined {
+  if (!isRow(raw)) return undefined;
+  const archive: RecordArchive = {};
+  for (const competition of ANALYSIS_COMPETITIONS) {
+    const entry = raw[competition];
+    if (!isRow(entry) || typeof entry.since !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(entry.since)) continue;
+    const value = decodeTotals(entry.value);
+    const best = decodeTotals(entry.best);
+    if (value && best) archive[competition] = { since: entry.since, value, best };
+  }
+  return Object.keys(archive).length ? archive : undefined;
+}
+
 /** Public, informational data. Invalid analyses are dropped, never repaired. */
 export function decodeAnalysisBoard(value: unknown): AnalysisBoard | null {
   if (!isRow(value) || value.formatVersion !== ANALYSIS_FORMAT || !date(value.updatedAt) || !Array.isArray(value.analyses))
@@ -446,5 +587,6 @@ export function decodeAnalysisBoard(value: unknown): AnalysisBoard | null {
     .slice(0, MAX_ANALYSES)
     .flatMap((a) => decodeAnalysis(a) ?? [])
     .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt));
-  return { formatVersion: ANALYSIS_FORMAT, updatedAt: value.updatedAt, analyses };
+  const archive = decodeArchive(value.archive);
+  return { formatVersion: ANALYSIS_FORMAT, updatedAt: value.updatedAt, analyses, ...(archive ? { archive } : {}) };
 }

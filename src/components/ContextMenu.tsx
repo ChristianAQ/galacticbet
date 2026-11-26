@@ -23,6 +23,12 @@ export const menuTarget = (get: Getter) => (element: HTMLElement | null) => {
   registry.set(element, get);
   element.dataset.contextMenu = "";
 };
+/** The element no longer has a menu (the same element can stay on screen). */
+export const clearMenuTarget = (element: HTMLElement | null) => {
+  if (!element) return;
+  registry.delete(element);
+  delete element.dataset.contextMenu;
+};
 
 interface Open {
   element: HTMLElement;

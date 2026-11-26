@@ -7,30 +7,49 @@ import { usePreferences } from "./useGroupSelection";
 /**
  * The competition chosen in Ligas, Quiniela or Clasificación — official or one
  * of your own — is one choice for the three, like the official ones always
- * were. A link (?liga= or, in Ligas, ?competition=) becomes the choice; a page
- * shown again with an older URL follows the newer choice instead of undoing it.
+ * were. A link becomes the choice: ?liga=, in Ligas ?competition=, and an
+ * official round (?round=PD-2026-…, the avisos) or a group (?group=, «Hacer
+ * quiniela» from a group), which mean the official quiniela, not the league
+ * you had open. A page shown again with an older URL follows the newer choice
+ * instead of undoing it.
  */
 export function useLeagueChoice(uid: string, { officialParam = false } = {}) {
   const [params, setParams] = useSearchParams();
   const preferences = usePreferences(uid);
   const urlLiga = params.get("liga") || "";
   const urlCompetition = officialParam ? params.get("competition") : null;
-  const explicitOfficial = isCompetition(urlCompetition);
+  const urlRound = urlLiga ? "" : params.get("round") || "";
+  const roundCode = /^[A-Z]{2}-\d{4}-/.test(urlRound) ? urlRound.split("-")[0] : "";
+  const officialRound = isCompetition(roundCode);
+  const urlGroup = urlLiga ? "" : params.get("group") || "";
+  const explicitOfficial = isCompetition(urlCompetition) || officialRound || Boolean(urlGroup);
   const liga = urlLiga || (explicitOfficial || !uid ? "" : preferences.liga);
-  const competition: CompetitionCode = explicitOfficial ? urlCompetition : preferences.competition;
+  const competition: CompetitionCode = isCompetition(urlCompetition)
+    ? urlCompetition
+    : officialRound
+      ? (roundCode as CompetitionCode)
+      : preferences.competition;
 
   // What the URL asks for becomes everyone's choice, but only when the URL
   // itself changes (a link, a chip). A page shown again keeps its old URL and
   // re-runs its effects: that must not bring an old choice back.
-  const urlKey = urlLiga ? `liga:${urlLiga}` : explicitOfficial ? `competition:${urlCompetition}` : "";
+  const urlKey = urlLiga
+    ? `liga:${urlLiga}`
+    : isCompetition(urlCompetition)
+      ? `competition:${urlCompetition}`
+      : officialRound
+        ? `round:${urlRound}`
+        : urlGroup
+          ? `group:${urlGroup}`
+          : "";
   const lastUrl = useRef<string | null>(null);
   useEffect(() => {
     if (lastUrl.current === urlKey) return;
     lastUrl.current = urlKey;
     if (!uid || !urlKey) return;
     if (urlLiga) preferenceStore.update(uid, { liga: urlLiga });
-    else if (explicitOfficial) preferenceStore.update(uid, { competition: urlCompetition, liga: "" });
-  }, [uid, urlKey, urlLiga, explicitOfficial, urlCompetition]);
+    else if (explicitOfficial) preferenceStore.update(uid, { competition, liga: "" });
+  }, [uid, urlKey, urlLiga, explicitOfficial, competition]);
 
   // Chosen elsewhere meanwhile: this page's URL follows.
   const choice = `${preferences.liga}|${preferences.competition}`;

@@ -118,6 +118,26 @@ describe.skipIf(!enabled)(
       await syncCalendars(db, "CL", [source]);
       expect(batches).not.toHaveBeenCalled();
     });
+    it("reescribe una vez las jornadas abiertas publicadas con la regla anterior; las cerradas no se tocan", async () => {
+      const at = (id: number, utcDate: string, matchday: number): ApiMatch => ({ ...raw(id), utcDate, matchday });
+      const now = Date.parse("2026-11-26T12:00:00Z");
+      // J23: one match brought forward to December, the bulk in February. J13: already played.
+      const j23 = [at(231, "2026-12-02T20:00:00Z", 23), ...[232, 233, 234, 235].map((id) => at(id, "2027-02-07T15:00:00Z", 23))];
+      const j13 = [at(131, "2026-11-20T20:00:00Z", 13), at(132, "2026-11-21T20:00:00Z", 13), at(133, "2026-11-22T20:00:00Z", 13)];
+      await syncCalendars(db, "PD", [...j23, ...j13], new Map(), now);
+      const open = db.doc(`rounds/${normalize(j23[0], "PD").roundId}`);
+      const closed = db.doc(`rounds/${normalize(j13[0], "PD").roundId}`);
+      expect((await open.get()).data()!.submissionDeadline.toMillis()).toBe(Date.parse("2027-02-07T15:00:00Z"));
+      // As version 2 published them: J23 closing on 2 December.
+      await open.set({ submissionDeadline: Timestamp.fromMillis(Date.parse("2026-12-02T20:00:00Z")) }, { merge: true });
+      await closed.set({ legacy: true }, { merge: true });
+      await db.doc("calendars/PD-2026").set({ deliverySchemaVersion: 2 }, { merge: true });
+      const closedBefore = await closed.get();
+      await syncCalendars(db, "PD", [...j23, ...j13], new Map(), now);
+      expect((await open.get()).data()!.submissionDeadline.toMillis()).toBe(Date.parse("2027-02-07T15:00:00Z"));
+      expect((await closed.get()).updateTime).toEqual(closedBefore.updateTime);
+      expect((await db.doc("calendars/PD-2026").get()).data()!.deliverySchemaVersion).toBe(3);
+    });
     it("una reejecución idéntica no reescribe partidos ni calendario aunque cambie el orden de la API", async () => {
       await syncCalendars(db, "PD", [raw(1), raw(2)]);
       const fixture = await db.doc("matches/1").get();

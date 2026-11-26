@@ -438,6 +438,9 @@ describe.skipIf(!enabled)("Competiciones entre amigos: permisos en Firestore", (
     await assertFails(setDoc(doc(as("bob"), `${C}/rounds/J4`), round(future(), [])));
     await assertFails(setDoc(doc(as("bob"), `${C}/rounds/J 5`), round(future())));
     await assertSucceeds(getDoc(doc(as(null), R)));
+    // Closed: nobody moves its deadline back into the future to seal late.
+    await openRound(past());
+    await assertFails(setDoc(doc(as("alice"), R), round(future())));
   });
 
   it("sellar: un boleto completo, antes del plazo, una sola vez y sin tocarlo después", async () => {

@@ -727,9 +727,11 @@ export function useRoundEntries(cid: string, rk: string, enabled: boolean) {
     null,
   );
   const key = `${cid}:${rk}`;
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!enabled || !cid || !rk || !db) return;
-    return onSnapshot(
+    let retry: number | undefined;
+    const stop = onSnapshot(
       collection(roundRef(cid, rk), "entries"),
       (snap) => {
         const entries: Record<string, Record<string, PredictionValue>> = {};
@@ -739,9 +741,18 @@ export function useRoundEntries(cid: string, rk: string, enabled: boolean) {
         }
         setState({ key, entries });
       },
-      () => setState({ key, entries: {} }),
+      () => {
+        // Closed by this device's clock but not yet by the server's (or no
+        // signal): still loading, try again shortly; give up after a while.
+        if (attempt < 8) retry = window.setTimeout(() => setAttempt((n) => n + 1), 15_000);
+        else setState({ key, entries: {} });
+      },
     );
-  }, [cid, rk, key, enabled]);
+    return () => {
+      stop();
+      window.clearTimeout(retry);
+    };
+  }, [cid, rk, key, enabled, attempt]);
   return enabled && state && state.key === key ? state.entries : null;
 }
 

@@ -80,6 +80,16 @@ export function useChrome() {
 /** Id of the stack entry a component renders in. */
 export const EntryContext = createContext("");
 
+/**
+ * Whether the page a component renders in is the one on top. A page under
+ * the top one is shown again during the back swipe and re-runs its effects:
+ * overlays of its own (a card) must stay out of the way until it is on top.
+ */
+export function useIsTopEntry() {
+  const id = useContext(EntryContext);
+  return useSyncExternalStore(subscribe, () => !id || !stack.length || stack[stack.length - 1] === id);
+}
+
 /** Registers the compact title shown in the navigation bar for this page. */
 export function useNavTitle(title: string | undefined) {
   const id = useContext(EntryContext);

@@ -6,20 +6,25 @@ import Segmented from "../components/Segmented";
 import { SkeletonRows } from "../components/Skeleton";
 import { Crest, Empty, PageTitle } from "../components/ui";
 import {
+  ANALYSIS_COMPETITIONS,
   MARKET_NAMES,
   MIN_VALUE,
-  edge,
+  archivedRecord,
+  isJuicy,
+  marketValue,
   nextAnalysis,
   pickKey,
   pickLabel,
   picksOf,
   settlePick,
   trackRecord,
+  valuePercent,
   type AnalysisCompetition,
   type AnalysisMatch,
   type AnalysisPick,
   type BettingAnalysis,
   type PickResult,
+  type RecordArchive,
 } from "../lib/bettingAnalysis";
 import { competitionName } from "../lib/competitions";
 import type { Match } from "../lib/domain";
@@ -39,6 +44,9 @@ const hour = new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit" 
 const when = new Intl.DateTimeFormat("es", { weekday: "long", hour: "2-digit", minute: "2-digit" });
 const ago = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
 const pct = (p: number) => `${Math.round(p * 100)} %`;
+const signedPct = (n: number) => (n > 0 ? `+${n} %` : n < 0 ? `−${Math.abs(n)} %` : "0 %");
+/** The «jugosa» threshold as the texts say it. */
+const JUICY = pct(MIN_VALUE);
 /** The day of an analysis, at noon in Spain so no time zone moves it. */
 const dayOf = (a: BettingAnalysis) => new Date(`${a.date}T12:00:00`);
 
@@ -65,7 +73,11 @@ function ResultBadge({ pick, match }: { pick: AnalysisPick; match?: Match }) {
         <Icon size={14} strokeWidth={3} aria-hidden="true" />
         {label}
         {result !== "void" && <b>{units.format(gain)} u</b>}
-        {match && <small>{match.homeScore}-{match.awayScore}</small>}
+        {match && match.homeScore !== null && match.awayScore !== null && (
+          <small>
+            {match.homeScore}-{match.awayScore}
+          </small>
+        )}
       </span>
     );
   }
@@ -119,6 +131,13 @@ function Why({
             <dd>
               {book}
               {sharp ? " y Pinnacle (precio justo)" : ""}, vía OddsPapi, a las {hour.format(new Date(analysis.oddsAt))}
+            </dd>
+          </div>
+          <div>
+            <dt>Valor</dt>
+            <dd>
+              lo que paga la cuota sobre la probabilidad: «IA» con la estimación de la IA; «Mercado», con la de Pinnacle sin
+              su margen
             </dd>
           </div>
           <div>
@@ -187,15 +206,35 @@ function PickCard({
   );
 }
 
-/** The value of a price, as it is: «+8 %» when it pays more than it should, «−4 %» when less. */
+/**
+ * The value of a price, as it is: by the AI's estimate and, when Pinnacle
+ * priced it, by the market. Both side by side, so a «jugosa» the market
+ * disagrees with is plain to see.
+ */
 function ValueChip({ pick }: { pick: AnalysisPick }) {
-  const value = Math.round(edge(pick.probability, pick.price) * 100);
-  return value * 0.01 >= MIN_VALUE ? (
-    <span className="bet-value">Valor +{value} %</span>
-  ) : (
-    <span className="bet-value is-flat" title="Según la IA, la cuota paga menos de lo justo o casi lo justo">
-      {value > 0 ? `Valor +${value} %` : value === 0 ? "Valor 0 %" : `Sin valor (${value} %)`.replace("-", "−")}
-    </span>
+  const value = valuePercent(pick.probability, pick.price);
+  const market = marketValue(pick);
+  const marketPct = market === null ? null : Math.round(market * 100);
+  return (
+    <>
+      {isJuicy(pick) ? (
+        <span className="bet-value" title="Lo que paga la cuota por encima de lo justo, según la estimación de la IA">
+          IA {signedPct(value)}
+        </span>
+      ) : (
+        <span className="bet-value is-flat" title="Según la IA, la cuota paga menos de lo justo o casi lo justo">
+          {value < 0 ? `IA sin valor (${signedPct(value)})` : `IA ${signedPct(value)}`}
+        </span>
+      )}
+      {marketPct !== null && (
+        <span
+          className={`bet-value is-market${marketPct > 0 ? " is-up" : ""}`}
+          title="Lo que paga la cuota según Pinnacle, la casa de referencia, sin su margen"
+        >
+          Mercado {signedPct(marketPct)}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -318,8 +357,8 @@ function AnalysisDay({
         </ol>
       ) : (
         <p className="bet-note">
-          Ninguna cuota paga hoy al menos un 3 % más de lo justo. Debajo tienes la mejor opción de cada partido, con su valor
-          real.
+          Ninguna cuota paga hoy al menos un {JUICY} más de lo justo. Debajo tienes la mejor opción de cada partido, con su
+          valor real.
         </p>
       )}
       <h3 className="bet-subhead">
@@ -342,8 +381,22 @@ function AnalysisDay({
   );
 }
 
-function Record({ analyses, matches, kind }: { analyses: BettingAnalysis[]; matches: Match[]; kind: "value" | "best" }) {
-  const r = useMemo(() => trackRecord(analyses, matches, kind), [analyses, matches, kind]);
+function Record({
+  analyses,
+  matches,
+  kind,
+  archive,
+  competitions,
+}: {
+  analyses: BettingAnalysis[];
+  matches: Match[];
+  kind: "value" | "best";
+  archive?: RecordArchive;
+  competitions: readonly AnalysisCompetition[];
+}) {
+  // Older analyses no longer on the board still count: their totals were archived.
+  const older = useMemo(() => archivedRecord(archive, competitions, kind), [archive, competitions, kind]);
+  const r = useMemo(() => trackRecord(analyses, matches, kind, older?.totals), [analyses, matches, kind, older]);
   if (!r.picks) return null;
   const staked = r.won + r.lost;
   return (
@@ -377,6 +430,7 @@ function Record({ analyses, matches, kind }: { analyses: BettingAnalysis[]; matc
           ? `Una unidad por apuesta a la cuota del análisis${r.void ? `; ${r.void} nulas devuelven la apuesta` : ""}.`
           : "Se resolverán cuando terminen los partidos."}
         {r.settled > 0 && r.picks > r.settled && ` ${r.picks - r.settled} por resolver.`}
+        {older && ` Desde el ${shortDay.format(new Date(`${older.since}T12:00:00`))}.`}
       </p>
     </div>
   );
@@ -437,6 +491,7 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
   const board = demo ? sample : live.board;
   const { loading: boardLoading, error, retry } = live;
   const [filter, setFilter] = useState<Filter>("all");
+  const competitions = useMemo(() => (filter === "all" ? ANALYSIS_COMPETITIONS : [filter]), [filter]);
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
   const analyses = useMemo(
     () => (board?.analyses ?? []).filter((a) => filter === "all" || a.competition === filter),
@@ -506,13 +561,13 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
               </Empty>
             )
           )}
-          {analyses.length > 0 && (
+          {(analyses.length > 0 || archivedRecord(board?.archive, competitions, "best")) && (
             <section aria-labelledby="bet-record-title">
               <div className="section-heading">
                 <h2 id="bet-record-title">Historial</h2>
               </div>
-              <Record analyses={analyses} matches={matches} kind="value" />
-              <Record analyses={analyses} matches={matches} kind="best" />
+              <Record analyses={analyses} matches={matches} kind="value" archive={board?.archive} competitions={competitions} />
+              <Record analyses={analyses} matches={matches} kind="best" archive={board?.archive} competitions={competitions} />
               {(fresh ? past : analyses).length > 0 && (
                 <ul className="bet-past-list">
                   {(fresh ? past : analyses).map((a) => (
@@ -528,7 +583,7 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
         <strong>+18</strong>
         <p>
           Información orientativa generada por IA: puede equivocarse y ninguna apuesta es segura. Las cuotas cambian;
-          compruébalas en bet365. GalacticBet no gestiona apuestas ni dinero. Juega con responsabilidad:{" "}
+          compruébalas en la casa de apuestas. GalacticBet no gestiona apuestas ni dinero. Juega con responsabilidad:{" "}
           <a href="https://www.jugarbien.es" target="_blank" rel="noreferrer">
             jugarbien.es
           </a>

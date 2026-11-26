@@ -188,8 +188,19 @@ export function TeamSheetCard({
           <section className="team-sheet-section">
             <h3>En casa y fuera</h3>
             <div className="team-sheet-meters">
-              <Meter label="Casa" value={sheet.home.points} max={sheet.home.played * 3} figure={`${percent(sheet.home)}%`} />
-              <Meter label="Fuera" value={sheet.away.points} max={sheet.away.played * 3} figure={`${percent(sheet.away)}%`} />
+              {/* No games yet on one side: «—», not «0%». */}
+              <Meter
+                label="Casa"
+                value={sheet.home.points}
+                max={sheet.home.played * 3}
+                figure={sheet.home.played ? `${percent(sheet.home)}%` : "—"}
+              />
+              <Meter
+                label="Fuera"
+                value={sheet.away.points}
+                max={sheet.away.played * 3}
+                figure={sheet.away.played ? `${percent(sheet.away)}%` : "—"}
+              />
               <p className="team-sheet-muted">de los puntos que se podían ganar</p>
             </div>
             <div className="team-sheet-split">
@@ -262,6 +273,7 @@ export default function TeamCards({
       onClose={onClose}
       className="is-team"
       label="Más equipos"
+      ids={rows.map((r) => r.key)}
       itemLabel={(i) => rows[i].name}
       render={(i, titleId) => (
         <TeamSheetCard

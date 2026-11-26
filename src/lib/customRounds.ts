@@ -1,13 +1,14 @@
 import { roundKey, type CompetitionView, type ResolvedMatch } from "./customCompetition";
 import { encodePick, type PickMap } from "./customPicks";
-import type { PredictionValue } from "./domain";
+import { roundCore, type PredictionValue } from "./domain";
 import { decodeDelivery, MAX_ROUND_MATCHES } from "./roundDelivery";
 
 /**
  * Rounds of a friends' competition's quiniela, like LaLiga's: a round closes
- * at its first kick-off and asks for a pick on every match that is still on
- * (not postponed or cancelled) and whose two sides are known. Sealed slips
- * are the only ones that count.
+ * at the first kick-off of its bulk and asks for a pick on every match of it
+ * that is still on (not postponed or cancelled) and whose two sides are
+ * known. A match moved weeks away from the rest doesn't set the deadline.
+ * Sealed slips are the only ones that count.
  */
 export interface RoundPlan {
   /** Round key: «J3», «G1», «A2» or a knockout stage. */
@@ -30,7 +31,9 @@ export function roundPlans(view: Pick<CompetitionView, "matches">): RoundPlan[] 
     byRound.set(key, [...(byRound.get(key) || []), m]);
   }
   return [...byRound.entries()].flatMap(([id, matches]) => {
-    const required = matches.filter(playable);
+    const required = roundCore(
+      matches.filter(playable).map((m) => ({ m, utcDate: new Date(m.startAt).toISOString() })),
+    ).core.map(({ m }) => m);
     if (!required.length) return [];
     return [
       {

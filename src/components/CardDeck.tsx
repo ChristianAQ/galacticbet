@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useIsTopEntry } from "../lib/chrome";
 import { haptic, prefersReducedMotion, rubberBand, springTo } from "../lib/motion";
 import { lockBody } from "../lib/useBodyScrollLock";
 import "../styles/cardDeck.css";
@@ -45,6 +46,7 @@ export default function CardDeck({
   tilt = false,
   className = "",
   label,
+  ids,
 }: {
   count: number;
   start: number;
@@ -58,8 +60,24 @@ export default function CardDeck({
   className?: string;
   /** What the pager browses: «Más jugadores», «Más equipos». */
   label: string;
+  /** Who is on each card: if the list re-sorts while open, the deck keeps showing the same one. */
+  ids?: string[];
 }) {
   const [index, setIndex] = useState(Math.min(Math.max(start, 0), count - 1));
+  // Under another page (shown again during the back swipe), the deck stays
+  // hidden and lets the page scroll: it comes back once its page is on top.
+  const onTop = useIsTopEntry();
+  const shown = useRef(ids?.[index]);
+  useEffect(() => {
+    shown.current = ids?.[index];
+  }, [index]);
+  const idsKey = ids?.join("\u0000") ?? "";
+  useLayoutEffect(() => {
+    if (count <= 0) return onClose();
+    const at = shown.current === undefined || !ids ? -1 : ids.indexOf(shown.current);
+    if (at >= 0 && at !== index) setIndex(at);
+    else if (index >= count) setIndex(count - 1);
+  }, [idsKey, count]);
   const titleId = useId();
   const backdrop = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -74,8 +92,13 @@ export default function CardDeck({
   // with the deck open, e.g. to open a match from it).
   const release = useRef<((options?: { restore?: boolean }) => void) | null>(null);
   useEffect(() => {
+    if (!onTop) return;
     release.current = lockBody();
-  }, []);
+    return () => {
+      release.current?.();
+      release.current = null;
+    };
+  }, [onTop]);
   useLayoutEffect(
     () => () => {
       release.current?.();
@@ -84,8 +107,9 @@ export default function CardDeck({
     [],
   );
 
-  // Open: out of the tapped row, into the middle.
+  // Open: out of the tapped row, into the middle (again when its page is back on top).
   useLayoutEffect(() => {
+    if (!onTop) return;
     closeButton.current?.focus({ preventScroll: true });
     const card = stage.current;
     if (!card || prefersReducedMotion()) return;
@@ -107,7 +131,7 @@ export default function CardDeck({
       { response: 0.44, damping: 0.8 },
     );
     return () => origin?.focus({ preventScroll: true });
-  }, []);
+  }, [onTop]);
 
   // A new card slides in from the side it comes from.
   useLayoutEffect(() => {
@@ -253,7 +277,7 @@ export default function CardDeck({
   const dialog = useRef<HTMLDivElement>(null);
   const keys = useRef<(event: globalThis.KeyboardEvent) => void>(() => {});
   keys.current = (event) => {
-    if (event.defaultPrevented) return;
+    if (event.defaultPrevented || !onTop) return;
     if (event.key === "Escape") {
       event.preventDefault();
       close();
@@ -264,8 +288,12 @@ export default function CardDeck({
       event.preventDefault();
       step(-1);
     } else if (event.key === "Tab") {
-      // Focus stays on the card's controls.
-      const controls = [...(dialog.current?.querySelectorAll<HTMLElement>("button:not(:disabled)") || [])];
+      // Focus stays on the card: its buttons, links and charts.
+      const controls = [
+        ...(dialog.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])',
+        ) || []),
+      ];
       const at = controls.indexOf(document.activeElement as HTMLElement);
       const next = event.shiftKey ? at - 1 : at + 1;
       event.preventDefault();
@@ -282,7 +310,7 @@ export default function CardDeck({
     stage.current?.setAttribute("aria-label", `${itemLabel(index)}, ${index + 1} de ${count}`);
   }, [index, count]);
 
-  if (index < 0 || index >= count) return null;
+  if (!onTop || index < 0 || index >= count) return null;
   return createPortal(
     <div
       ref={dialog}

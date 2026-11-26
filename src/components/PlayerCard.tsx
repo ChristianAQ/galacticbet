@@ -142,6 +142,7 @@ export default function PlayerCards({
       onClose={onClose}
       tilt
       label="Más jugadores"
+      ids={players.map((p) => p.key)}
       itemLabel={(i) => players[i].name}
       render={(i, titleId) => <Cromo key={players[i].key} player={players[i]} titleId={titleId} />}
     />

@@ -15,6 +15,14 @@ import { normalize, type ApiMatch } from "./normalize";
 import { roundRequirements, requiresDelivery } from "../src/lib/roundDelivery";
 import { preserveSportResult } from "./sportApi";
 
+/**
+ * Version of the published round rules. 3: a round closes at the first kick-off
+ * of its bulk (a match moved weeks away no longer sets its deadline). Rounds
+ * published under 2 are rewritten once while still open; closed ones stay as
+ * they were played and scored.
+ */
+const DELIVERY_SCHEMA = 3;
+
 function roundMetadata(fixtures: Match[], policyFrom: string) {
   const rounds = new Map<string, Match[]>();
   for (const m of fixtures)
@@ -61,6 +69,7 @@ export async function syncCalendars(
   code: CompetitionCode,
   rawMatches: ApiMatch[],
   policies = new Map<string, string>(),
+  now = Date.now(),
 ) {
   const seasons = new Map<string, { raw: ApiMatch; match: Match }[]>();
   for (const raw of rawMatches) {
@@ -92,7 +101,7 @@ export async function syncCalendars(
     if (
       previousData?.formatVersion === CALENDAR_FORMAT &&
       previousData.payload === data.payload &&
-      previousData.deliverySchemaVersion === 2
+      previousData.deliverySchemaVersion === DELIVERY_SCHEMA
     ) {
       console.log(
         `${seasonId}: sin cambios; 1 lectura de calendario, 0 escrituras de partidos.`,
@@ -136,11 +145,16 @@ export async function syncCalendars(
       await batch.commit();
     }
     const oldRounds = roundMetadata(oldFixtures, policyFrom);
-    const updates = [...roundMetadata(fixtures, policyFrom)].filter(
-      ([rid, value]) =>
-        previousData?.deliverySchemaVersion !== 2 ||
-        JSON.stringify(oldRounds.get(rid)) !== JSON.stringify(value),
-    );
+    const schema = previousData?.deliverySchemaVersion;
+    const updates = [...roundMetadata(fixtures, policyFrom)].filter(([rid, value]) => {
+      if (JSON.stringify(oldRounds.get(rid)) !== JSON.stringify(value)) return true;
+      if (schema === DELIVERY_SCHEMA) return false;
+      // Published under version 2 (deadline at the very first match): only
+      // rounds still open change; the new deadline is never earlier.
+      if (schema === 2)
+        return value.submissionDeadlineMillis === null || value.submissionDeadlineMillis > now;
+      return true;
+    });
     for (let i = 0; i < updates.length; i += 400) {
       const batch = db.batch();
       for (const [rid, { submissionDeadlineMillis, ...value }] of updates.slice(
@@ -162,7 +176,7 @@ export async function syncCalendars(
     }
     await ref.set({
       ...data,
-      deliverySchemaVersion: 2,
+      deliverySchemaVersion: DELIVERY_SCHEMA,
       deliveryPolicyFrom: policyFrom,
     });
     console.log(

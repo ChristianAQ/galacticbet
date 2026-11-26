@@ -94,12 +94,15 @@ export function teamSheet(
     const scored = side === "home" ? m.homeScore! : m.awayScore!;
     const conceded = side === "home" ? m.awayScore! : m.homeScore!;
     const result: FormResult = scored > conceded ? "win" : scored < conceded ? "loss" : "draw";
-    const v = venues[side];
-    v.played++;
-    v.goalsFor += scored;
-    v.goalsAgainst += conceded;
-    v[result === "win" ? "wins" : result === "draw" ? "draws" : "losses"]++;
-    v.points += result === "win" ? 3 : result === "draw" ? 1 : 0;
+    // Home and away add up to the table: league matches only (a knockout tie gives no points).
+    if (LEAGUE_STAGES.includes(m.stage)) {
+      const v = venues[side];
+      v.played++;
+      v.goalsFor += scored;
+      v.goalsAgainst += conceded;
+      v[result === "win" ? "wins" : result === "draw" ? "draws" : "losses"]++;
+      v.points += result === "win" ? 3 : result === "draw" ? 1 : 0;
+    }
     if (conceded === 0) cleanSheets++;
     results.push(result);
     const other = side === "home" ? "away" : "home";
@@ -165,21 +168,25 @@ export function standingNotes(table: LeagueRow[], index: number, code?: string):
   const at = (position: number) => table[position - 1]?.points ?? 0;
   const position = index + 1;
   const notes: string[] = [];
+  // Level on points (ahead or behind on goals): said as it is, never «a 0 puntos».
+  const level = (place: number) => `Empatado a puntos con el ${place === 1 ? "líder" : `${place}.º`}`;
+  const behind = (diff: number, what: string, place: number) => (diff > 0 ? `A ${pts(diff)} ${what}` : level(place));
+  const ahead = (diff: number, what: string, place: number) => (diff > 0 ? `${pts(diff)} ${what}` : level(place));
   if (index === 0) {
     const margin = table[1] ? own - table[1].points : 0;
     notes.push(margin ? `Líder con ${pts(margin)} de ventaja` : "Líder, empatado a puntos con el segundo");
-  } else notes.push(`A ${pts(at(1) - own)} del líder`);
+  } else notes.push(behind(at(1) - own, "del líder", 1));
   if ((code === "PD" || code === "PL") && table.length === 20) {
-    if (position > 4) notes.push(`A ${pts(at(4) - own)} de la Champions`);
-    else if (index > 0) notes.push(`${pts(own - at(5))} sobre el 5.º`);
-    if (position >= 18) notes.push(`A ${pts(at(17) - own)} de la salvación`);
-    else if (position >= 11) notes.push(`${pts(own - at(18))} sobre el descenso`);
+    if (position > 4) notes.push(behind(at(4) - own, "de la Champions", 4));
+    else if (index > 0) notes.push(ahead(own - at(5), "sobre el 5.º", 5));
+    if (position >= 18) notes.push(behind(at(17) - own, "de la salvación", 17));
+    else if (position >= 11) notes.push(ahead(own - at(18), "sobre el descenso", 18));
   }
   if (code === "CL" && table.length === 36) {
     if (position <= 8) {
-      if (index > 0) notes.push(`${pts(own - at(9))} sobre el 9.º: octavos directos`);
-    } else if (position <= 24) notes.push(`A ${pts(at(8) - own)} de los octavos directos`);
-    else notes.push(`A ${pts(at(24) - own)} del playoff`);
+      if (index > 0) notes.push(ahead(own - at(9), "sobre el 9.º: octavos directos", 9));
+    } else if (position <= 24) notes.push(behind(at(8) - own, "de los octavos directos", 8));
+    else notes.push(behind(at(24) - own, "del playoff", 24));
   }
   return notes;
 }

@@ -1,6 +1,6 @@
 import { Plus, Search, X } from "lucide-react";
 import type { CompetitionChip } from "../lib/customCompetitionData";
-import { menuTarget } from "./ContextMenu";
+import { clearMenuTarget, menuTarget } from "./ContextMenu";
 import "../styles/customBadge.css";
 
 /** The competition's picture, or its initials, in the same badge as official ones. */
@@ -52,18 +52,19 @@ export function CustomChips({
           key={c.id}
           className="is-custom"
           ref={(element) => {
-            if (onRemove && c.followed === false)
-              menuTarget(() => ({
-                title: c.name,
-                items: [
-                  {
-                    label: "Quitar de la lista",
-                    icon: <X size={18} aria-hidden="true" />,
-                    destructive: true,
-                    onSelect: () => onRemove(c.id),
-                  },
-                ],
-              }))(element);
+            // Followed meanwhile: the same chip stays, its «Quitar» menu goes.
+            if (!onRemove || c.followed !== false) return clearMenuTarget(element);
+            menuTarget(() => ({
+              title: c.name,
+              items: [
+                {
+                  label: "Quitar de la lista",
+                  icon: <X size={18} aria-hidden="true" />,
+                  destructive: true,
+                  onSelect: () => onRemove(c.id),
+                },
+              ],
+            }))(element);
           }}
           type="button"
           aria-pressed={current === c.id}

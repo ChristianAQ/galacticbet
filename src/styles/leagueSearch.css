@@ -110,7 +110,8 @@
   justify-content: center;
   gap: 5px;
   min-width: 88px;
-  min-height: 36px;
+  /* A thumb's worth: 44 px, as everywhere else. */
+  min-height: 44px;
   padding: 0 14px;
   border-radius: 999px;
   font-size: var(--text-sm);

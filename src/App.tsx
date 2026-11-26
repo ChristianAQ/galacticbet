@@ -448,8 +448,13 @@ export default function App() {
           {login && (
             <LoginModal
               close={() => setLogin(false)}
-              // Just signed in: start from Inicio, like opening the app.
-              onSignedIn={() => go("/", { reset: true })}
+              // Just signed in: start from Inicio, like opening the app, unless
+              // the link was an invitation (join a group, follow a league):
+              // then it carries on right there.
+              onSignedIn={() => {
+                const query = new URLSearchParams(window.location.hash.split("?")[1] || "");
+                if (!["join", "code", "codigo", "liga"].some((key) => query.has(key))) go("/", { reset: true });
+              }}
             />
           )}
         </div>

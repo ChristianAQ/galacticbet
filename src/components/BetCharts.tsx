@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { edge, MIN_VALUE, type AnalysisMatch, type AnalysisPick, type MatchMarket } from "../lib/bettingAnalysis";
+import { edge, isJuicy, MIN_VALUE, type AnalysisMatch, type AnalysisPick, type MatchMarket } from "../lib/bettingAnalysis";
 import "../styles/charts.css";
 
 /**
@@ -86,27 +86,38 @@ export function BreakEven({ pick }: { pick: AnalysisPick }) {
   const needed = 1 / pick.price;
   const value = edge(pick.probability, pick.price);
   const pays = pick.probability >= needed;
+  // Pinnacle's fair chance, when it priced it: where the market puts the bet.
+  const fair = pick.fair;
   return (
     <figure className="bet-chart">
       <figcaption>
         <span className="bet-chart-title">¿Compensa?</span>
         <span className={`bet-chart-note${pays ? " is-good" : ""}`}>
-          {value >= MIN_VALUE ? `Sí, ${signed(value)} de valor` : pays ? `Por poco, ${signed(value)}` : `No, ${signed(value)}`}
+          {isJuicy(pick) ? `Sí, ${signed(value)} de valor` : pays ? `Por poco, ${signed(value)}` : `No, ${signed(value)}`}
         </span>
       </figcaption>
       <div
         className={`bet-even${pays ? " is-pays" : ""}`}
         role="img"
-        aria-label={`La IA le da un ${pct(pick.probability)}; a cuota ${decimal.format(pick.price)} hace falta un ${pct(needed)} para que compense.`}
+        aria-label={
+          `La IA le da un ${pct(pick.probability)}; a cuota ${decimal.format(pick.price)} hace falta un ${pct(needed)} para que compense.` +
+          (fair !== undefined ? ` El mercado (Pinnacle) le da un ${pct(fair)}.` : "")
+        }
       >
         <span className="bet-even-track" aria-hidden="true">
           <i style={{ width: `${(pick.probability * 100).toFixed(1)}%` }} />
+          {fair !== undefined && <b style={{ left: `${(fair * 100).toFixed(1)}%` }} />}
           <em style={{ left: `${(needed * 100).toFixed(1)}%` }} />
         </span>
         <span className="bet-even-legend" aria-hidden="true">
           <span>
             <i className="is-ai" /> IA <strong>{pct(pick.probability)}</strong>
           </span>
+          {fair !== undefined && (
+            <span>
+              <i className="is-market" /> Mercado <strong>{pct(fair)}</strong>
+            </span>
+          )}
           <span>
             <i className="is-need" /> Necesita <strong>{pct(needed)}</strong> a {decimal.format(pick.price)}
           </span>
@@ -126,7 +137,7 @@ export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; o
   // Symmetric scale in steps of 5 %, never narrower than ±10 %.
   const span = Math.max(0.1, Math.ceil((Math.max(...rows.map((r) => Math.abs(r.value))) + 0.005) * 20) / 20);
   const x = (v: number) => 50 + (Math.max(-span, Math.min(span, v)) / span) * 50;
-  const juicy = rows.filter((r) => r.value >= MIN_VALUE).length;
+  const juicy = rows.filter((r) => isJuicy(r.m.pick!)).length;
   return (
     <figure className="bet-chart bet-overview">
       <figcaption>
@@ -139,7 +150,7 @@ export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; o
         <span>paga menos</span>
         <span>paga más</span>
       </div>
-      <ul className="bet-overview-rows" style={{ "--line": `${x(0.03)}%` } as CSSProperties}>
+      <ul className="bet-overview-rows" style={{ "--line": `${x(MIN_VALUE)}%` } as CSSProperties}>
         {rows.map(({ m, value }) => (
           <li key={m.matchId}>
             <button
@@ -160,13 +171,13 @@ export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; o
                   }}
                 />
               </span>
-              <strong className={value >= MIN_VALUE ? "is-good" : undefined}>{signed(value)}</strong>
+              <strong className={isJuicy(m.pick!) ? "is-good" : undefined}>{signed(value)}</strong>
             </button>
           </li>
         ))}
       </ul>
       <p className="bet-overview-key" aria-hidden="true">
-        <i /> línea de «jugosa»: +3 %
+        <i /> línea de «jugosa»: +{Math.round(MIN_VALUE * 100)} %
       </p>
     </figure>
   );

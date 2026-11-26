@@ -13,7 +13,10 @@ apuestas ni dinero.
    menos de 45 minutos. El análisis llega así entre 35 y 45 minutos antes. Si
    GitHub se salta esa ventana, se hace antes del siguiente partido de ese
    día. Hay un análisis por competición y día en hora de España
-   (`PD-2026-11-28`).
+   (`PD-2026-11-28`), y se hace una sola vez: cuenta como hecho desde 3 horas
+   antes del primer partido del día, aunque ese partido ya haya empezado. Si
+   un análisis se rehace (uno manual de mucho antes), los partidos que ya han
+   empezado conservan lo que se publicó y siguen contando en el historial.
 2. **Cuotas.** OddsPapi (plan gratuito, 250 peticiones al mes). Cada análisis
    hace una petición con los partidos del día (para emparejar los nombres) y
    otra por partido. Cada una de estas trae a la vez bet365, varias casas con
@@ -51,11 +54,14 @@ apuestas ni dinero.
      valor sea negativo. La app muestra ese valor tal cual: «Valor +4 %» o
      «Sin valor (−3 %)».
 5. **Validación.** Solo se guardan apuestas sobre mercados que existen, con
-   la cuota real de la casa (nunca la de la IA). Las jugosas necesitan al
-   menos un 2 % de valor según la estimación de la IA, y la mejor opción de un
-   partido, al menos un 40 % de probabilidad. El resultado se publica en
-   `analysis/football`, un documento público de solo lectura que guarda los
-   24 últimos análisis.
+   la cuota real de la casa (nunca la de la IA). Una jugosa tiene que mostrar
+   al menos «+3 %» de valor según la IA (redondeado: desde un 2,5 %) y la IA
+   no puede darle más de 10 puntos por encima de la probabilidad justa de
+   Pinnacle: más que eso es exceso de confianza, no valor. La mejor opción de
+   un partido necesita al menos un 40 % de probabilidad. La hora de las
+   cuotas es la de su lectura, no la de la respuesta de la IA. El resultado se
+   publica en `analysis/football`, un documento público de solo lectura con
+   los 24 últimos análisis y, en `archive`, los totales de los anteriores.
 
 ## En la app
 
@@ -70,6 +76,10 @@ Lo importante se ve de un vistazo, con gráficas:
 - **Forma:** los últimos cinco resultados de cada equipo.
 - **¿Compensa?:** la probabilidad que da la IA frente a la que necesita la
   cuota para compensar (1 / cuota). Si la barra pasa la marca, paga de más.
+  Un punto marca la del mercado (Pinnacle sin margen), cuando la hay.
+- **Valor:** dos etiquetas, una al lado de la otra. «IA +5 %» es lo que paga
+  la cuota según la estimación de la IA; «Mercado −3 %», según Pinnacle sin su
+  margen. Así se ve enseguida cuándo el mercado no está de acuerdo.
 
 El texto queda en segundo plano, plegado en «Por qué y de dónde sale»: la
 previa, el motivo, el riesgo y el origen de cada dato (cuotas, casa y hora;
@@ -80,7 +90,10 @@ Datos.
 
 La app resuelve cada apuesta con el resultado oficial a 90 minutos y lleva
 dos historiales a una unidad por apuesta, sin reescribir nada: el de las
-jugosas y el de la mejor opción de cada partido.
+jugosas y el de la mejor opción de cada partido. Cuando un análisis sale del
+documento (se guardan los 24 últimos), sus apuestas ya resueltas se suman a
+los totales archivados de su competición: el historial no olvida ninguna e
+indica desde cuándo cuenta.
 
 ## Configurar
 
