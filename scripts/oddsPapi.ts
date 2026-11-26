@@ -277,6 +277,36 @@ export function createOddsPapiClient(
   };
 }
 
+/** How many fixtures the bookmaker has active or suspended, and its newest price change. */
+function bookStates(items: Row[], bookmaker: string) {
+  let active = 0;
+  let suspended = 0;
+  let newest = "";
+  for (const r of items) {
+    const b = isRow(r.bookmakerOdds) ? r.bookmakerOdds[bookmaker] : null;
+    if (!isRow(b)) continue;
+    if (b.bookmakerIsActive === true) active++;
+    if (b.suspended === true) suspended++;
+    const m = isRow(b.markets) ? b.markets["101"] : null;
+    const o = isRow(m) && isRow(m.outcomes) ? m.outcomes["101"] : null;
+    const p = isRow(o) && isRow(o.players) ? o.players["0"] : null;
+    for (const t of isRow(p) ? [p.bookmakerChangedAt, p.changedAt] : [])
+      if (typeof t === "string" && t > newest) newest = t;
+  }
+  return `${active}/${items.length} activos, ${suspended} suspendidos, último cambio de 1X2 ${newest.slice(0, 16) || "—"}`;
+}
+function sample(book: Row) {
+  const m = isRow(book.markets) ? book.markets["101"] : null;
+  if (!isRow(m) || !isRow(m.outcomes)) return "—";
+  return ["101", "102", "103"]
+    .map((id) => {
+      const o = (m.outcomes as Row)[id];
+      const p = isRow(o) && isRow(o.players) ? o.players["0"] : null;
+      return isRow(p) ? `${String(p.price)}${p.active === false ? " (inactiva)" : ""} ${String(p.changedAt ?? "").slice(5, 16)}` : "—";
+    })
+    .join(" / ") + ` (mercado activo ${String(m.marketActive)})`;
+}
+
 /** Test mode: what a bookmaker's answer looks like (ids and counts, never prices in bulk). */
 export function oddsShape(value: unknown, bookmaker: string, fixtureIds: string[]) {
   const items = list(value).filter(isRow);
@@ -295,6 +325,8 @@ export function oddsShape(value: unknown, bookmaker: string, fixtureIds: string[
     book ? `activa ${String(book.bookmakerIsActive)}, suspendida ${String(book.suspended)}` : "sin bloque de la casa",
     `${markets.length} mercados: ${markets.slice(0, 24).join(",")}`,
     outcomes.length ? `resultados del ${markets[0]}: ${outcomes.join(",")}` : "",
+    `en toda la liga: ${bookStates(items, bookmaker)}`,
+    book ? `1X2 de este partido: ${sample(book)}` : "",
   ]
     .filter(Boolean)
     .join("; ");
