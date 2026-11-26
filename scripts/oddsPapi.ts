@@ -277,6 +277,29 @@ export function createOddsPapiClient(
   };
 }
 
+/** Test mode: what a bookmaker's answer looks like (ids and counts, never prices in bulk). */
+export function oddsShape(value: unknown, bookmaker: string, fixtureIds: string[]) {
+  const items = list(value).filter(isRow);
+  const ours = items.filter((r) => fixtureIds.includes(String(r.fixtureId)));
+  const row = ours[0];
+  const books = row && isRow(row.bookmakerOdds) ? Object.keys(row.bookmakerOdds) : [];
+  const book = row && isRow(row.bookmakerOdds) && isRow(row.bookmakerOdds[bookmaker]) ? (row.bookmakerOdds[bookmaker] as Row) : null;
+  const markets = book && isRow(book.markets) ? Object.keys(book.markets) : [];
+  const first = book && isRow(book.markets) ? (book.markets as Row)[markets[0]] : undefined;
+  const outcomes = isRow(first) && isRow(first.outcomes) ? Object.keys(first.outcomes) : [];
+  return [
+    `${bookmaker}: ${Array.isArray(value) ? "lista" : isRow(value) ? `objeto (${Object.keys(value).slice(0, 8).join(",")})` : typeof value} con ${items.length} partidos`,
+    `claves ${items[0] ? Object.keys(items[0]).slice(0, 14).join(",") : "-"}`,
+    `del día: ${ours.length}${row ? ` (statusId ${String(row.statusId)}, hasOdds ${String(row.hasOdds)})` : ""}`,
+    `casas: ${books.slice(0, 6).join(",") || "-"}`,
+    book ? `activa ${String(book.bookmakerIsActive)}, suspendida ${String(book.suspended)}` : "sin bloque de la casa",
+    `${markets.length} mercados: ${markets.slice(0, 24).join(",")}`,
+    outcomes.length ? `resultados del ${markets[0]}: ${outcomes.join(",")}` : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
+
 /* ---------- One match day ---------- */
 
 /** Cached market list (one request a month), falling back to the documented ids. */
@@ -314,15 +337,19 @@ export async function fetchDayOdds(
   client: OddsPapiClient,
   competition: AnalysisCompetition,
   matches: Match[],
-  options: { now: number; log: (m: string) => void },
+  options: { now: number; log: (m: string) => void; debug?: boolean },
 ): Promise<DayOdds> {
-  const { now, log } = options;
+  const { now, log, debug } = options;
   const month = new Date(now).toISOString().slice(0, 7);
   const budgetRef = db.doc(BUDGET_DOC);
   const budget = (await budgetRef.get()).data();
   const used = budget?.month === month ? Number(budget.used) || 0 : 0;
   const account = await client.remaining();
   if (account) log(`OddsPapi: ${account.used}/${account.limit} peticiones usadas este mes.`);
+  if (account && debug)
+    log(
+      `OddsPapi: ${account.bookmakers.length} casas en el plan; bet365 ${account.bookmakers.includes(BET365) ? "incluida" : "no aparece"}, Pinnacle ${account.bookmakers.includes(PINNACLE) ? "incluida" : "no aparece"}.`,
+    );
   const left = account ? account.limit - account.used : Infinity;
   if (used + 4 > ODDSPAPI_MONTH_LIMIT || left < 4)
     throw new OddsPapiError("presupuesto mensual alcanzado", 429, "MONTH_BUDGET");
@@ -334,10 +361,15 @@ export async function fetchDayOdds(
     const lastKick = Math.max(...matches.map((m) => Date.parse(m.utcDate)));
     const iso = (t: number) => new Date(t).toISOString().replace(/\.\d{3}Z$/, "Z");
     const fixtures = parseFixtures(await client.fixtures(tournament, iso(first - 3_600_000), iso(lastKick + 3_600_000)));
-    const bet365 = parseTournamentOdds(await client.tournamentOdds(tournament, BET365), BET365, markets);
+    const ids = fixtures.map((f) => f.fixtureId);
+    const softRaw = await client.tournamentOdds(tournament, BET365);
+    if (debug) log(`OddsPapi: ${oddsShape(softRaw, BET365, ids)}`);
+    const bet365 = parseTournamentOdds(softRaw, BET365, markets);
     let pinnacle: BookPrices = new Map();
     try {
-      pinnacle = parseTournamentOdds(await client.tournamentOdds(tournament, PINNACLE), PINNACLE, markets);
+      const sharpRaw = await client.tournamentOdds(tournament, PINNACLE);
+      if (debug) log(`OddsPapi: ${oddsShape(sharpRaw, PINNACLE, ids)}`);
+      pinnacle = parseTournamentOdds(sharpRaw, PINNACLE, markets);
     } catch (error) {
       log(`OddsPapi: sin referencia de Pinnacle (${error instanceof Error ? error.message : "error"}).`);
     }

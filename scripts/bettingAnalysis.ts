@@ -443,7 +443,7 @@ export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions
     const pending = day.matches.filter((m) => Date.parse(m.utcDate) > now + 5 * 60_000);
     let odds;
     try {
-      odds = await fetchDayOdds(db, client, day.competition, pending, { now, log });
+      odds = await fetchDayOdds(db, client, day.competition, pending, { now, log, debug: options.dryRun });
     } catch (error) {
       log(`Análisis ${label}: cuotas no disponibles (${error instanceof Error ? error.message : "error"}).`);
       continue;
