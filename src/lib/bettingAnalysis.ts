@@ -1,6 +1,6 @@
 import type { CompetitionCode } from "./competitions";
 import { hasPublishedResult, type Match } from "./domain";
-import type { MatchInsight } from "./matchInsightsData";
+import type { MatchInsight, PlayerStats } from "./matchInsightsData";
 
 /**
  * The AI's betting analysis: before the first match of each day of LaLiga or
@@ -33,7 +33,7 @@ export const ANALYSIS_LEAD_MS = 45 * 60_000;
 /** …and is skipped once even the last match of the day is about to start. */
 const LAST_CALL_MS = 10 * 60_000;
 
-export type BetMarket = "1X2" | "DC" | "DNB" | "BTTS" | "OU" | "SCORER" | "CARD";
+export type BetMarket = "1X2" | "DC" | "DNB" | "BTTS" | "OU" | "SCORER" | "CARD" | "SHOTS" | "SOT";
 export const MARKET_SELECTIONS: Record<BetMarket, readonly string[]> = {
   "1X2": ["1", "X", "2"],
   DC: ["1X", "12", "X2"],
@@ -42,15 +42,26 @@ export const MARKET_SELECTIONS: Record<BetMarket, readonly string[]> = {
   OU: ["over", "under"],
   SCORER: ["yes"],
   CARD: ["yes"],
+  SHOTS: ["yes"],
+  SOT: ["yes"],
 };
 /**
- * A player's bet: scores at any time (SCORER) or is booked (CARD). Pinnacle
- * doesn't price them, so they have no market reference, only the AI's.
+ * A player's bet: scores at any time (SCORER), is booked (CARD), or has at
+ * least `line` shots (SHOTS) or shots on target (SOT). Pinnacle doesn't price
+ * them, so they have no market reference, only the AI's.
  */
-export const PLAYER_MARKETS: readonly BetMarket[] = ["SCORER", "CARD"];
+export const PLAYER_MARKETS: readonly BetMarket[] = ["SCORER", "CARD", "SHOTS", "SOT"];
 export const isPlayerMarket = (market: BetMarket) => PLAYER_MARKETS.includes(market);
 /** Goal lines offered to the AI (half goals: no pushes, easy to read). */
 export const GOAL_LINES = [1.5, 2.5, 3.5] as const;
+/** «N or more» shots: the steps the bookmakers price. */
+export const SHOT_LINES = [1, 2, 3, 4, 5, 6] as const;
+/** The markets that come with a line, and the lines they may have. */
+export const MARKET_LINES: Partial<Record<BetMarket, readonly number[]>> = {
+  OU: GOAL_LINES,
+  SHOTS: SHOT_LINES,
+  SOT: SHOT_LINES,
+};
 /** How solid the AI finds its own reasons (shown as such, never as the chance of winning). */
 export const CONFIDENCE = ["alta", "media", "baja"] as const;
 export type Confidence = (typeof CONFIDENCE)[number];
@@ -80,9 +91,9 @@ export const winChance = (p: { probability: number; fair?: number }) =>
 export interface MarketPrice {
   market: BetMarket;
   selection: string;
-  /** Goal line (OU only). */
+  /** Goal line (OU), or the least number of shots (SHOTS, SOT). */
   line?: number;
-  /** The player, as the bookmaker names them (SCORER and CARD only). */
+  /** The player, as the bookmaker names them (players' markets only). */
   player?: string;
   /** Decimal price of `book`. */
   price: number;
@@ -99,7 +110,7 @@ export interface AnalysisPick {
   market: BetMarket;
   selection: string;
   line?: number;
-  /** The player (SCORER and CARD only). */
+  /** The player (players' markets only). */
   player?: string;
   /** Price when the analysis was made… */
   price: number;
@@ -325,6 +336,8 @@ export const MARKET_NAMES: Record<BetMarket, string> = {
   OU: "Goles",
   SCORER: "Goleador",
   CARD: "Tarjeta a jugador",
+  SHOTS: "Tiros",
+  SOT: "Tiros a puerta",
 };
 /** «Gana el Betis», «Más de 2,5 goles», «Marca Lewandowski»: the bet in words. */
 export function pickLabel(pick: Pick<AnalysisPick, "market" | "selection" | "line" | "player">, home: string, away: string) {
@@ -348,6 +361,11 @@ export function pickLabel(pick: Pick<AnalysisPick, "market" | "selection" | "lin
       return `Marca ${pick.player ?? "un jugador"}`;
     case "CARD":
       return `Tarjeta para ${pick.player ?? "un jugador"}`;
+    case "SHOTS":
+    case "SOT": {
+      const n = pick.line ?? 1;
+      return `${pick.player ?? "Un jugador"}: al menos ${n} ${n === 1 ? "tiro" : "tiros"}${pick.market === "SOT" ? " a puerta" : ""}`;
+    }
   }
 }
 
@@ -402,20 +420,45 @@ export interface PlayerFacts {
   booked: string[];
   /** Starters and players brought on; null without line-ups. */
   played: string[] | null;
+  /** Each player's numbers (shots…), when the report has them. */
+  numbers: { name: string; stats: PlayerStats }[];
+  /**
+   * Read once the match was over. Before that, a bet can be won (a goal, a
+   * card or a shot never go away) but not lost: the rest may still happen.
+   */
+  final: boolean;
 }
-export function playerFacts(insight: Pick<MatchInsight, "goals" | "incidents" | "lineups">, match: Match): PlayerFacts {
+export function playerFacts(
+  insight: Pick<MatchInsight, "goals" | "incidents" | "lineups">,
+  match: Match,
+  final: boolean,
+): PlayerFacts {
   const goals = insight.goals || [];
   const incidents = insight.incidents || [];
-  const starters = (insight.lineups || []).flatMap((l) => l.players.filter((p) => p.starter).map((p) => p.name));
+  const players = (insight.lineups || []).flatMap((l) => l.players);
+  const starters = players.filter((p) => p.starter).map((p) => p.name);
   return {
     scorers: goals.filter((g) => g.kind !== "own-goal").map((g) => g.scorer),
     goalsComplete: goals.length === (match.homeScore ?? -1) + (match.awayScore ?? -1),
     booked: incidents.filter((i) => i.kind !== "substitution").map((i) => i.player),
-    played: starters.length ? [...starters, ...incidents.filter((i) => i.kind === "substitution").map((i) => i.player)] : null,
+    played: starters.length
+      ? [
+          ...starters,
+          ...incidents.filter((i) => i.kind === "substitution").map((i) => i.player),
+          ...players.filter((p) => !p.starter && (p.subIn || p.stats)).map((p) => p.name),
+        ]
+      : null,
+    numbers: players.flatMap((p) => (p.stats ? [{ name: p.name, stats: p.stats }] : [])),
+    final,
   };
 }
+/** «Canales, Sergio» (as some bookmakers write it) → «Sergio Canales». */
+export const playerName = (name: string) => {
+  const parts = /^([^,]+),\s*(.+)$/.exec(name.trim());
+  return parts ? `${parts[2]} ${parts[1]}` : name.trim();
+};
 const playerKey = (name: string) =>
-  name
+  playerName(name)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -433,16 +476,25 @@ export function samePlayer(a: string, b: string) {
   return xs.length > 1 && ys.length > 1 && xs.at(-1) === ys.at(-1) && xs[0][0] === ys[0][0];
 }
 /**
- * Scores / is booked: won. Didn't, and played: lost. Didn't play: void (as
- * the bookmakers settle it). Not enough in the report yet: null.
+ * Scores / is booked / reaches the shots: won. Didn't, and played: lost.
+ * Didn't play: void (as the bookmakers settle it). Not enough in the report
+ * yet (or the match was still on when it was read): null.
  */
-export function settlePlayerPick(pick: Pick<AnalysisPick, "market" | "player">, facts: PlayerFacts): PickResult | null {
+export function settlePlayerPick(pick: Pick<AnalysisPick, "market" | "player" | "line">, facts: PlayerFacts): PickResult | null {
   const name = pick.player;
   if (!name || !isPlayerMarket(pick.market)) return null;
-  const done = pick.market === "SCORER" ? facts.scorers : facts.booked;
-  if (done.some((n) => samePlayer(n, name))) return "won";
-  if (!facts.played || (pick.market === "SCORER" && !facts.goalsComplete)) return null;
-  return facts.played.some((n) => samePlayer(n, name)) ? "lost" : "void";
+  const shots = pick.market === "SHOTS" || pick.market === "SOT";
+  const count = shots
+    ? facts.numbers.find((n) => samePlayer(n.name, name))?.stats[pick.market === "SOT" ? "shotsOnTarget" : "shots"]
+    : undefined;
+  const done = shots
+    ? (count ?? 0) >= (pick.line ?? 1)
+    : (pick.market === "SCORER" ? facts.scorers : facts.booked).some((n) => samePlayer(n, name));
+  if (done) return "won";
+  if (!facts.final || !facts.played || (pick.market === "SCORER" && !facts.goalsComplete)) return null;
+  if (!facts.played.some((n) => samePlayer(n, name))) return "void";
+  // Shots need the player's numbers: without them nothing can be said.
+  return shots && count === undefined ? null : "lost";
 }
 
 export interface TrackRecord {
@@ -712,7 +764,8 @@ export function validMarketChoice(market: unknown, selection: unknown, line: unk
   if (typeof selection !== "string" || !MARKET_SELECTIONS[market as BetMarket].includes(selection)) return false;
   if (isPlayerMarket(market as BetMarket) !== (typeof player === "string" && player.trim().length > 0 && player.length <= 60))
     return false;
-  return market === "OU" ? (GOAL_LINES as readonly unknown[]).includes(line) : line === undefined;
+  const lines = MARKET_LINES[market as BetMarket];
+  return lines ? (lines as readonly unknown[]).includes(line) : line === undefined;
 }
 
 function decodePick(raw: unknown, matchIds: Set<string>): AnalysisPick | null {
@@ -726,7 +779,7 @@ function decodePick(raw: unknown, matchIds: Set<string>): AnalysisPick | null {
     matchId,
     market,
     selection: selection as string,
-    ...(market === "OU" ? { line: line as number } : {}),
+    ...(MARKET_LINES[market] ? { line: line as number } : {}),
     ...(isPlayerMarket(market) ? { player: (player as string).trim() } : {}),
     price,
     ...(text(book, 40) ? { book } : {}),

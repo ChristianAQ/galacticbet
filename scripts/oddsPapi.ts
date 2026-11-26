@@ -2,6 +2,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import {
   GOAL_LINES,
   PLAYER_MARKETS,
+  playerName,
   type AnalysisCompetition,
   type BetMarket,
   type MarketPrice,
@@ -60,6 +61,8 @@ const OUTCOME_NAMES: Record<BetMarket, Record<string, string>> = {
   OU: { over: "over", under: "under" },
   SCORER: { yes: "yes" },
   CARD: { yes: "yes" },
+  SHOTS: { yes: "yes" },
+  SOT: { yes: "yes" },
 };
 
 /** The full-time soccer markets the analysis uses, from `/v4/markets`. */
@@ -132,18 +135,42 @@ export function parsePlayerMarkets(value: unknown): PlayerMarket[] {
   return [...found.values()].slice(0, 600);
 }
 
-/** The player markets the analysis uses: scores at any time, and is booked. */
+/**
+ * The player markets the analysis uses: scores at any time, is booked, and
+ * «N or more» shots / shots on target (`Player Shots (incl. overtime)`).
+ */
 export function playerMarketKind(m: PlayerMarket): BetMarket | null {
   if (m.period && !["fulltime", "result"].includes(m.period)) return null;
   if (/anytime goal ?scorer/i.test(m.name)) return "SCORER";
   if (/to be (carded|booked)/i.test(m.name)) return "CARD";
+  if (/^player shots on (goal|target)\b/i.test(m.name)) return "SOT";
+  if (/^player shots\b/i.test(m.name)) return "SHOTS";
   return null;
 }
 /** Players per market offered to the AI: the shortest prices (long shots are rarely value). */
 export const MAX_PLAYERS_PER_MARKET = 20;
+/** Shots steps offered to the AI («N or more»): the ones whose prices are worth a look. */
+export const OFFERED_SHOT_LINES: Partial<Record<BetMarket, readonly number[]>> = { SHOTS: [2, 3], SOT: [1, 2] };
+/** Players per shots step: fewer than for goalscorer, as there are several steps. */
+export const MAX_PLAYERS_PER_LINE = 8;
+
+/** The outcomes of a player market that are used, with their line: «Yes», or «2+» for shots. */
+function playerOutcomes(kind: BetMarket, definition: PlayerMarket, ids: string[]): [string, number | undefined][] {
+  const labels = Object.entries(definition.outcomes ?? {});
+  if (kind === "SCORER" || kind === "CARD") {
+    const yes = labels.find(([, label]) => /^yes$/i.test(label))?.[0] ?? (ids.length === 1 ? ids[0] : undefined);
+    return yes ? [[yes, undefined]] : [];
+  }
+  return labels.flatMap(([id, label]): [string, number][] => {
+    const n = Number(/^(\d)\+$/.exec(label.trim())?.[1]);
+    return OFFERED_SHOT_LINES[kind]?.includes(n) ? [[id, n]] : [];
+  });
+}
 /**
- * Prices of the players' «yes» for goalscorer and booking at the chosen
- * bookmaker (the one of the rest of the match), from the same answer.
+ * Prices of the players' «yes» for goalscorer and booking, and of the shots
+ * steps, at the chosen bookmaker (the one of the rest of the match), from the
+ * same answer. Names as «Sergio Canales», even if the bookmaker writes
+ * «Canales, Sergio».
  */
 export function playerPrices(value: unknown, catalog: PlayerMarket[], slug: string, book: string): MarketPrice[] {
   const raw = list(value).find(isRow);
@@ -151,27 +178,35 @@ export function playerPrices(value: unknown, catalog: PlayerMarket[], slug: stri
   if (!isRow(odds) || odds.bookmakerIsActive !== true || odds.suspended === true || !isRow(odds.markets)) return [];
   const result: MarketPrice[] = [];
   for (const kind of PLAYER_MARKETS) {
-    const byPlayer = new Map<string, MarketPrice>();
+    // Line → player → price (the first market that gives it).
+    const byLine = new Map<number | undefined, Map<string, MarketPrice>>();
     for (const definition of catalog) {
       if (playerMarketKind(definition) !== kind) continue;
       const market = odds.markets[definition.marketId];
       if (!isRow(market) || market.marketActive === false || !isRow(market.outcomes)) continue;
-      const ids = Object.keys(market.outcomes);
-      const yes =
-        Object.entries(definition.outcomes ?? {}).find(([, label]) => /^yes$/i.test(label))?.[0] ??
-        (ids.length === 1 ? ids[0] : undefined);
-      const outcome = yes ? market.outcomes[yes] : undefined;
-      if (!isRow(outcome) || !isRow(outcome.players)) continue;
-      for (const p of Object.values(outcome.players)) {
-        if (!isRow(p) || p.active === false) continue;
-        const player = str(p.playerName, 60);
-        const price = p.price;
-        if (!player || typeof price !== "number" || !Number.isFinite(price) || price < 1.01 || price > 1000) continue;
-        const key = player.toLowerCase();
-        if (!byPlayer.has(key)) byPlayer.set(key, { market: kind, selection: "yes", player, price, book });
+      for (const [id, line] of playerOutcomes(kind, definition, Object.keys(market.outcomes))) {
+        const outcome = market.outcomes[id];
+        if (!isRow(outcome) || !isRow(outcome.players)) continue;
+        const byPlayer = byLine.get(line) ?? new Map<string, MarketPrice>();
+        byLine.set(line, byPlayer);
+        for (const p of Object.values(outcome.players)) {
+          if (!isRow(p) || p.active === false) continue;
+          const name = str(p.playerName, 60);
+          const price = p.price;
+          if (!name || typeof price !== "number" || !Number.isFinite(price) || price < 1.01 || price > 1000) continue;
+          const player = playerName(name);
+          const key = player.toLowerCase();
+          if (!byPlayer.has(key))
+            byPlayer.set(key, { market: kind, selection: "yes", ...(line !== undefined ? { line } : {}), player, price, book });
+        }
       }
     }
-    result.push(...[...byPlayer.values()].sort((a, b) => a.price - b.price).slice(0, MAX_PLAYERS_PER_MARKET));
+    for (const [line, byPlayer] of byLine)
+      result.push(
+        ...[...byPlayer.values()]
+          .sort((a, b) => a.price - b.price)
+          .slice(0, line === undefined ? MAX_PLAYERS_PER_MARKET : MAX_PLAYERS_PER_LINE),
+      );
   }
   return result;
 }

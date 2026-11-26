@@ -137,8 +137,8 @@ function Why({
         {pick && isPlayerMarket(pick.market) && (
           <p className="bet-why-muted">
             Apuesta de jugador: Pinnacle no las cotiza, así que no hay valor «según el mercado», solo la estimación de la
-            IA. Se resuelve con el acta del partido (goles, tarjetas y alineaciones de ESPN); si el jugador no llega a
-            jugar, es nula.
+            IA. Se resuelve con el acta del partido de ESPN (goles, tarjetas, alineaciones y tiros de cada jugador, con la
+            prórroga si la hay); si el jugador no llega a jugar, es nula.
           </p>
         )}
         <dl className="bet-sources">

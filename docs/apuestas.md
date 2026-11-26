@@ -36,9 +36,13 @@ no gestiona apuestas ni dinero.
 
    Mercados: 1X2, doble oportunidad, empate no válido, ambos marcan y más/menos
    de 1,5, 2,5 y 3,5 goles, y de jugador: **goleador** (marca en cualquier
-   momento) y **tarjeta a jugador**, de la misma casa que el resto del partido
-   y en la misma petición (los 20 jugadores con la cuota más corta de cada
-   uno). La lista oficial de mercados, con los de jugador, se guarda un mes
+   momento), **tarjeta a jugador** y **tiros** y **tiros a puerta** («al menos
+   N», prórroga incluida), de la misma casa que el resto del partido y en la
+   misma petición. De goleador y tarjeta, los 20 jugadores con la cuota más
+   corta; de tiros, los 8 más cortos de cada escalón que se ofrece: al menos 2
+   y 3 tiros, y al menos 1 y 2 a puerta (en la prueba del 27/11/2026, Winamax
+   daba de 1+ a 6+ con unos 50 jugadores por escalón). Los nombres se guardan
+   como «Sergio Canales» aunque la casa escriba «Canales, Sergio». La lista oficial de mercados, con los de jugador, se guarda un mes
    (`providerCache/oddspapiMarkets`). El consumo se cuenta en
    `providerBudgets/oddspapi`, con un tope interno de 220 peticiones al mes.
 3. **Datos.** Se añaden la clasificación, la forma, los partidos en casa y
@@ -78,11 +82,14 @@ no gestiona apuestas ni dinero.
    mercado». La referencia es la probabilidad de la propia cuota (1 / cuota,
    con el margen de la casa) y la IA no puede pasarla en más de 10 puntos.
    Como mucho 2 entre las apuestas con valor. El job las resuelve en cada pasada con el
-   acta del partido de ESPN (`matchInsights`): marca o ve tarjeta, acertada;
-   jugó y no, fallada; no jugó (ni titular ni entró), nula, como en las casas.
-   Para dar por fallado un goleador hacen falta todos los goles del marcador
-   en el acta; si el acta no se completa en una semana, la apuesta es nula.
-   Los remates a puerta aún no: el acta solo trae estadísticas por equipo. La hora de las
+   acta del partido de ESPN (`matchInsights`, el campo `insight`): marca, ve
+   tarjeta o llega a los tiros, acertada; jugó y no, fallada; no jugó (ni
+   titular ni entró), nula, como en las casas. Los tiros salen de los números
+   por jugador del acta. Para dar por fallada una apuesta, el acta tiene que
+   haberse leído con el partido ya terminado (`status: FINISHED` en el
+   documento); antes solo puede darse por acertada. Para fallar un goleador
+   hacen falta además todos los goles del marcador en el acta. Si el acta no
+   se completa en una semana, la apuesta es nula. La hora de las
    cuotas es la de su lectura, no la de la respuesta de la IA. El resultado se
    publica en `analysis/football`, un documento público de solo lectura con
    los 24 últimos análisis y, en `archive`, los totales de los anteriores.

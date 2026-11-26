@@ -56,6 +56,7 @@ import {
   parsePlayerMarkets,
   playerMarketKind,
   playerPrices,
+  MAX_PLAYERS_PER_LINE,
   findFixture,
   marketPrices,
   parseFixtureOdds,
@@ -124,6 +125,94 @@ describe("confianza y cuotas del partido", () => {
   });
 });
 
+describe("apuestas de jugador: tiros y tiros a puerta", () => {
+  // As OddsPapi lists them (Winamax, 27/11/2026): one outcome per step, «1+» to «6+».
+  const steps = (first: number) => Array.from({ length: 6 }, (_, i) => ({ outcomeId: first + i, outcomeName: `${i + 1}+` }));
+  const catalog = parsePlayerMarkets([
+    { marketId: 10743, sportId: 10, playerProp: true, marketName: "Player Shots (incl. overtime)", period: "result", outcomes: steps(10744) },
+    { marketId: 10753, sportId: 10, playerProp: true, marketName: "Player Shots On Goal (incl. overtime)", period: "result", outcomes: steps(10754) },
+    { marketId: 10800, sportId: 10, playerProp: true, marketName: "Over Under Player Shots On Goal", period: "result", handicap: 1.5 },
+  ]);
+
+  it("recognises shots and shots on target, and offers the useful steps with the shortest prices", () => {
+    expect(catalog.map((m) => playerMarketKind(m))).toEqual(["SHOTS", "SOT", null]);
+    const players = (n: number, base: number) =>
+      Object.fromEntries(Array.from({ length: n }, (_, i) => [String(i + 1), { price: base + i * 0.25, active: true, playerName: i ? `Apellido${i}, Nombre` : "Canales, Sergio" }]));
+    const answer = {
+      bookmakerOdds: {
+        "winamax.es": {
+          bookmakerIsActive: true,
+          markets: {
+            "10743": { marketActive: true, outcomes: { "10744": { players: players(12, 1.04) }, "10745": { players: players(12, 1.32) }, "10746": { players: players(3, 1.98) } } },
+            "10753": { marketActive: true, outcomes: { "10754": { players: players(12, 1.56) }, "10755": { players: players(2, 3.25) }, "10756": { players: players(2, 8.5) } } },
+          },
+        },
+      },
+    };
+    const prices = playerPrices(answer, catalog, "winamax.es", "Winamax");
+    // SHOTS 2+ and 3+, SOT 1+ and 2+; at most 8 players a step, names as «Sergio Canales».
+    expect(prices.map((p) => `${p.market} ${p.line}`).reduce<Record<string, number>>((n, k) => ({ ...n, [k]: (n[k] ?? 0) + 1 }), {})).toEqual({
+      "SHOTS 2": MAX_PLAYERS_PER_LINE,
+      "SHOTS 3": 3,
+      "SOT 1": MAX_PLAYERS_PER_LINE,
+      "SOT 2": 2,
+    });
+    expect(prices.find((p) => p.market === "SOT" && p.line === 2)).toEqual({
+      market: "SOT", selection: "yes", line: 2, player: "Sergio Canales", price: 3.25, book: "Winamax",
+    });
+    expect(pickLabel({ market: "SOT", selection: "yes", line: 2, player: "Sergio Canales" }, "Levante", "Racing")).toBe("Sergio Canales: al menos 2 tiros a puerta");
+    expect(pickLabel({ market: "SHOTS", selection: "yes", line: 1, player: "Sergio Canales" }, "Levante", "Racing")).toBe("Sergio Canales: al menos 1 tiro");
+  });
+
+  it("takes the AI's choice at the price of its own step, never another one", () => {
+    const day = analysisDays([match({ id: "a" })], 0)[0];
+    const prices = new Map<string, MarketPrice[]>([
+      ["a", [
+        { market: "SOT", selection: "yes", line: 1, player: "Iñigo Vicente", price: 1.6, book: "Winamax" },
+        { market: "SOT", selection: "yes", line: 2, player: "Iñigo Vicente", price: 3.4, book: "Winamax" },
+      ]],
+    ]);
+    const bet = (line: number | null, probability: number) => ({
+      matchId: "a", market: "SOT", selection: "yes", line, player: "Inigo Vicente", probability, confidence: "media", reason: "Tira mucho.", risk: "Suplencia.",
+    });
+    const analysis = acceptAnalysis(day, {
+      headline: "H",
+      summary: "S",
+      matches: [{ matchId: "a", preview: "P", bestPick: bet(1, 0.66) }],
+      picks: [bet(2, 0.34), bet(null, 0.7), bet(7, 0.2)],
+    }, prices, 0)!;
+    expect(analysis.picks.map((p) => [p.line, p.player, p.price])).toEqual([[2, "Iñigo Vicente", 3.4]]);
+    expect(analysis.matches[0].pick).toMatchObject({ market: "SOT", line: 1, price: 1.6 });
+    const board = decodeAnalysisBoard(JSON.parse(JSON.stringify({ formatVersion: ANALYSIS_FORMAT, updatedAt: analysis.generatedAt, analyses: [analysis] })))!;
+    expect(board.analyses[0].picks[0]).toMatchObject({ market: "SOT", line: 2, player: "Iñigo Vicente" });
+  });
+
+  it("settles with the player's numbers in the report, only once the match is over", () => {
+    const insight = {
+      goals: [],
+      incidents: [{ minute: "70'", side: "home", kind: "substitution", player: "Suplente", playerOut: "Titular" }],
+      lineups: [{ side: "home", players: [
+        { name: "Sergio Canales", starter: true, stats: { shots: 4, shotsOnTarget: 1 } },
+        { name: "Sin números", starter: true },
+        { name: "Suplente", starter: false, subIn: "70'", stats: { shots: 0, shotsOnTarget: 0 } },
+        { name: "No juega", starter: false },
+      ] }],
+    } as unknown as MatchInsight;
+    const facts = playerFacts(insight, finished("m1", 0, 0), true);
+    const bet = (market: "SHOTS" | "SOT", line: number, player: string) => settlePlayerPick({ market, line, player }, facts);
+    expect(bet("SHOTS", 3, "Canales, Sergio")).toBe("won");
+    expect(bet("SOT", 1, "Sergio Canales")).toBe("won");
+    expect(bet("SOT", 2, "Sergio Canales")).toBe("lost");
+    expect(bet("SHOTS", 1, "Suplente")).toBe("lost");
+    expect(bet("SHOTS", 1, "No juega")).toBe("void");
+    expect(bet("SHOTS", 1, "Sin números")).toBeNull(); // played, but no numbers to tell
+    // While the match was on: reached already counts, not reached stays open.
+    const live = playerFacts(insight, finished("m1", 0, 0), false);
+    expect(settlePlayerPick({ market: "SHOTS", line: 3, player: "Sergio Canales" }, live)).toBe("won");
+    expect(settlePlayerPick({ market: "SOT", line: 2, player: "Sergio Canales" }, live)).toBeNull();
+  });
+});
+
 describe("apuestas de jugador: goleador y tarjeta", () => {
   const catalog = parsePlayerMarkets([
     { marketId: 60001, sportId: 10, playerProp: true, marketName: "Anytime Goal Scorer", period: "fulltime", outcomes: [{ outcomeId: 60001, outcomeName: "Yes" }] },
@@ -184,7 +273,7 @@ describe("apuestas de jugador: goleador y tarjeta", () => {
       ],
       lineups: [{ side: "home", players: [{ name: "Kylian Mbappé", starter: true }, { name: "Endrick", starter: false }, { name: "Jude Bellingham", starter: true }] }],
     } as unknown as MatchInsight;
-    const facts = playerFacts(insight, finished("m1", 2, 0));
+    const facts = playerFacts(insight, finished("m1", 2, 0), true);
     const bet = (market: "SCORER" | "CARD", player: string) => settlePlayerPick({ market, player }, facts);
     expect(bet("SCORER", "Kylian Mbappe")).toBe("won");
     expect(bet("SCORER", "Djené")).toBe("void"); // own goal; not in the home line-up given
@@ -194,8 +283,15 @@ describe("apuestas de jugador: goleador y tarjeta", () => {
     expect(bet("CARD", "Djené")).toBe("won");
     expect(bet("CARD", "Jude Bellingham")).toBe("lost");
     // Goals missing from the report: a non-scorer stays open; without line-ups too.
-    expect(settlePlayerPick({ market: "SCORER", player: "Jude Bellingham" }, playerFacts(insight, finished("m1", 3, 0)))).toBeNull();
-    expect(settlePlayerPick({ market: "CARD", player: "Jude Bellingham" }, playerFacts({ ...insight, lineups: [] }, finished("m1", 2, 0)))).toBeNull();
+    expect(settlePlayerPick({ market: "SCORER", player: "Jude Bellingham" }, playerFacts(insight, finished("m1", 3, 0), true))).toBeNull();
+    expect(settlePlayerPick({ market: "CARD", player: "Jude Bellingham" }, playerFacts({ ...insight, lineups: [] }, finished("m1", 2, 0), true))).toBeNull();
+    // Read while the match was still on: a card or a goal already counts, the rest stays open.
+    const live = playerFacts(insight, finished("m1", 2, 0), false);
+    expect(settlePlayerPick({ market: "CARD", player: "Djené" }, live)).toBe("won");
+    expect(settlePlayerPick({ market: "CARD", player: "Jude Bellingham" }, live)).toBeNull();
+    expect(settlePlayerPick({ market: "SCORER", player: "Luka Modric" }, live)).toBeNull();
+    // Some bookmakers write «Surname, Name».
+    expect(samePlayer("Canales, Sergio", "Sergio Canales")).toBe(true);
   });
 
   it("accepts the AI's player bets on the real price, within the limits", () => {
@@ -253,7 +349,11 @@ describe("apuestas de jugador: goleador y tarjeta", () => {
     const now = Date.parse("2026-11-28T16:00:00Z");
     // No report yet: stays open.
     expect(await settlePlayerBets(db, analyses, [played], now)).toBeNull();
-    docs.set("matchInsights/m1", report);
+    const stored = (status: string) => ({ insight: report, checkedAt: "2026-11-28T15:00:00Z", kickoff: played.utcDate, status });
+    // Read in play, he hadn't scored yet: still open.
+    docs.set("matchInsights/m1", stored("IN_PLAY"));
+    expect(await settlePlayerBets(db, [{ ...analyses[0], picks: [{ ...pick, player: "Jude Bellingham" }] }], [played], now)).toBeNull();
+    docs.set("matchInsights/m1", stored("FINISHED"));
     const done = (await settlePlayerBets(db, analyses, [played], now))!;
     expect(done.settled).toBe(1);
     expect(done.analyses[0].picks[0].result).toBe("won");
@@ -266,6 +366,8 @@ describe("apuestas de jugador: goleador y tarjeta", () => {
 
 describe("números de jugador de los últimos partidos, para la IA", () => {
   type Players = MatchInsight["lineups"][number]["players"];
+  // As the sync stores it: the report in `insight`.
+  const stored = (m: Match, home: Players, away: Players) => ({ insight: report(m, home, away), checkedAt: m.utcDate, kickoff: m.utcDate, status: "FINISHED" });
   const report = (m: Match, home: Players, away: Players): MatchInsight => ({
     version: 1,
     matchId: m.id,
@@ -292,7 +394,7 @@ describe("números de jugador de los últimos partidos, para la IA", () => {
   const store = new Map<string, unknown>([
     [
       "matchInsights/r1",
-      report(
+      stored(
         r1,
         [
           { name: "Kylian Mbappé", starter: true, stats: { shots: 5, shotsOnTarget: 3, goals: 2 } },
@@ -304,7 +406,7 @@ describe("números de jugador de los últimos partidos, para la IA", () => {
     ],
     [
       "matchInsights/r2",
-      report(
+      stored(
         r2,
         [{ name: "Mohamed Salah", starter: true, stats: { shots: 9, shotsOnTarget: 4 } }],
         [
