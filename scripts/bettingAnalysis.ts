@@ -127,12 +127,13 @@ export function matchContext(match: Match, matches: Match[], scorers: Scorer[], 
     local: side("home"),
     visitante: side("away"),
     ...(meetings.length ? { enfrentamientos: meetings } : {}),
+    casa: prices[0]?.book ?? "bet365",
     cuotas: prices.map((p) => ({
       market: p.market,
       selection: p.selection,
       line: p.line ?? null,
       apuesta: pickLabel(p, match.home, match.away),
-      bet365: p.price,
+      cuota: p.price,
       ...(p.sharp ? { pinnacle: p.sharp, probJusta: p.fair, valorFrentePinnacle: Math.round(edge(p.fair!, p.price) * 1000) / 1000 } : {}),
     })),
   };
@@ -140,9 +141,9 @@ export function matchContext(match: Match, matches: Match[], scorers: Scorer[], 
 
 export const ANALYST_PROMPT = `Eres un analista de apuestas de fútbol riguroso y prudente. Escribes para una app privada entre amigos que solo informa: no gestiona apuestas ni dinero.
 
-Recibes en JSON los partidos de hoy con las cuotas reales de bet365 y, cuando existen, las de Pinnacle (la casa de referencia). «probJusta» es la probabilidad de Pinnacle sin su margen y «valorFrentePinnacle» lo que paga bet365 por encima de esa probabilidad (0,05 = 5 %). También tienes datos oficiales de la temporada de cada equipo.
+Recibes en JSON los partidos de hoy con las cuotas reales de bet365 («cuota»; si bet365 no está al día, son de otra casa española, indicada en «casa») y, cuando existen, las de Pinnacle (la casa de referencia). «probJusta» es la probabilidad de Pinnacle sin su margen y «valorFrentePinnacle» lo que paga la cuota por encima de esa probabilidad (0,05 = 5 %). También tienes datos oficiales de la temporada de cada equipo.
 
-Tu trabajo: encontrar las apuestas de bet365 más jugosas, es decir, las que pagan más de lo que deberían según tu estimación.
+Tu trabajo: encontrar las apuestas más jugosas, es decir, las que pagan más de lo que deberían según tu estimación.
 
 Reglas:
 - Usa solo los mercados del JSON y copia exactamente matchId, market, selection y line. Nunca inventes cuotas ni mercados.
@@ -261,6 +262,7 @@ export function acceptAnalysis(
       selection: price.selection,
       ...(price.line !== undefined ? { line: price.line } : {}),
       price: price.price,
+      ...(price.book ? { book: price.book } : {}),
       probability: Math.round(probability * 1000) / 1000,
       ...(price.fair ? { fair: price.fair } : {}),
       confidence: (CONFIDENCE as readonly unknown[]).includes(p.confidence) ? (p.confidence as Confidence) : "baja",
@@ -270,13 +272,15 @@ export function acceptAnalysis(
     if (picks.length >= MAX_PICKS) break;
   }
   const at = new Date(now).toISOString();
+  // «bet365», or the bookmakers really used when bet365 was not up to date.
+  const books = [...new Set([...prices.values()].flatMap((list) => (list[0]?.book ? [list[0].book] : [])))];
   return {
     id: day.id,
     competition: day.competition,
     date: day.date,
     generatedAt: at,
     oddsAt: at,
-    bookmaker: BET365,
+    bookmaker: clip(books.join(" · "), 40) || BET365,
     headline: clip(a.headline, 140) || `${competitionName(day.competition, true)}: análisis del día`,
     summary: clip(a.summary, 900) || "Sin resumen.",
     matches,
@@ -449,7 +453,7 @@ export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions
       continue;
     }
     log(
-      `Análisis ${label}: ${odds.prices.size}/${pending.length} partidos con cuotas de bet365 (${odds.requests} peticiones a OddsPapi).` +
+      `Análisis ${label}: ${odds.prices.size}/${pending.length} partidos con cuotas (${odds.requests} peticiones a OddsPapi).` +
         (odds.unmatched.length ? ` Sin emparejar: ${odds.unmatched.join("; ")}.` : ""),
     );
     if (!odds.prices.size) continue;
@@ -460,8 +464,8 @@ export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions
     const prompt = `Competición: ${competitionName(day.competition, true)}. Día: ${day.date}.\n\nPartidos de hoy (JSON):\n${JSON.stringify(context)}`;
     if (options.dryRun) {
       for (const c of context) {
-        const result = c.cuotas.filter((q) => q.market === "1X2").map((q) => `${q.selection} ${q.bet365}${"pinnacle" in q ? `/${q.pinnacle}` : ""}`);
-        log(`  ${c.partido}: ${c.cuotas.length} cuotas; 1X2 bet365/Pinnacle ${result.join(" · ") || "—"}`);
+        const result = c.cuotas.filter((q) => q.market === "1X2").map((q) => `${q.selection} ${q.cuota}${"pinnacle" in q ? `/${q.pinnacle}` : ""}`);
+        log(`  ${c.partido}: ${c.cuotas.length} cuotas de ${c.casa}; 1X2 ${c.casa}/Pinnacle ${result.join(" · ") || "—"}`);
       }
       log(`Análisis ${label}: modo prueba, ${prompt.length} caracteres de datos; no se llama a la IA ni se guarda nada.`);
       continue;

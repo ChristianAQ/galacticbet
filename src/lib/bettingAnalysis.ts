@@ -32,14 +32,19 @@ export const GOAL_LINES = [1.5, 2.5, 3.5] as const;
 export const CONFIDENCE = ["alta", "media", "baja"] as const;
 export type Confidence = (typeof CONFIDENCE)[number];
 
-/** One price of a match: bet365's, with Pinnacle's next to it when known. */
+/**
+ * One price of a match: bet365's (or, when bet365 is not up to date, another
+ * bookmaker licensed in Spain), with Pinnacle's next to it when known.
+ */
 export interface MarketPrice {
   market: BetMarket;
   selection: string;
   /** Goal line (OU only). */
   line?: number;
-  /** bet365, decimal. */
+  /** Decimal price of `book`. */
   price: number;
+  /** The bookmaker of `price` («bet365», «Winamax»…). */
+  book?: string;
   /** Pinnacle, decimal, margin included. */
   sharp?: number;
   /** Pinnacle's probability with its margin removed (0–1). */
@@ -51,8 +56,10 @@ export interface AnalysisPick {
   market: BetMarket;
   selection: string;
   line?: number;
-  /** bet365 price when the analysis was made. */
+  /** Price when the analysis was made… */
   price: number;
+  /** …at this bookmaker (bet365 when absent). */
+  book?: string;
   /** The AI's estimate (0–1). */
   probability: number;
   /** Pinnacle's no-margin probability, when Pinnacle priced it. */
@@ -277,7 +284,7 @@ export function validMarketChoice(market: unknown, selection: unknown, line: unk
 
 function decodePick(raw: unknown, matchIds: Set<string>): AnalysisPick | null {
   if (!isRow(raw)) return null;
-  const { matchId, market, selection, line, price, confidence, reason, risk, fair } = raw;
+  const { matchId, market, selection, line, price, confidence, reason, risk, fair, book } = raw;
   if (typeof matchId !== "string" || !matchIds.has(matchId)) return null;
   if (!validMarketChoice(market, selection, line ?? undefined)) return null;
   if (!decimalPrice(price) || !probability(raw.probability)) return null;
@@ -288,6 +295,7 @@ function decodePick(raw: unknown, matchIds: Set<string>): AnalysisPick | null {
     selection: selection as string,
     ...(market === "OU" ? { line: line as number } : {}),
     price,
+    ...(text(book, 40) ? { book } : {}),
     probability: raw.probability,
     ...(probability(fair) ? { fair } : {}),
     confidence: confidence as Confidence,

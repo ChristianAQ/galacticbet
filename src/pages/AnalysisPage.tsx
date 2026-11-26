@@ -117,7 +117,7 @@ function PickCard({ pick, game, match, index }: { pick: AnalysisPick; game?: Ana
         </div>
         <div className="bet-pick-price">
           <strong className="numeral">{odds.format(pick.price)}</strong>
-          <small>bet365</small>
+          <small>{pick.book ?? "bet365"}</small>
         </div>
       </div>
       <div className="bet-pick-tags">
@@ -250,7 +250,7 @@ function PastDay({ analysis, byId }: { analysis: BettingAnalysis; byId: Map<stri
                 <span>
                   <strong>{pickLabel(p, game?.home ?? "", game?.away ?? "")}</strong>
                   <small>
-                    {game ? `${game.home} – ${game.away}` : ""} · {odds.format(p.price)}
+                    {game ? `${game.home} – ${game.away}` : ""} · {odds.format(p.price)} {p.book ?? "bet365"}
                   </small>
                 </span>
                 <ResultBadge pick={p} match={match} />
@@ -292,7 +292,7 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
       <PageTitle
         eyebrow="Análisis IA · cuotas de bet365"
         title="Apuestas"
-        description="Antes del primer partido de cada día de LaLiga y Champions, la IA compara las cuotas de bet365 con las de Pinnacle y con los datos de la temporada, y señala las que pagan más de lo que deberían."
+        description="Antes del primer partido de cada día de LaLiga y Champions, la IA compara las cuotas de bet365 (u otra casa española si bet365 no está al día) con las de Pinnacle y con los datos de la temporada, y señala las que pagan más de lo que deberían."
       />
       <Segmented<Filter>
         label="Competición"

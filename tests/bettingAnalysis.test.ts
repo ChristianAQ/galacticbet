@@ -17,11 +17,12 @@ import type { Match } from "../src/lib/domain";
 import { acceptAnalysis, clip, goalFacts } from "../scripts/bettingAnalysis";
 import {
   KNOWN_MARKETS,
+  chooseBook,
   findFixture,
   marketPrices,
+  parseFixtureOdds,
   parseFixtures,
   parseMarketDefinitions,
-  parseTournamentOdds,
 } from "../scripts/oddsPapi";
 
 const match = (over: Partial<Match>): Match => ({
@@ -70,27 +71,42 @@ describe("OddsPapi", () => {
     expect(() => parseMarketDefinitions({ error: {} })).toThrow();
   });
 
-  it("parses fixtures and one bookmaker's prices, skipping inactive ones", () => {
+  it("parses fixtures and the prices of bookmakers that are up to date", () => {
     const fixtures = parseFixtures([
       { fixtureId: "id1", startTime: "2026-11-28T13:00:00.000Z", participant1Name: "Real Madrid", participant1ShortName: "Real Madrid", participant2Name: "Getafe CF", participant2ShortName: "Getafe" },
       { fixtureId: "bad", startTime: "nope", participant1Name: "A", participant2Name: "B" },
     ]);
     expect(fixtures).toEqual([{ fixtureId: "id1", startTime: "2026-11-28T13:00:00.000Z", home: ["Real Madrid", "Real Madrid"], away: ["Getafe CF", "Getafe"] }]);
     const price = (p: number, active = true) => ({ players: { "0": { active, price: p } } });
-    const odds = parseTournamentOdds(
-      [
-        { fixtureId: "id1", statusId: 0, bookmakerOdds: { bet365: { bookmakerIsActive: true, suspended: false, markets: {
-          "101": { marketActive: true, outcomes: { "101": price(1.5), "102": price(4.2), "103": price(6.5) } },
-          "1010": { marketActive: false, outcomes: { "1010": price(1.8), "1011": price(2) } },
-          "999": { marketActive: true, outcomes: { "999": price(3) } },
-        } } } },
-        { fixtureId: "id2", statusId: 1, bookmakerOdds: { bet365: { markets: { "101": { outcomes: { "101": price(2) } } } } } },
-      ],
-      "bet365",
+    const oneX2 = (a: number, b: number, c: number, active = true) => ({
+      "101": { marketActive: true, outcomes: { "101": price(a, active), "102": price(b, active), "103": price(c, active) } },
+    });
+    const books = parseFixtureOdds(
+      {
+        fixtureId: "id1",
+        statusId: 0,
+        bookmakerOdds: {
+          // OddsPapi stopped collecting bet365 a week ago: its old prices never count.
+          bet365: { bookmakerIsActive: false, suspended: true, markets: oneX2(2.02, 3.6, 3.2) },
+          "winamax.es": { bookmakerIsActive: true, suspended: false, markets: {
+            ...oneX2(2, 3.9, 3.05),
+            "1010": { marketActive: false, outcomes: { "1010": price(1.8), "1011": price(2) } },
+            "999": { marketActive: true, outcomes: { "999": price(3) } },
+          } },
+          "888sport.es": { bookmakerIsActive: true, suspended: false, markets: oneX2(2.1, 3.75, 3, false) },
+          "pinnacle+30": { bookmakerIsActive: true, suspended: false, markets: oneX2(2.09, 4.07, 3.27) },
+        },
+      },
       KNOWN_MARKETS,
     );
-    expect([...odds.keys()]).toEqual(["id1"]);
-    expect(Object.fromEntries(odds.get("id1")!)).toEqual({ "101|101": 1.5, "101|102": 4.2, "101|103": 6.5 });
+    expect([...books.keys()]).toEqual(["winamax.es", "pinnacle+30"]);
+    expect(Object.fromEntries(books.get("winamax.es")!)).toEqual({ "101|101": 2, "101|102": 3.9, "101|103": 3.05 });
+    expect(chooseBook(books)).toBe("winamax.es");
+    // bet365 comes first whenever it is up to date.
+    books.set("bet365", new Map([["101|101", 2.05], ["101|102", 3.8], ["101|103", 3.1]]));
+    expect(chooseBook(books)).toBe("bet365");
+    expect(chooseBook(new Map())).toBeNull();
+    expect(parseFixtureOdds({ fixtureId: "id2", statusId: 1, bookmakerOdds: {} }, KNOWN_MARKETS).size).toBe(0);
   });
 
   it("matches fixtures by kick-off and team, and prices complete markets only", () => {
@@ -100,15 +116,15 @@ describe("OddsPapi", () => {
     ]);
     expect(findFixture(match({}), fixtures)?.fixtureId).toBe("id1");
     expect(findFixture(match({ utcDate: "2026-11-28T18:00:00Z" }), fixtures)).toBeNull();
-    const bet365 = new Map([["id1", new Map([["101|101", 1.5], ["101|102", 4.4], ["101|103", 7], ["104|104", 2.1]])]]);
-    const pinnacle = new Map([["id1", new Map([["101|101", 1.52], ["101|102", 4.3], ["101|103", 6.6]])]]);
-    const prices = marketPrices("id1", KNOWN_MARKETS, bet365, pinnacle);
+    const bet365 = new Map([["101|101", 1.5], ["101|102", 4.4], ["101|103", 7], ["104|104", 2.1]]);
+    const pinnacle = new Map([["101|101", 1.52], ["101|102", 4.3], ["101|103", 6.6]]);
+    const prices = marketPrices(KNOWN_MARKETS, bet365, pinnacle, "bet365");
     // BTTS is left out: bet365 priced only «yes».
     expect(prices.map((p) => p.selection)).toEqual(["1", "X", "2"]);
     const fair = prices.map((p) => p.fair!);
     expect(fair.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 3);
-    expect(prices[0]).toMatchObject({ market: "1X2", price: 1.5, sharp: 1.52 });
-    expect(marketPrices("id1", KNOWN_MARKETS, bet365, new Map())[0].fair).toBeUndefined();
+    expect(prices[0]).toMatchObject({ market: "1X2", price: 1.5, sharp: 1.52, book: "bet365" });
+    expect(marketPrices(KNOWN_MARKETS, bet365, undefined, "bet365")[0].fair).toBeUndefined();
   });
 });
 
@@ -187,7 +203,7 @@ describe("accepting the AI's answer", () => {
       { market: "1X2", selection: "1", price: 1.5, sharp: 1.52, fair: 0.63 },
       { market: "OU", selection: "over", line: 2.5, price: 1.8, sharp: 1.85, fair: 0.52 },
     ]],
-    ["b", [{ market: "BTTS", selection: "yes", price: 1.9 }]],
+    ["b", [{ market: "BTTS", selection: "yes", price: 1.9, book: "Winamax" }]],
   ]);
   const pick = (over: Record<string, unknown>) => ({
     matchId: "a", market: "OU", selection: "over", line: 2.5, probability: 0.6, confidence: "media",
@@ -215,7 +231,8 @@ describe("accepting the AI's answer", () => {
       ["b", "BTTS", 1.9],
     ]);
     expect(analysis.picks[0]).toMatchObject({ line: 2.5, fair: 0.52, confidence: "media" });
-    expect(analysis.picks[1].confidence).toBe("baja");
+    expect(analysis.picks[1]).toMatchObject({ confidence: "baja", book: "Winamax" });
+    expect(analysis.bookmaker).toBe("Winamax");
     expect(edge(0.6, 1.8)).toBeCloseTo(0.08);
     expect(analysis.matches.map((m) => [m.matchId, m.preview])).toEqual([
       ["a", "El Madrid llega en racha."],

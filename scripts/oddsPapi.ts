@@ -10,6 +10,8 @@ import { canonicalTeamName } from "./espn";
 
 /**
  * OddsPapi v4 (free plan: 250 requests a month, every bookmaker, pre-match).
+ * Prices of bet365 when OddsPapi is collecting it, otherwise of a bookmaker
+ * licensed in Spain, and Pinnacle's as the fair reference.
  * The key goes in the `apiKey` query parameter, so URLs are never printed.
  */
 const API = "https://api.oddspapi.io/v4";
@@ -117,18 +119,22 @@ export function parseFixtures(value: unknown): PapiFixture[] {
   });
 }
 
-/** fixtureId → outcome id → decimal price, for one bookmaker. Inactive prices are left out. */
-export type BookPrices = Map<string, Map<string, number>>;
-export function parseTournamentOdds(value: unknown, bookmaker: string, markets: MarketDefinition[]): BookPrices {
+/** Bookmaker slug → `marketId|outcomeId` → decimal price, for one fixture. */
+export type FixtureBooks = Map<string, Map<string, number>>;
+
+/**
+ * Prices of one fixture from `/v4/odds`. Only bookmakers OddsPapi is still
+ * collecting (`bookmakerIsActive`), not suspended, with active prices: a
+ * price kept from a week ago must never look current.
+ */
+export function parseFixtureOdds(value: unknown, markets: MarketDefinition[]): FixtureBooks {
   const wanted = new Map(markets.map((d) => [d.marketId, d]));
-  const prices: BookPrices = new Map();
-  for (const raw of list(value)) {
-    // Not started only (live prices are not on the free plan).
-    if (!isRow(raw) || (typeof raw.statusId === "number" && raw.statusId !== 0)) continue;
-    const fixtureId = str(raw.fixtureId, 80);
-    const book = isRow(raw.bookmakerOdds) ? raw.bookmakerOdds[bookmaker] : undefined;
-    if (!fixtureId || !isRow(book) || book.bookmakerIsActive === false || book.suspended === true) continue;
-    if (!isRow(book.markets)) continue;
+  const books: FixtureBooks = new Map();
+  const raw = list(value).find(isRow);
+  // Not started only (live prices are not on the free plan).
+  if (!raw || (typeof raw.statusId === "number" && raw.statusId !== 0) || !isRow(raw.bookmakerOdds)) return books;
+  for (const [slug, book] of Object.entries(raw.bookmakerOdds)) {
+    if (!isRow(book) || book.bookmakerIsActive !== true || book.suspended === true || !isRow(book.markets)) continue;
     const own = new Map<string, number>();
     for (const [marketId, market] of Object.entries(book.markets)) {
       const definition = wanted.get(marketId);
@@ -142,9 +148,41 @@ export function parseTournamentOdds(value: unknown, bookmaker: string, markets: 
           own.set(`${marketId}|${outcomeId}`, price);
       }
     }
-    if (own.size) prices.set(fixtureId, own);
+    if (own.size) books.set(slug, own);
   }
-  return prices;
+  return books;
+}
+
+/**
+ * bet365 first. When OddsPapi is not collecting it (often: bet365 is hard to
+ * read), the first bookmaker licensed in Spain that prices the match.
+ */
+export const SOFT_BOOKS = [
+  "bet365",
+  "winamax.es",
+  "888sport.es",
+  "bwin.es",
+  "codere.es",
+  "leovegas.es",
+  "goldenpark.es",
+  "williamhill",
+  "betway",
+  "betsson",
+] as const;
+export const BOOK_NAMES: Record<string, string> = {
+  bet365: "bet365",
+  "winamax.es": "Winamax",
+  "888sport.es": "888sport",
+  "bwin.es": "bwin",
+  "codere.es": "Codere",
+  "leovegas.es": "LeoVegas",
+  "goldenpark.es": "Golden Park",
+  williamhill: "William Hill",
+  betway: "Betway",
+  betsson: "Betsson",
+};
+export function chooseBook(books: FixtureBooks) {
+  return SOFT_BOOKS.find((slug) => ["101", "102", "103"].every((o) => books.get(slug)?.has(`101|${o}`))) ?? null;
 }
 
 /** Same day, kick-off within 15 minutes and at least one team by name; unique only. */
@@ -160,21 +198,17 @@ export function findFixture(match: Match, fixtures: PapiFixture[]) {
   return candidates.length === 1 ? candidates[0] : null;
 }
 
-/** Every market both books priced, with Pinnacle's margin removed per market. */
+/** Every market the chosen bookmaker prices completely, with Pinnacle's margin removed per market. */
 export function marketPrices(
-  fixtureId: string,
   markets: MarketDefinition[],
-  bet365: BookPrices,
-  pinnacle: BookPrices,
+  soft: Map<string, number>,
+  sharp: Map<string, number> | undefined,
+  book: string,
 ): MarketPrice[] {
-  const soft = bet365.get(fixtureId);
-  if (!soft) return [];
-  const sharp = pinnacle.get(fixtureId);
   const result: MarketPrice[] = [];
   for (const d of markets) {
     const outcomes = Object.entries(d.outcomes);
     const softPrices = outcomes.map(([oid]) => soft.get(`${d.marketId}|${oid}`));
-    // A market only counts when bet365 prices every outcome of it.
     if (softPrices.some((p) => p === undefined)) continue;
     const sharpPrices = outcomes.map(([oid]) => sharp?.get(`${d.marketId}|${oid}`));
     const complete = sharpPrices.every((p) => p !== undefined);
@@ -185,6 +219,7 @@ export function marketPrices(
         selection,
         ...(d.line !== undefined ? { line: d.line } : {}),
         price: softPrices[i]!,
+        book,
         ...(complete
           ? { sharp: sharpPrices[i]!, fair: Math.round((1 / sharpPrices[i]! / total) * 10_000) / 10_000 }
           : {}),
@@ -211,7 +246,6 @@ export interface OddsPapiClient {
   remaining(): Promise<{ limit: number; used: number; bookmakers: string[] } | null>;
   markets(): Promise<unknown>;
   fixtures(tournamentId: number, from: string, to: string): Promise<unknown>;
-  tournamentOdds(tournamentId: number, bookmaker: string): Promise<unknown>;
   /** One fixture, several bookmakers at once (all of them when none are given). */
   fixtureOdds(fixtureId: string, bookmakers?: string[]): Promise<unknown>;
   /** Requests that used quota in this run. */
@@ -226,8 +260,8 @@ export function createOddsPapiClient(
   const sleep = options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const last = new Map<string, number>();
   let spent = 0;
-  // Minimum gap per endpoint (documented): odds-by-tournaments 1 s, fixtures 2 s.
-  const gaps: Record<string, number> = { "odds-by-tournaments": 1100, fixtures: 2100, markets: 1100, account: 1100, odds: 600 };
+  // Minimum gap per endpoint (documented): odds 0.5 s, fixtures 2 s, the rest 1 s.
+  const gaps: Record<string, number> = { odds: 600, fixtures: 2100, markets: 1100, account: 1100 };
   async function call(path: string, params: Record<string, string | number>, free = false): Promise<unknown> {
     const wait = (last.get(path) ?? -Infinity) + (gaps[path] ?? 1100) - Date.now();
     if (wait > 0) await sleep(wait);
@@ -272,72 +306,12 @@ export function createOddsPapiClient(
     },
     markets: () => call("markets", { language: "en" }),
     fixtures: (tournamentId, from, to) => call("fixtures", { tournamentId, from, to, statusId: 0 }),
-    tournamentOdds: (tournamentId, bookmaker) => call("odds-by-tournaments", { tournamentIds: tournamentId, bookmaker }),
     fixtureOdds: (fixtureId, bookmakers) =>
       call("odds", { fixtureId, ...(bookmakers?.length ? { bookmakers: bookmakers.join(",") } : {}) }),
     get spent() {
       return spent;
     },
   };
-}
-
-/** Bookmakers licensed in Spain (and a few big European ones), by slug. */
-export const SPANISH_BOOKS =
-  /bet365|bwin|codere|sportium|william|888|betway|marca|luckia|kirol|retabet|versus|betsson|winamax|betfair|pokerstars|leovegas|interwetten|juegging|goldenpark|casumo|paston|enracha|bet777|yaass|dazn|tonybet|unibet|betano|marathon|1xbet/i;
-
-/** How many fixtures the bookmaker has active or suspended, and its newest price change. */
-function bookStates(items: Row[], bookmaker: string) {
-  let active = 0;
-  let suspended = 0;
-  let newest = "";
-  for (const r of items) {
-    const b = isRow(r.bookmakerOdds) ? r.bookmakerOdds[bookmaker] : null;
-    if (!isRow(b)) continue;
-    if (b.bookmakerIsActive === true) active++;
-    if (b.suspended === true) suspended++;
-    const m = isRow(b.markets) ? b.markets["101"] : null;
-    const o = isRow(m) && isRow(m.outcomes) ? m.outcomes["101"] : null;
-    const p = isRow(o) && isRow(o.players) ? o.players["0"] : null;
-    for (const t of isRow(p) ? [p.bookmakerChangedAt, p.changedAt] : [])
-      if (typeof t === "string" && t > newest) newest = t;
-  }
-  return `${active}/${items.length} activos, ${suspended} suspendidos, último cambio de 1X2 ${newest.slice(0, 16) || "—"}`;
-}
-function sample(book: Row) {
-  const m = isRow(book.markets) ? book.markets["101"] : null;
-  if (!isRow(m) || !isRow(m.outcomes)) return "—";
-  return ["101", "102", "103"]
-    .map((id) => {
-      const o = (m.outcomes as Row)[id];
-      const p = isRow(o) && isRow(o.players) ? o.players["0"] : null;
-      return isRow(p) ? `${String(p.price)}${p.active === false ? " (inactiva)" : ""} ${String(p.changedAt ?? "").slice(5, 16)}` : "—";
-    })
-    .join(" / ") + ` (mercado activo ${String(m.marketActive)})`;
-}
-
-/** Test mode: what a bookmaker's answer looks like (ids and counts, never prices in bulk). */
-export function oddsShape(value: unknown, bookmaker: string, fixtureIds: string[]) {
-  const items = list(value).filter(isRow);
-  const ours = items.filter((r) => fixtureIds.includes(String(r.fixtureId)));
-  const row = ours[0];
-  const books = row && isRow(row.bookmakerOdds) ? Object.keys(row.bookmakerOdds) : [];
-  const book = row && isRow(row.bookmakerOdds) && isRow(row.bookmakerOdds[bookmaker]) ? (row.bookmakerOdds[bookmaker] as Row) : null;
-  const markets = book && isRow(book.markets) ? Object.keys(book.markets) : [];
-  const first = book && isRow(book.markets) ? (book.markets as Row)[markets[0]] : undefined;
-  const outcomes = isRow(first) && isRow(first.outcomes) ? Object.keys(first.outcomes) : [];
-  return [
-    `${bookmaker}: ${Array.isArray(value) ? "lista" : isRow(value) ? `objeto (${Object.keys(value).slice(0, 8).join(",")})` : typeof value} con ${items.length} partidos`,
-    `claves ${items[0] ? Object.keys(items[0]).slice(0, 14).join(",") : "-"}`,
-    `del día: ${ours.length}${row ? ` (statusId ${String(row.statusId)}, hasOdds ${String(row.hasOdds)})` : ""}`,
-    `casas: ${books.slice(0, 6).join(",") || "-"}`,
-    book ? `activa ${String(book.bookmakerIsActive)}, suspendida ${String(book.suspended)}` : "sin bloque de la casa",
-    `${markets.length} mercados: ${markets.slice(0, 24).join(",")}`,
-    outcomes.length ? `resultados del ${markets[0]}: ${outcomes.join(",")}` : "",
-    `en toda la liga: ${bookStates(items, bookmaker)}`,
-    book ? `1X2 de este partido: ${sample(book)}` : "",
-  ]
-    .filter(Boolean)
-    .join("; ");
 }
 
 /* ---------- One match day ---------- */
@@ -362,15 +336,16 @@ async function marketList(db: Firestore, client: OddsPapiClient, now: number, lo
 }
 
 export interface DayOdds {
-  /** Our match id → bet365 prices (with Pinnacle's when available). */
+  /** Our match id → prices of the chosen bookmaker (with Pinnacle's when available). */
   prices: Map<string, MarketPrice[]>;
   unmatched: string[];
   requests: number;
 }
 
 /**
- * Three requests per match day: the fixtures (team names), bet365's prices
- * and Pinnacle's. Keeps a monthly count below the free plan.
+ * One request for the day's fixtures (team names), then one per match with
+ * bet365, the Spanish fallbacks and Pinnacle together. Keeps a monthly count
+ * below the free plan.
  */
 export async function fetchDayOdds(
   db: Firestore,
@@ -386,12 +361,9 @@ export async function fetchDayOdds(
   const used = budget?.month === month ? Number(budget.used) || 0 : 0;
   const account = await client.remaining();
   if (account) log(`OddsPapi: ${account.used}/${account.limit} peticiones usadas este mes.`);
-  if (account && debug)
-    log(
-      `OddsPapi: ${account.bookmakers.length} casas en el plan; bet365 ${account.bookmakers.includes(BET365) ? "incluida" : "no aparece"}, Pinnacle ${account.bookmakers.includes(PINNACLE) ? "incluida" : "no aparece"}.`,
-    );
+  const needed = matches.length + 2;
   const left = account ? account.limit - account.used : Infinity;
-  if (used + 4 > ODDSPAPI_MONTH_LIMIT || left < 4)
+  if (used + needed > ODDSPAPI_MONTH_LIMIT || left < needed)
     throw new OddsPapiError("presupuesto mensual alcanzado", 429, "MONTH_BUDGET");
   const before = client.spent;
   try {
@@ -401,52 +373,27 @@ export async function fetchDayOdds(
     const lastKick = Math.max(...matches.map((m) => Date.parse(m.utcDate)));
     const iso = (t: number) => new Date(t).toISOString().replace(/\.\d{3}Z$/, "Z");
     const fixtures = parseFixtures(await client.fixtures(tournament, iso(first - 3_600_000), iso(lastKick + 3_600_000)));
-    const ids = fixtures.map((f) => f.fixtureId);
-    const softRaw = await client.tournamentOdds(tournament, BET365);
-    if (debug) log(`OddsPapi: ${oddsShape(softRaw, BET365, ids)}`);
-    const bet365 = parseTournamentOdds(softRaw, BET365, markets);
-    let pinnacle: BookPrices = new Map();
-    try {
-      const sharpRaw = await client.tournamentOdds(tournament, PINNACLE);
-      if (debug) log(`OddsPapi: ${oddsShape(sharpRaw, PINNACLE, ids)}`);
-      pinnacle = parseTournamentOdds(sharpRaw, PINNACLE, markets);
-    } catch (error) {
-      log(`OddsPapi: sin referencia de Pinnacle (${error instanceof Error ? error.message : "error"}).`);
-    }
     const prices = new Map<string, MarketPrice[]>();
     const unmatched: string[] = [];
     for (const match of matches) {
       const fixture = findFixture(match, fixtures);
-      const list = fixture ? marketPrices(fixture.fixtureId, markets, bet365, pinnacle) : [];
-      if (list.length) prices.set(match.id, list);
-      else unmatched.push(`${match.home} - ${match.away}${fixture ? " (sin cuotas de bet365)" : ""}`);
-    }
-    if (debug && fixtures[0]) {
-      // Which Spanish bookmakers really have fresh prices for this fixture (one request).
-      const candidates = (account?.bookmakers ?? []).filter((slug) => SPANISH_BOOKS.test(slug)).slice(0, 45);
-      log(`OddsPapi: casas candidatas: ${candidates.join(", ")}`);
-      const all = await client.fixtureOdds(fixtures[0].fixtureId, candidates);
-      const books = isRow(all) && isRow(all.bookmakerOdds) ? Object.entries(all.bookmakerOdds) : [];
-      const live = books.flatMap(([slug, b]) => {
-        if (!isRow(b) || b.bookmakerIsActive !== true || b.suspended === true) return [];
-        const m = isRow(b.markets) ? b.markets["101"] : null;
-        if (!isRow(m) || m.marketActive === false || !isRow(m.outcomes)) return [];
-        const p = ["101", "102", "103"].map((id) => {
-          const o = (m.outcomes as Row)[id];
-          const pl = isRow(o) && isRow(o.players) ? o.players["0"] : null;
-          return isRow(pl) && pl.active !== false ? pl : null;
-        });
-        if (p.some((x) => !x)) return [];
-        const changed = p.map((x) => String(x!.changedAt ?? "")).sort().at(-1) || "";
-        return [{ slug, prices: p.map((x) => x!.price).join("/"), changed }];
-      });
-      live.sort((a, b) => b.changed.localeCompare(a.changed));
-      log(
-        `OddsPapi: ${books.length} casas con este partido, ${live.length} activas con 1X2: ${live
-          .map((l) => `${l.slug} ${l.prices} (${l.changed.slice(5, 16)})`)
-          .join("; ")
-          .slice(0, 6000)}`,
-      );
+      if (!fixture) {
+        unmatched.push(`${match.home} - ${match.away}`);
+        continue;
+      }
+      const books = parseFixtureOdds(await client.fixtureOdds(fixture.fixtureId, [...SOFT_BOOKS, PINNACLE]), markets);
+      const slug = chooseBook(books);
+      if (!slug) {
+        unmatched.push(`${match.home} - ${match.away} (ninguna casa con cuotas al día)`);
+        continue;
+      }
+      const list = marketPrices(markets, books.get(slug)!, books.get(PINNACLE), BOOK_NAMES[slug] ?? slug);
+      prices.set(match.id, list);
+      if (debug || slug !== BET365)
+        log(
+          `OddsPapi: ${match.home} - ${match.away}: ${slug === BET365 ? "bet365" : `bet365 no está al día, se usa ${BOOK_NAMES[slug] ?? slug}`}; ` +
+            `${list.length} cuotas${books.has(PINNACLE) ? ", con Pinnacle" : ", sin Pinnacle"}.`,
+        );
     }
     if (unmatched.length && fixtures.length)
       log(

@@ -1,8 +1,8 @@
 # Apuestas: análisis de la IA
 
 La pestaña **Apuestas** (`#/apuestas`) muestra, para cada día de LaLiga o
-Champions, las apuestas de bet365 que la IA considera más jugosas: las que
-pagan más de lo que deberían. Es información: GalacticBet no gestiona
+Champions, las apuestas de bet365 (u otra casa española si bet365 no está al
+día) que la IA considera más jugosas: las que pagan más de lo que deberían. Es información: GalacticBet no gestiona
 apuestas ni dinero.
 
 ## Cómo funciona
@@ -15,11 +15,19 @@ apuestas ni dinero.
    día. Hay un análisis por competición y día en hora de España
    (`PD-2026-11-28`).
 2. **Cuotas.** OddsPapi (plan gratuito, 250 peticiones al mes). Cada análisis
-   hace tres peticiones:
-   - los partidos, para emparejar los nombres;
-   - las cuotas de bet365;
-   - las de Pinnacle (`pinnacle+30`), la casa de referencia, de las que se
-     quita el margen para obtener la probabilidad justa.
+   hace una petición con los partidos del día (para emparejar los nombres) y
+   otra por partido. Cada una de estas trae a la vez bet365, varias casas con
+   licencia en España y Pinnacle (`pinnacle+30`), la casa de referencia, de la
+   que se quita el margen para obtener la probabilidad justa. Un día de LaLiga
+   gasta entre 2 y 5 peticiones; uno de Champions, unas 10.
+
+   **bet365 primero.** OddsPapi no siempre tiene bet365 al día (en la prueba
+   del 26/11/2026 solo lo estaba en 1 de 22 partidos de LaLiga, con cuotas de
+   hacía una semana). Las cuotas de una casa que OddsPapi no está leyendo
+   (`bookmakerIsActive: false`) o que tiene suspendida no se usan nunca. En ese
+   caso se usa la primera casa española al día, en este orden: Winamax,
+   888sport, bwin, Codere, LeoVegas, Golden Park, William Hill, Betway y
+   Betsson. La app muestra la casa junto a cada cuota.
 
    Mercados: 1X2, doble oportunidad, empate no válido, ambos marcan y más/menos
    de 1,5, 2,5 y 3,5 goles. La lista oficial de mercados se guarda un mes
@@ -61,8 +69,9 @@ conversación normal de Claude Code; no se paga nada aparte.
 
 Actions → **AI betting analysis** → Run workflow con «Prueba» marcado: trae
 las cuotas y los datos del próximo día de partidos y escribe en el registro
-cuántos partidos se han emparejado y sus cuotas 1X2. No llama a la IA ni
-guarda nada. Gasta 3 o 4 peticiones de OddsPapi.
+cuántos partidos se han emparejado, de qué casa son las cuotas y su 1X2. No
+llama a la IA ni guarda nada. Gasta una petición más que el número de
+partidos de ese día.
 
 Sin «Prueba», hace lo mismo que la tarea programada: solo genera el
 análisis si toca.
