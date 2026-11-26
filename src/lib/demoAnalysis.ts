@@ -1,4 +1,4 @@
-import type { AnalysisBoard, AnalysisPick, MatchMarket } from "./bettingAnalysis";
+import { pickKey, type AnalysisBoard, type AnalysisPick, type MatchMarket } from "./bettingAnalysis";
 import { demoMatches } from "./demo";
 
 /**
@@ -91,6 +91,8 @@ export function demoAnalysisBoard(): AnalysisBoard {
           }, { home: 0.38, draw: 0.32, away: 0.3, over25: 0.42, btts: 0.47, source: "Pinnacle" }, []),
         ],
         picks: [btts, atletiWin],
+        // Two jugosas of different matches: the day's combinada.
+        combo: [pickKey(btts), pickKey(atletiWin)],
       },
     ],
   };

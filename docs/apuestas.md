@@ -88,9 +88,28 @@ enlace; la hora del análisis). Los colores de 1 · X · 2 (ámbar, gris y azul)
 están validados para daltonismo en los dos temas y son los mismos en Ligas ›
 Datos.
 
+### Combinada
+
+- **La combinada de las jugosas.** Si un día hay jugosas de al menos dos
+  partidos, se forma sola con la mejor de cada partido (como mucho tres, la
+  de más valor primero). Se fija al publicar el análisis
+  (`analyses[].combo`, las claves de sus apuestas) y lleva su propio
+  historial: gana si aciertan todas, pierde con una fallada; una nula cuenta a
+  cuota 1, como en las casas.
+- **Tu combinada.** «＋ Combinada» en cualquier apuesta del análisis la añade
+  a la tuya; una de un partido que ya estaba ocupa su lugar (dos del mismo
+  partido no se multiplican: están relacionadas y las casas las cotizan
+  aparte). Un panel fijo enseña la cuota total y, al abrirlo, las apuestas, la
+  probabilidad de acertarla según la IA y según el mercado, su valor y la
+  gráfica «¿Compensa?». No se guarda: es una calculadora.
+- Siempre con el mismo aviso: las cuotas se multiplican y el margen de la
+  casa también; una combinada solo tiene valor si lo tiene cada apuesta, y se
+  acierta pocas veces.
+
 La app resuelve cada apuesta con el resultado oficial a 90 minutos y lleva
-dos historiales a una unidad por apuesta, sin reescribir nada: el de las
-jugosas y el de la mejor opción de cada partido. Cuando un análisis sale del
+tres historiales a una unidad por apuesta, sin reescribir nada: el de las
+jugosas, el de la mejor opción de cada partido y el de la combinada de las
+jugosas (una unidad por combinada, a su cuota total). Cuando un análisis sale del
 documento (se guardan los 24 últimos), sus apuestas ya resueltas se suman a
 los totales archivados de su competición: el historial no olvida ninguna e
 indica desde cuándo cuenta.

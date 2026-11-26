@@ -6,6 +6,9 @@ import {
   archiveAnalyses,
   archivedRecord,
   analysisDays,
+  comboOf,
+  juicyCombo,
+  settleCombo,
   isJuicy,
   marketValue,
   mergeAnalysis,
@@ -446,6 +449,7 @@ describe("what the charts read", () => {
   });
 });
 
+type AnalysisPickLike = BettingAnalysis["picks"][number];
 describe("the record never forgets and the day is analysed once", () => {
   // A LaLiga Saturday: 14:00, 16:15, 18:30 and 21:00 in Madrid.
   const saturday = [
@@ -501,6 +505,7 @@ describe("the record never forgets and the day is analysed once", () => {
       since: "2026-10-04",
       value: { picks: 1, settled: 1, won: 1, lost: 0, void: 0, units: 1.5 },
       best: { picks: 1, settled: 1, won: 1, lost: 0, void: 0, units: 0.8 },
+      combo: { picks: 0, settled: 0, won: 0, lost: 0, void: 0, units: 0 },
     });
     // Added to, never replaced; the board reads it back.
     const later = analysis({ id: "PD-2026-10-05", date: "2026-10-05", picks: [tip("b")], matches: [game("b", "2026-10-05T13:00:00Z")] });
@@ -512,6 +517,45 @@ describe("the record never forgets and the day is analysed once", () => {
     const base = archivedRecord(board.archive, ["PD", "CL"], "value")!;
     expect(trackRecord([], [], "value", base.totals)).toMatchObject({ picks: 2, won: 1, lost: 1, units: 0.5, yield: 0.25 });
     expect(archivedRecord(board.archive, ["CL"], "value")).toBeNull();
+  });
+
+  it("la combinada de las jugosas: una por partido, la de más valor, y se fija al publicar", () => {
+    const leg = (matchId: string, price: number, probability: number, over: Partial<AnalysisPickLike> = {}) =>
+      ({ matchId, market: "1X2", selection: "1", price, probability, confidence: "media", reason: "R", ...over }) as const;
+    const picks = [
+      leg("a", 2, 0.55), // +10 %
+      leg("a", 1.8, 0.6, { market: "BTTS", selection: "yes" }), // +8 %: same match, the better one stays
+      leg("b", 2.5, 0.43, { fair: 0.4 }), // +7,5 %
+      leg("c", 1.5, 0.67), // +0,5 %: not a jugosa
+    ];
+    expect(juicyCombo(picks).map((p) => [p.matchId, p.market])).toEqual([
+      ["a", "1X2"],
+      ["b", "1X2"],
+    ]);
+    expect(juicyCombo([leg("a", 2, 0.55)])).toEqual([]);
+    // Prices and chances multiply; the market's only when it priced every leg.
+    expect(comboOf([leg("a", 2, 0.55, { fair: 0.5 }), leg("b", 2.5, 0.43, { fair: 0.4 })])).toEqual({
+      price: 5,
+      probability: expect.closeTo(0.2365, 4),
+      fair: expect.closeTo(0.2, 4),
+    });
+    expect(comboOf([leg("a", 2, 0.55), leg("b", 2.5, 0.43, { fair: 0.4 })]).fair).toBeUndefined();
+    // Settled: all won pays the product; a void leg counts at 1; one lost loses it.
+    const legs = [leg("a", 2, 0.55), leg("b", 2.5, 0.43)];
+    const byId = (a: Match, b: Match) => new Map([["a", a], ["b", b]]);
+    expect(settleCombo(legs, byId(finished("a", 1, 0), finished("b", 2, 1)))).toEqual({ result: "won", payout: 5 });
+    expect(settleCombo(legs, byId(finished("a", 1, 0), match({ id: "b", status: "POSTPONED" })))).toEqual({ result: "won", payout: 2 });
+    expect(settleCombo(legs, byId(finished("a", 0, 1), match({ id: "b" })))).toEqual({ result: "lost", payout: 0 });
+    expect(settleCombo(legs, byId(finished("a", 1, 0), match({ id: "b" })))).toBeNull();
+    // One pick at the combined price in its own record, read back from the board.
+    const day = analysis({ picks: legs as unknown as BettingAnalysis["picks"], matches: [game("a", "2026-11-28T13:00:00Z"), game("b", "2026-11-28T15:00:00Z")], combo: legs.map((l) => `${l.matchId}|1X2|1|`) });
+    const board = decodeAnalysisBoard(JSON.parse(JSON.stringify({ formatVersion: ANALYSIS_FORMAT, updatedAt: day.generatedAt, analyses: [day] })))!;
+    expect(board.analyses[0].combo).toEqual(["a|1X2|1|", "b|1X2|1|"]);
+    expect(trackRecord(board.analyses, [finished("a", 1, 0), finished("b", 2, 1)], "combo")).toMatchObject({ picks: 1, won: 1, units: 4 });
+    // A combinada that doesn't fit (same match twice, unknown pick) is dropped, the analysis stays.
+    const twice = decodeAnalysisBoard({ formatVersion: ANALYSIS_FORMAT, updatedAt: day.generatedAt, analyses: [{ ...day, combo: ["a|1X2|1|", "a|1X2|1|"] }] })!;
+    expect(twice.analyses[0].combo).toBeUndefined();
+    expect(twice.analyses[0].picks).toHaveLength(2);
   });
 
   it("«jugosa» means +3 % as shown, and never far above the market", () => {

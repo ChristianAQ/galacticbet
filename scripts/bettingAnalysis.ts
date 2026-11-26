@@ -11,6 +11,7 @@ import {
   analysisDays,
   archiveAnalyses,
   isJuicy,
+  juicyCombo,
   marketView,
   mergeAnalysis,
   sourceHosts,
@@ -318,6 +319,8 @@ export function acceptAnalysis(
     if (picks.length >= MAX_PICKS) break;
   }
   const at = new Date(now).toISOString();
+  // «La combinada de las jugosas», fixed now: the record never re-picks it later.
+  const combo = juicyCombo(picks).map(pickKey);
   // «bet365», or the bookmakers really used when bet365 was not up to date.
   const books = [...new Set([...prices.values()].flatMap((list) => (list[0]?.book ? [list[0].book] : [])))];
   return {
@@ -331,6 +334,7 @@ export function acceptAnalysis(
     summary: clip(a.summary, 900) || "Sin resumen.",
     matches,
     picks,
+    ...(combo.length ? { combo } : {}),
   };
 }
 

@@ -169,6 +169,11 @@ export interface BettingAnalysis {
   summary: string;
   matches: AnalysisMatch[];
   picks: AnalysisPick[];
+  /**
+   * «La combinada de las jugosas», fixed when the analysis is published: the
+   * keys (pickKey) of its legs, all among `picks`, from different matches.
+   */
+  combo?: string[];
 }
 /** Settled totals of one kind of pick (see TrackRecord). */
 export interface RecordTotals {
@@ -180,8 +185,9 @@ export interface RecordTotals {
   units: number;
 }
 /** Per competition: the record of analyses that no longer fit on the board. */
+export type RecordKind = "value" | "best" | "combo";
 export type RecordArchive = Partial<
-  Record<AnalysisCompetition, { since: string; value: RecordTotals; best: RecordTotals }>
+  Record<AnalysisCompetition, { since: string; value: RecordTotals; best: RecordTotals; combo?: RecordTotals }>
 >;
 export interface AnalysisBoard {
   formatVersion: typeof ANALYSIS_FORMAT;
@@ -293,19 +299,88 @@ export interface TrackRecord {
 export const picksOf = (analysis: BettingAnalysis, kind: "value" | "best") =>
   kind === "value" ? analysis.picks : analysis.matches.flatMap((m) => (m.pick ? [m.pick] : []));
 
+/* ---------- Combinada ---------- */
+
+export const MAX_COMBO_LEGS = 3;
+/**
+ * A combinada: the prices multiply, and so do the chances (legs of different
+ * matches are independent). The bookmaker's margin multiplies too, so it only
+ * has value when every leg has it.
+ */
+export function comboOf(legs: Pick<AnalysisPick, "price" | "probability" | "fair">[]) {
+  const product = (values: number[]) => values.reduce((a, b) => a * b, 1);
+  return {
+    price: Math.round(product(legs.map((l) => l.price)) * 100) / 100,
+    probability: product(legs.map((l) => l.probability)),
+    /** The market's chance (Pinnacle without margin), when it priced every leg. */
+    fair: legs.every((l) => l.fair !== undefined) ? product(legs.map((l) => l.fair!)) : undefined,
+  };
+}
+/**
+ * «La combinada de las jugosas»: the best jugosa of each match, up to three,
+ * most value first; none with fewer than two matches.
+ */
+export function juicyCombo(picks: AnalysisPick[]): AnalysisPick[] {
+  const best = new Map<string, AnalysisPick>();
+  for (const p of picks.filter(isJuicy)) {
+    const current = best.get(p.matchId);
+    if (!current || edge(p.probability, p.price) > edge(current.probability, current.price)) best.set(p.matchId, p);
+  }
+  const legs = [...best.values()]
+    .sort((a, b) => edge(b.probability, b.price) - edge(a.probability, a.price))
+    .slice(0, MAX_COMBO_LEGS);
+  return legs.length >= 2 ? legs : [];
+}
+/** The legs of an analysis's combinada, as published. */
+export const comboLegs = (analysis: Pick<BettingAnalysis, "combo" | "picks">) =>
+  (analysis.combo ?? []).flatMap((key) => analysis.picks.find((p) => pickKey(p) === key) ?? []);
+/**
+ * A combinada wins when every leg does; one lost leg loses it. A void leg
+ * counts at price 1 (as bookmakers settle it); all void returns the stake.
+ */
+export function settleCombo(legs: AnalysisPick[], byId: Map<string, Match>) {
+  let pending = false;
+  let payout = 1;
+  let anyWon = false;
+  for (const leg of legs) {
+    const result = settlePick(leg, byId.get(leg.matchId));
+    if (result === "lost") return { result: "lost" as const, payout: 0 };
+    if (result === null) pending = true;
+    else if (result === "won") {
+      anyWon = true;
+      payout *= leg.price;
+    }
+  }
+  if (pending) return null;
+  return { result: anyWon ? ("won" as const) : ("void" as const), payout: Math.round(payout * 100) / 100 };
+}
+
 /**
  * Honest scoreboard of every pick of a kind on the board, one unit each,
- * on top of what older analyses already settled (`base`).
+ * on top of what older analyses already settled (`base`). A combinada is one
+ * pick at its combined price.
  */
 export function trackRecord(
   analyses: BettingAnalysis[],
   matches: Match[],
-  kind: "value" | "best" = "value",
+  kind: RecordKind = "value",
   base?: RecordTotals,
 ): TrackRecord {
   const byId = new Map(matches.map((m) => [m.id, m]));
   const record: TrackRecord = { picks: 0, settled: 0, won: 0, lost: 0, void: 0, units: 0, yield: null, ...base };
-  for (const analysis of analyses)
+  for (const analysis of analyses) {
+    if (kind === "combo") {
+      const legs = comboLegs(analysis);
+      if (legs.length < 2) continue;
+      record.picks++;
+      const settled = settleCombo(legs, byId);
+      if (!settled) continue;
+      record.settled++;
+      record[settled.result]++;
+      if (settled.result === "won") record.units += settled.payout - 1;
+      if (settled.result === "lost") record.units -= 1;
+      continue;
+    }
     for (const pick of picksOf(analysis, kind)) {
       record.picks++;
       const result = settlePick(pick, byId.get(pick.matchId));
@@ -315,6 +390,7 @@ export function trackRecord(
       if (result === "won") record.units += pick.price - 1;
       if (result === "lost") record.units -= 1;
     }
+  }
   const staked = record.won + record.lost;
   record.units = Math.round(record.units * 100) / 100;
   record.yield = staked ? record.units / staked : null;
@@ -422,12 +498,12 @@ export function mergeAnalysis(previous: BettingAnalysis | undefined, next: Betti
 }
 
 /** Archived totals of a kind for some competitions (summed), and since when. */
-export function archivedRecord(archive: RecordArchive | undefined, competitions: readonly AnalysisCompetition[], kind: "value" | "best") {
+export function archivedRecord(archive: RecordArchive | undefined, competitions: readonly AnalysisCompetition[], kind: RecordKind) {
   const entries = competitions.flatMap((c) => (archive?.[c] ? [archive[c]!] : []));
   if (!entries.length) return null;
   const totals: RecordTotals = { picks: 0, settled: 0, won: 0, lost: 0, void: 0, units: 0 };
   for (const e of entries)
-    for (const key of Object.keys(totals) as (keyof RecordTotals)[]) totals[key] += e[kind][key];
+    for (const key of Object.keys(totals) as (keyof RecordTotals)[]) totals[key] += e[kind]?.[key] ?? 0;
   return { totals, since: entries.map((e) => e.since).sort()[0] };
 }
 
@@ -438,7 +514,7 @@ export function archiveAnalyses(archive: RecordArchive | undefined, dropped: Bet
     const own = dropped.filter((a) => a.competition === competition);
     if (!own.length) continue;
     const before = next[competition];
-    const totals = (kind: "value" | "best"): RecordTotals => {
+    const totals = (kind: RecordKind): RecordTotals => {
       const { yield: _yield, ...r } = trackRecord(own, matches, kind, before?.[kind]);
       return r;
     };
@@ -447,6 +523,7 @@ export function archiveAnalyses(archive: RecordArchive | undefined, dropped: Bet
       since: before && before.since < oldest ? before.since : oldest,
       value: totals("value"),
       best: totals("best"),
+      combo: totals("combo"),
     };
   }
   return next;
@@ -544,6 +621,16 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
   if (!matches.length) return null;
   const ids = new Set(matches.map((m) => m.matchId));
   const picks = raw.picks.slice(0, MAX_STORED_PICKS).flatMap((p) => decodePick(p, ids) ?? []);
+  // The combinada: two or three of its own picks, each of a different match.
+  const keys = new Map(picks.map((p) => [pickKey(p), p.matchId]));
+  const combo =
+    Array.isArray(raw.combo) &&
+    raw.combo.length >= 2 &&
+    raw.combo.length <= MAX_COMBO_LEGS &&
+    raw.combo.every((k) => typeof k === "string" && keys.has(k)) &&
+    new Set(raw.combo.map((k) => keys.get(k as string))).size === raw.combo.length
+      ? (raw.combo as string[])
+      : null;
   return {
     id: id as string,
     competition: competition as AnalysisCompetition,
@@ -555,6 +642,7 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
     summary: summary as string,
     matches,
     picks,
+    ...(combo ? { combo } : {}),
   };
 }
 
@@ -574,7 +662,8 @@ function decodeArchive(raw: unknown): RecordArchive | undefined {
     if (!isRow(entry) || typeof entry.since !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(entry.since)) continue;
     const value = decodeTotals(entry.value);
     const best = decodeTotals(entry.best);
-    if (value && best) archive[competition] = { since: entry.since, value, best };
+    const combo = decodeTotals(entry.combo);
+    if (value && best) archive[competition] = { since: entry.since, value, best, ...(combo ? { combo } : {}) };
   }
   return Object.keys(archive).length ? archive : undefined;
 }

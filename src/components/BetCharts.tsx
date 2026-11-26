@@ -82,7 +82,7 @@ export function GoalChances({ market }: { market: MatchMarket }) {
  * «¿Compensa?»: the AI's chance against the one the price needs to break even
  * (1 / cuota). Past the mark, the bet pays more than it should.
  */
-export function BreakEven({ pick }: { pick: AnalysisPick }) {
+export function BreakEven({ pick }: { pick: Pick<AnalysisPick, "price" | "probability" | "fair"> }) {
   const needed = 1 / pick.price;
   const value = edge(pick.probability, pick.price);
   const pays = pick.probability >= needed;

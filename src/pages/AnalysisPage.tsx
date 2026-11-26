@@ -10,28 +10,29 @@ import {
   MARKET_NAMES,
   MIN_VALUE,
   archivedRecord,
-  isJuicy,
-  marketValue,
+  comboLegs,
+  comboOf,
   nextAnalysis,
   pickKey,
   pickLabel,
   picksOf,
   settlePick,
   trackRecord,
-  valuePercent,
   type AnalysisCompetition,
   type AnalysisMatch,
   type AnalysisPick,
   type BettingAnalysis,
   type PickResult,
   type RecordArchive,
+  type RecordKind,
 } from "../lib/bettingAnalysis";
 import { competitionName } from "../lib/competitions";
 import type { Match } from "../lib/domain";
 import { BreakEven, GoalChances, OutcomeChances, ValueOverview } from "../components/BetCharts";
+import { ComboCard, ComboPanel, ComboResult, ComboToggle, ValueChip } from "../components/BetCombo";
 import TeamForm from "../components/TeamForm";
 import { demoAnalysisBoard } from "../lib/demoAnalysis";
-import { prefersReducedMotion } from "../lib/motion";
+import { haptic, prefersReducedMotion } from "../lib/motion";
 import { useAnalysisBoard } from "../lib/useAnalysisBoard";
 import "../styles/analysis.css";
 
@@ -44,7 +45,6 @@ const hour = new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit" 
 const when = new Intl.DateTimeFormat("es", { weekday: "long", hour: "2-digit", minute: "2-digit" });
 const ago = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
 const pct = (p: number) => `${Math.round(p * 100)} %`;
-const signedPct = (n: number) => (n > 0 ? `+${n} %` : n < 0 ? `−${Math.abs(n)} %` : "0 %");
 /** The «jugosa» threshold as the texts say it. */
 const JUICY = pct(MIN_VALUE);
 /** The day of an analysis, at noon in Spain so no time zone moves it. */
@@ -160,18 +160,27 @@ function Why({
   );
 }
 
+/** Your combinada while you build it: which bets are in, add or take out, empty it. */
+interface Slip {
+  has: (pick: AnalysisPick) => boolean;
+  toggle: (pick: AnalysisPick) => void;
+  clear: () => void;
+}
+
 function PickCard({
   analysis,
   pick,
   game,
   match,
   index,
+  slip,
 }: {
   analysis: BettingAnalysis;
   pick: AnalysisPick;
   game?: AnalysisMatch;
   match?: Match;
   index: number;
+  slip?: Slip;
 }) {
   const home = game?.home ?? match?.home ?? "Local";
   const away = game?.away ?? match?.away ?? "Visitante";
@@ -199,42 +208,11 @@ function PickCard({
         <ValueChip pick={pick} />
         <span className={`bet-confidence is-${pick.confidence}`}>Confianza {pick.confidence}</span>
         <ResultBadge pick={pick} match={match} />
+        {slip && <ComboToggle pick={pick} inSlip={slip.has(pick)} onToggle={slip.toggle} />}
       </div>
       <BreakEven pick={pick} />
       <Why analysis={analysis} game={game} pick={pick} preview={false} />
     </li>
-  );
-}
-
-/**
- * The value of a price, as it is: by the AI's estimate and, when Pinnacle
- * priced it, by the market. Both side by side, so a «jugosa» the market
- * disagrees with is plain to see.
- */
-function ValueChip({ pick }: { pick: AnalysisPick }) {
-  const value = valuePercent(pick.probability, pick.price);
-  const market = marketValue(pick);
-  const marketPct = market === null ? null : Math.round(market * 100);
-  return (
-    <>
-      {isJuicy(pick) ? (
-        <span className="bet-value" title="Lo que paga la cuota por encima de lo justo, según la estimación de la IA">
-          IA {signedPct(value)}
-        </span>
-      ) : (
-        <span className="bet-value is-flat" title="Según la IA, la cuota paga menos de lo justo o casi lo justo">
-          {value < 0 ? `IA sin valor (${signedPct(value)})` : `IA ${signedPct(value)}`}
-        </span>
-      )}
-      {marketPct !== null && (
-        <span
-          className={`bet-value is-market${marketPct > 0 ? " is-up" : ""}`}
-          title="Lo que paga la cuota según Pinnacle, la casa de referencia, sin su margen"
-        >
-          Mercado {signedPct(marketPct)}
-        </span>
-      )}
-    </>
   );
 }
 
@@ -246,6 +224,7 @@ function GameCard({
   matches,
   index,
   juicy,
+  slip,
 }: {
   analysis: BettingAnalysis;
   game: AnalysisMatch;
@@ -253,6 +232,7 @@ function GameCard({
   matches: Match[];
   index: number;
   juicy: boolean;
+  slip?: Slip;
 }) {
   const pick = game.pick;
   return (
@@ -300,6 +280,7 @@ function GameCard({
               <span className={`bet-confidence is-${pick.confidence}`}>Confianza {pick.confidence}</span>
             )}
             <ResultBadge pick={pick} match={match} />
+            {slip && <ComboToggle pick={pick} inSlip={slip.has(pick)} onToggle={slip.toggle} />}
           </div>
           <BreakEven pick={pick} />
         </div>
@@ -314,13 +295,18 @@ function AnalysisDay({
   byId,
   matches,
   latest,
+  slip,
+  slipLegs = [],
 }: {
   analysis: BettingAnalysis;
   byId: Map<string, Match>;
   matches: Match[];
   latest: boolean;
+  slip?: Slip;
+  slipLegs?: AnalysisPick[];
 }) {
   const games = new Map(analysis.matches.map((m) => [m.matchId, m]));
+  const combo = comboLegs(analysis);
   const open = (matchId: string) =>
     document
       .getElementById(`bet-game-${matchId}`)
@@ -337,6 +323,9 @@ function AnalysisDay({
         </small>
       </header>
       <h2 id={`bet-${analysis.id}`}>{analysis.headline}</h2>
+      {slip && slipLegs.length > 0 && (
+        <ComboPanel legs={slipLegs} games={games} onRemove={slip.toggle} onClear={slip.clear} />
+      )}
       <ValueOverview matches={analysis.matches} onOpen={open} />
       <p className="bet-summary">{analysis.summary}</p>
       <h3 className="bet-subhead">
@@ -352,6 +341,7 @@ function AnalysisDay({
               game={games.get(pick.matchId)}
               match={byId.get(pick.matchId)}
               index={i}
+              slip={slip}
             />
           ))}
         </ol>
@@ -361,6 +351,7 @@ function AnalysisDay({
           valor real.
         </p>
       )}
+      {combo.length >= 2 && <ComboCard legs={combo} games={games} byId={byId} />}
       <h3 className="bet-subhead">
         Partido a partido <small>{analysis.matches.length}</small>
       </h3>
@@ -374,6 +365,7 @@ function AnalysisDay({
             matches={matches}
             index={i}
             juicy={Boolean(m.pick && analysis.picks.some((p) => pickKey(p) === pickKey(m.pick!)))}
+            slip={slip}
           />
         ))}
       </ul>
@@ -390,7 +382,7 @@ function Record({
 }: {
   analyses: BettingAnalysis[];
   matches: Match[];
-  kind: "value" | "best";
+  kind: RecordKind;
   archive?: RecordArchive;
   competitions: readonly AnalysisCompetition[];
 }) {
@@ -402,8 +394,10 @@ function Record({
   return (
     <div className="bet-record-block">
       <h3 className="bet-subhead">
-        {kind === "value" ? "Las jugosas" : "La mejor opción de cada partido"}
-        <small>{r.picks} {r.picks === 1 ? "apuesta" : "apuestas"}</small>
+        {kind === "value" ? "Las jugosas" : kind === "best" ? "La mejor opción de cada partido" : "La combinada de las jugosas"}
+        <small>
+          {r.picks} {kind === "combo" ? (r.picks === 1 ? "combinada" : "combinadas") : r.picks === 1 ? "apuesta" : "apuestas"}
+        </small>
       </h3>
       {r.settled ? (
         <div className="bet-record">
@@ -427,7 +421,7 @@ function Record({
       ) : null}
       <p className="bet-source">
         {r.settled
-          ? `Una unidad por apuesta a la cuota del análisis${r.void ? `; ${r.void} nulas devuelven la apuesta` : ""}.`
+          ? `Una unidad por ${kind === "combo" ? "combinada a su cuota total" : "apuesta a la cuota del análisis"}${r.void ? `; ${r.void} nulas devuelven la apuesta` : ""}.`
           : "Se resolverán cuando terminen los partidos."}
         {r.settled > 0 && r.picks > r.settled && ` ${r.picks - r.settled} por resolver.`}
         {older && ` Desde el ${shortDay.format(new Date(`${older.since}T12:00:00`))}.`}
@@ -440,6 +434,7 @@ function PastDay({ analysis, byId }: { analysis: BettingAnalysis; byId: Map<stri
   const juicy = new Set(analysis.picks.map(pickKey));
   const all = [...analysis.picks, ...picksOf(analysis, "best").filter((p) => !juicy.has(pickKey(p)))];
   const results = all.map((p) => settlePick(p, byId.get(p.matchId)));
+  const combo = comboLegs(analysis);
   const [open, setOpen] = useState(false);
   return (
     <li className={`bet-past${open ? " is-open" : ""}`}>
@@ -478,6 +473,18 @@ function PastDay({ analysis, byId }: { analysis: BettingAnalysis; byId: Map<stri
               </li>
             );
           })}
+          {combo.length >= 2 && (
+            <li className="bet-past-combo">
+              <span>
+                <strong>
+                  Combinada de {combo.length}
+                  <em className="bet-juicy">Jugosas</em>
+                </strong>
+                <small>Cuota {odds.format(comboOf(combo).price)}</small>
+              </span>
+              <ComboResult legs={combo} byId={byId} />
+            </li>
+          )}
           {!all.length && <li className="bet-past-none">Sin apuestas.</li>}
         </ol>
       )}
@@ -507,6 +514,27 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
     return upcoming;
   }, [matches, board, filter]);
   const [latest, ...past] = analyses;
+  // Your combinada, for the analysis on top (a new one starts it empty).
+  const [picked, setPicked] = useState<{ id: string; legs: AnalysisPick[] }>({ id: "", legs: [] });
+  const slipLegs = latest && picked.id === latest.id ? picked.legs : [];
+  const slip: Slip | undefined = latest
+    ? {
+        has: (pick) => slipLegs.some((l) => pickKey(l) === pickKey(pick)),
+        toggle: (pick) => {
+          const key = pickKey(pick);
+          const inside = slipLegs.some((l) => pickKey(l) === key);
+          if (!inside) haptic();
+          // One bet per match: a new one of the same match takes the place of the other.
+          setPicked({
+            id: latest.id,
+            legs: inside
+              ? slipLegs.filter((l) => pickKey(l) !== key)
+              : [...slipLegs.filter((l) => l.matchId !== pick.matchId), pick],
+          });
+        },
+        clear: () => setPicked({ id: latest.id, legs: [] }),
+      }
+    : undefined;
   // The latest stays on top while its matches are still to be played or just ended.
   const fresh = latest && Date.now() - Date.parse(latest.generatedAt) < 2 * 86_400_000;
   return (
@@ -553,7 +581,7 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
             </p>
           )}
           {latest && fresh ? (
-            <AnalysisDay analysis={latest} byId={byId} matches={matches} latest />
+            <AnalysisDay analysis={latest} byId={byId} matches={matches} latest slip={slip} slipLegs={slipLegs} />
           ) : (
             !latest && (
               <Empty art="net" title="Aún no hay análisis">
@@ -568,6 +596,7 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
               </div>
               <Record analyses={analyses} matches={matches} kind="value" archive={board?.archive} competitions={competitions} />
               <Record analyses={analyses} matches={matches} kind="best" archive={board?.archive} competitions={competitions} />
+              <Record analyses={analyses} matches={matches} kind="combo" archive={board?.archive} competitions={competitions} />
               {(fresh ? past : analyses).length > 0 && (
                 <ul className="bet-past-list">
                   {(fresh ? past : analyses).map((a) => (
