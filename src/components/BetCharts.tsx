@@ -1,5 +1,14 @@
 import type { CSSProperties } from "react";
-import { edge, hasValue, MIN_VALUE, type AnalysisMatch, type AnalysisPick, type MatchMarket } from "../lib/bettingAnalysis";
+import {
+  edge,
+  hasValue,
+  marketValue,
+  MIN_VALUE,
+  priceVerdict,
+  type AnalysisMatch,
+  type AnalysisPick,
+  type MatchMarket,
+} from "../lib/bettingAnalysis";
 import "../styles/charts.css";
 
 /**
@@ -14,6 +23,7 @@ const signed = (v: number) => {
   return n > 0 ? `+${n} %` : n < 0 ? `−${Math.abs(n)} %` : "0 %";
 };
 const decimal = new Intl.NumberFormat("es", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const euros = new Intl.NumberFormat("es", { style: "currency", currency: "EUR" });
 
 /** «¿Quién gana?»: the market's chances of 1, X and 2 as one segmented bar. */
 export function OutcomeChances({ market, home, away }: { market: MatchMarket; home: string; away: string }) {
@@ -86,14 +96,16 @@ export function BreakEven({ pick }: { pick: Pick<AnalysisPick, "price" | "probab
   const needed = 1 / pick.price;
   const value = edge(pick.probability, pick.price);
   const pays = pick.probability >= needed;
+  const verdict = priceVerdict(pick);
   // Pinnacle's fair chance, when it priced it: where the market puts the bet.
   const fair = pick.fair;
+  const market = marketValue(pick);
   return (
     <figure className="bet-chart">
       <figcaption>
         <span className="bet-chart-title">¿Compensa?</span>
-        <span className={`bet-chart-note${pays ? " is-good" : ""}`}>
-          {hasValue(pick) ? `Sí, ${signed(value)} de valor` : pays ? `Por poco, ${signed(value)}` : `No, ${signed(value)}`}
+        <span className={`bet-chart-note${verdict === "good" ? " is-good" : ""}`}>
+          {verdict === "good" ? "Sí, paga bien" : verdict === "fair" ? "Más o menos" : "No, paga poco"}
         </span>
       </figcaption>
       <div
@@ -123,6 +135,12 @@ export function BreakEven({ pick }: { pick: Pick<AnalysisPick, "price" | "probab
           </span>
         </span>
       </div>
+      {/* The value in euros: what 10 € bet many times would bring back on average. */}
+      <p className="bet-even-text">
+        A {decimal.format(pick.price)} hay que acertar {Math.round(needed * 100)} de cada 100 para no perder. Apostada
+        muchas veces, de cada 10 € volverían de media {euros.format(10 * (1 + value))} según la IA
+        {market !== null && <> y {euros.format(10 * (1 + market))} según el mercado</>}.
+      </p>
     </figure>
   );
 }
@@ -141,9 +159,9 @@ export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; o
   return (
     <figure className="bet-chart bet-overview">
       <figcaption>
-        <span className="bet-chart-title">De un vistazo: valor de cada partido</span>
+        <span className="bet-chart-title">De un vistazo: cuánto paga cada recomendación</span>
         <span className={`bet-chart-note${valued ? " is-good" : ""}`}>
-          {valued ? `${valued} con valor` : "ninguna con valor"}
+          {valued ? `${valued} ${valued === 1 ? "paga" : "pagan"} bien` : "ninguna paga bien"}
         </span>
       </figcaption>
       <div className="bet-overview-axis" aria-hidden="true">
@@ -156,7 +174,7 @@ export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; o
             <button
               type="button"
               onClick={() => onOpen(m.matchId)}
-              aria-label={`${m.home} – ${m.away}: valor ${signed(value)}. Ver el partido`}
+              aria-label={`${m.home} – ${m.away}: paga ${signed(value)}. Ver el partido`}
               title={`${m.home} – ${m.away}: ${signed(value)}`}
             >
               <span className="bet-overview-name">
@@ -177,7 +195,7 @@ export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; o
         ))}
       </ul>
       <p className="bet-overview-key" aria-hidden="true">
-        <i /> umbral de valor: +{Math.round(MIN_VALUE * 100)} %
+        <i /> desde +{Math.round(MIN_VALUE * 100)} %, paga bien
       </p>
     </figure>
   );

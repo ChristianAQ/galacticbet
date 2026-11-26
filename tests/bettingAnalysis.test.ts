@@ -15,6 +15,7 @@ import {
   winChance,
   hasValue,
   marketValue,
+  priceVerdict,
   mergeAnalysis,
   decodeAnalysisBoard,
   dueAnalysisDays,
@@ -30,7 +31,15 @@ import {
   type MarketPrice,
 } from "../src/lib/bettingAnalysis";
 import type { Match } from "../src/lib/domain";
-import { acceptAnalysis, clip, goalFacts, MAX_PLAYER_PICKS, settlePlayerBets } from "../scripts/bettingAnalysis";
+import {
+  acceptAnalysis,
+  clip,
+  goalFacts,
+  matchContext,
+  MAX_PLAYER_PICKS,
+  recentReports,
+  settlePlayerBets,
+} from "../scripts/bettingAnalysis";
 import {
   pickKey as keyOf,
   playerFacts,
@@ -43,6 +52,7 @@ import {
   MAX_PLAYERS_PER_MARKET,
   chooseBook,
   describePlayerProps,
+  describeShotMarkets,
   parsePlayerMarkets,
   playerMarketKind,
   playerPrices,
@@ -254,7 +264,121 @@ describe("apuestas de jugador: goleador y tarjeta", () => {
   });
 });
 
+describe("números de jugador de los últimos partidos, para la IA", () => {
+  type Players = MatchInsight["lineups"][number]["players"];
+  const report = (m: Match, home: Players, away: Players): MatchInsight => ({
+    version: 1,
+    matchId: m.id,
+    competition: m.competition,
+    kickoff: m.utcDate,
+    provider: "ESPN",
+    eventId: "1",
+    fetchedAt: m.utcDate,
+    goals: [],
+    statistics: [],
+    lineups: [
+      { side: "home", players: home },
+      { side: "away", players: away },
+    ],
+  });
+  const fixture = match({ id: "next" });
+  const r1 = finished("r1", 2, 0, { utcDate: "2026-11-20T20:00:00Z", away: "Sevilla FC" });
+  // Another competition counts too; the team plays away there.
+  const r2 = finished("r2", 1, 1, { utcDate: "2026-11-24T20:00:00Z", competition: "CL", home: "Liverpool FC", away: "Real Madrid CF" });
+  const r0 = finished("r0", 3, 0, { utcDate: "2026-10-01T20:00:00Z", away: "Sevilla FC" });
+  // Played after this kick-off: never part of its context.
+  const after = finished("r3", 0, 0, { utcDate: "2026-11-29T20:00:00Z", away: "Sevilla FC" });
+  const matches = [fixture, r1, r2, r0, after];
+  const store = new Map<string, unknown>([
+    [
+      "matchInsights/r1",
+      report(
+        r1,
+        [
+          { name: "Kylian Mbappé", starter: true, stats: { shots: 5, shotsOnTarget: 3, goals: 2 } },
+          { name: "Federico Valverde", starter: true, stats: { shots: 1, foulsCommitted: 3, yellowCards: 1 } },
+          { name: "Sin jugar", starter: false },
+        ],
+        [{ name: "Rival", starter: true, stats: { shots: 7 } }],
+      ),
+    ],
+    [
+      "matchInsights/r2",
+      report(
+        r2,
+        [{ name: "Mohamed Salah", starter: true, stats: { shots: 9, shotsOnTarget: 4 } }],
+        [
+          { name: "Kylian Mbappé", starter: true, stats: { shots: 3, shotsOnTarget: 1 } },
+          { name: "Rodrygo", starter: false, subIn: "70'", stats: { shots: 2, shotsOnTarget: 2, goals: 1 } },
+        ],
+      ),
+    ],
+    ["matchInsights/r0", { roto: true }],
+  ]);
+  const db = { doc: (path: string) => ({ get: async () => ({ data: () => store.get(path) }) }) } as unknown as import("firebase-admin/firestore").Firestore;
+
+  it("reads the reports of each team's last matches and sums its players' numbers, shooters first", async () => {
+    const recent = await recentReports(db, [fixture], matches);
+    expect(recent.wanted).toBe(3);
+    expect([...recent.reports.keys()].sort()).toEqual(["r1", "r2"]);
+    const context = matchContext(fixture, matches, [], [], Date.parse("2026-11-27T12:00:00Z"), recent.reports);
+    expect(context.local.jugadoresUltimosPartidos).toEqual({
+      partidos: 2,
+      lista: [
+        "Kylian Mbappé: 2 jugados (2 de titular), 8 tiros (4 a puerta), 2 goles, 0 asistencias, 0 faltas, 0 amarillas",
+        "Rodrygo: 1 jugados (0 de titular), 2 tiros (2 a puerta), 1 goles, 0 asistencias, 0 faltas, 0 amarillas",
+        "Federico Valverde: 1 jugados (1 de titular), 1 tiros (0 a puerta), 0 goles, 0 asistencias, 3 faltas, 1 amarillas",
+      ],
+    });
+    // Without reports with numbers, nothing is said about the players.
+    expect(context.visitante).not.toHaveProperty("jugadoresUltimosPartidos");
+  });
+});
+
 describe("OddsPapi: mercados de jugador (modo prueba)", () => {
+  it("shows how a bookmaker prices players' shots: lines, outcomes, players and raw fields", () => {
+    const catalog = parsePlayerMarkets([
+      {
+        marketId: 50010,
+        sportId: 10,
+        playerProp: true,
+        marketName: "Over Under Player Shots On Goal",
+        period: "fulltime",
+        handicap: 1.5,
+        outcomes: [
+          { outcomeId: 50010, outcomeName: "Over" },
+          { outcomeId: 50011, outcomeName: "Under" },
+        ],
+      },
+      { marketId: 60001, sportId: 10, playerProp: true, marketName: "Anytime Goal Scorer", period: "fulltime", handicap: 0 },
+    ]);
+    expect(catalog[0]).toMatchObject({ line: 1.5 });
+    expect(catalog[1]).not.toHaveProperty("line");
+    const answer = {
+      bookmakerOdds: {
+        "winamax.es": {
+          bookmakerIsActive: true,
+          markets: {
+            "50010": {
+              marketActive: true,
+              outcomes: {
+                "50010": { players: { "1": { price: 1.8, playerName: "Lamine Yamal", bookmakerOutcomeId: "abc/1.5" } } },
+                "50011": { players: {} },
+              },
+            },
+            "60001": { outcomes: { "60001": { players: { "1": { price: 2.5, playerName: "Lamine Yamal" } } } } },
+          },
+        },
+      },
+    };
+    expect(describeShotMarkets(answer, catalog, "winamax.es")).toEqual([
+      "«Over Under Player Shots On Goal · fulltime» (id 50010, línea 1.5): " +
+        'Over (id 50010): 1 jugadores (Lamine Yamal 1.8), id en la casa "abc/1.5"; campos: players · ' +
+        "Under (id 50011): 0 jugadores; campos: players. Campos del mercado: marketActive, outcomes",
+    ]);
+    expect(describeShotMarkets(answer, catalog, "bet365")).toEqual([]);
+  });
+
   it("lists which bookmakers price player markets, and the fields of a price", () => {
     const catalog = parsePlayerMarkets([
       { marketId: 101, sportId: 10, playerProp: false, marketName: "1X2" },
@@ -760,6 +884,10 @@ describe("the record never forgets and the day is analysed once", () => {
     expect(hasValue({ probability: 0.512, price: 2 })).toBe(false); // +2,4 % → «+2 %»
     expect(marketValue({ fair: 0.45, price: 2 })).toBeCloseTo(-0.1);
     expect(marketValue({ price: 2 })).toBeNull();
+    // In plain words: pays well from +3 %, poorly from −3 %, fair in between.
+    expect(
+      [0.53, 0.513, 0.51, 0.49, 0.486, 0.48].map((probability) => priceVerdict({ probability, price: 2 })),
+    ).toEqual(["good", "good", "fair", "fair", "poor", "poor"]);
     const day = analysisDays([match({ id: "a" })], 0)[0];
     const prices = new Map<string, MarketPrice[]>([["a", [{ market: "1X2", selection: "1", price: 2.2, sharp: 2.3, fair: 0.42 }]]]);
     const answer = (probability: number) => ({

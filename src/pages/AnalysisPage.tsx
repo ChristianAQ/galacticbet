@@ -150,10 +150,10 @@ function Why({
             </dd>
           </div>
           <div>
-            <dt>Valor</dt>
+            <dt>Paga bien / poco</dt>
             <dd>
-              lo que paga la cuota sobre la probabilidad: «IA» con la estimación de la IA; «Mercado», con la de Pinnacle sin
-              su margen
+              la cuota frente a la probabilidad que da la IA: +5 % es que, apostada muchas veces, de cada 10 € volverían
+              10,50 €. Paga bien desde +3 % y poco desde −3 %. El mercado es Pinnacle sin su margen
             </dd>
           </div>
           <div>

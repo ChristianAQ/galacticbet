@@ -2,15 +2,15 @@ import { Check, ChevronDown, Layers, Minus, Plus, Trash2, X } from "lucide-react
 import { useState } from "react";
 import {
   comboOf,
-  hasValue,
-  marketValue,
   pickKey,
   pickLabel,
+  priceVerdict,
   settleCombo,
   valuePercent,
   winChance,
   type AnalysisMatch,
   type AnalysisPick,
+  type PriceVerdict,
 } from "../lib/bettingAnalysis";
 import type { Match } from "../lib/domain";
 import { BreakEven } from "./BetCharts";
@@ -23,35 +23,20 @@ const chance = (p: number) =>
   new Intl.NumberFormat("es", { style: "percent", maximumFractionDigits: p < 0.1 ? 1 : 0 }).format(p);
 const signedPct = (n: number) => (n > 0 ? `+${n} %` : n < 0 ? `−${Math.abs(n)} %` : "0 %");
 
+const VERDICTS: Record<PriceVerdict, string> = { good: "Paga bien", fair: "Paga lo justo", poor: "Paga poco" };
+
 /**
- * The value of a price, as it is: by the AI's estimate and, when Pinnacle
- * priced it, by the market. Both side by side, so a value bet the market
- * disagrees with is plain to see.
+ * The price in plain words, by the AI's estimate: «Paga bien · +5 %»,
+ * «Paga lo justo» or «Paga poco · −4 %». What it means in euros, and the
+ * market's view, are spelt out in «¿Compensa?».
  */
-export function ValueChip({ pick }: { pick: Pick<AnalysisPick, "price" | "probability" | "fair"> }) {
-  const value = valuePercent(pick.probability, pick.price);
-  const market = marketValue(pick);
-  const marketPct = market === null ? null : Math.round(market * 100);
+export function ValueChip({ pick }: { pick: Pick<AnalysisPick, "price" | "probability"> }) {
+  const verdict = priceVerdict(pick);
   return (
-    <>
-      {hasValue(pick) ? (
-        <span className="bet-value" title="Lo que paga la cuota por encima de lo justo, según la estimación de la IA">
-          IA {signedPct(value)}
-        </span>
-      ) : (
-        <span className="bet-value is-flat" title="Según la IA, la cuota paga menos de lo justo o casi lo justo">
-          {value < 0 ? `IA sin valor (${signedPct(value)})` : `IA ${signedPct(value)}`}
-        </span>
-      )}
-      {marketPct !== null && (
-        <span
-          className={`bet-value is-market${marketPct > 0 ? " is-up" : ""}`}
-          title="Lo que paga la cuota según Pinnacle, la casa de referencia, sin su margen"
-        >
-          Mercado {signedPct(marketPct)}
-        </span>
-      )}
-    </>
+    <span className={`bet-value${verdict === "good" ? "" : " is-flat"}`}>
+      {VERDICTS[verdict]}
+      {verdict !== "fair" && ` · ${signedPct(valuePercent(pick.probability, pick.price))}`}
+    </span>
   );
 }
 

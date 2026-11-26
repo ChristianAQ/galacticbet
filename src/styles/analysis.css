@@ -372,20 +372,6 @@
   color: var(--ink-2);
   box-shadow: inset 0 0 0 1px var(--rule-strong);
 }
-/* The market's verdict next to the AI's: plain, so it never reads as a tip. */
-.bet-value.is-market {
-  background: var(--paper-2);
-  color: var(--ink-2);
-  box-shadow: none;
-  font-weight: 600;
-}
-.bet-value.is-market.is-up {
-  color: var(--ink);
-}
-/* The best option sits on paper-2: the chip keeps its edge on card. */
-.bet-best .bet-value.is-market {
-  background: var(--card);
-}
 .bet-pick .bet-value.is-flat {
   background: var(--paper-2);
   box-shadow: none;
@@ -770,6 +756,12 @@
   height: 12px;
   border-radius: 1px;
   background: var(--ink);
+}
+.bet-even-text {
+  margin-top: 8px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 /* Where the market (Pinnacle, no margin) puts the bet: a dot on the track. */
 .bet-even-track b {

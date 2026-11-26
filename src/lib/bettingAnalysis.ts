@@ -303,6 +303,15 @@ export const hasValue = (p: Pick<AnalysisPick, "probability" | "price">) =>
 /** What the market (Pinnacle without its margin) says the price is worth, when it priced it. */
 export const marketValue = (p: Pick<AnalysisPick, "fair" | "price">) =>
   p.fair === undefined ? null : edge(p.fair, p.price);
+export type PriceVerdict = "good" | "fair" | "poor";
+/** The price in plain words, by the AI's estimate: pays well from +3 %, poorly from −3 %. */
+export function priceVerdict(p: Pick<AnalysisPick, "probability" | "price">): PriceVerdict {
+  return hasValue(p)
+    ? "good"
+    : valuePercent(p.probability, p.price) <= -Math.round(MIN_VALUE * 100)
+      ? "poor"
+      : "fair";
+}
 
 export const pickKey = (p: { matchId: string; market: BetMarket; selection: string; line?: number; player?: string }) =>
   `${p.matchId}|${p.market}|${p.selection}|${p.line ?? ""}${p.player ? `|${p.player}` : ""}`;

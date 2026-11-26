@@ -117,8 +117,8 @@ export function MatchOptions({
         </button>
       ) : null}
       <p className="bet-chart-note">
-        «Pago»: lo que paga la cuota frente a su probabilidad sin margen; 0 % sería lo justo. Las casas suelen pagar algo
-        por debajo: su margen.
+        «Pago»: lo que paga la cuota frente a su probabilidad sin margen. 0 % es lo justo; −5 % quiere decir que,
+        apostada muchas veces, de cada 10 € volverían 9,50 €. Las casas suelen pagar algo por debajo: su margen.
       </p>
     </figure>
   );

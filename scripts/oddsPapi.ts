@@ -104,7 +104,11 @@ export interface PlayerMarket {
   /** outcome id → its name («Yes», «Over»…). */
   outcomes?: Record<string, string>;
   period?: string;
+  /** The line of over/under markets (shots 1.5…), when the list gives one. */
+  line?: number;
 }
+/** Bumped when PlayerMarket gains a field: a list cached before it is read again once. */
+export const PLAYER_CATALOG_VERSION = 2;
 /** The soccer player markets of `/v4/markets`, to recognise them in a fixture's prices. */
 export function parsePlayerMarkets(value: unknown): PlayerMarket[] {
   if (!Array.isArray(value)) return [];
@@ -122,7 +126,8 @@ export function parsePlayerMarkets(value: unknown): PlayerMarket[] {
       if (/^\d{1,9}$/.test(oid) && label) outcomes[oid] = label;
     }
     const period = str(raw.period, 30);
-    found.set(id, { marketId: id, name, outcomes, ...(period ? { period } : {}) });
+    const line = typeof raw.handicap === "number" && Number.isFinite(raw.handicap) && raw.handicap !== 0 ? raw.handicap : undefined;
+    found.set(id, { marketId: id, name, outcomes, ...(period ? { period } : {}), ...(line !== undefined ? { line } : {}) });
   }
   return [...found.values()].slice(0, 600);
 }
@@ -207,6 +212,43 @@ export function describePlayerProps(value: unknown, catalog: PlayerMarket[]): Pl
     if (markets.length) summary.push({ book: BOOK_NAMES[slug] ?? slug, active: book.bookmakerIsActive === true, markets });
   }
   return summary;
+}
+
+/**
+ * Test mode: how a bookmaker prices players' shots (markets, lines, outcomes,
+ * a few players and the raw fields), to build that market on what is really
+ * there. From the same answer: no extra request.
+ */
+export function describeShotMarkets(value: unknown, catalog: PlayerMarket[], slug: string): string[] {
+  const raw = list(value).find(isRow);
+  const odds = raw && isRow(raw.bookmakerOdds) ? raw.bookmakerOdds[slug] : undefined;
+  if (!isRow(odds) || !isRow(odds.markets)) return [];
+  const lines: string[] = [];
+  for (const definition of catalog) {
+    if (!/shot/i.test(definition.name)) continue;
+    const market = odds.markets[definition.marketId];
+    if (!isRow(market) || !isRow(market.outcomes)) continue;
+    const outcomes = Object.entries(market.outcomes).flatMap(([id, outcome]) => {
+      if (!isRow(outcome)) return [];
+      const players = isRow(outcome.players) ? Object.values(outcome.players).filter(isRow) : [];
+      const sample = players
+        .slice(0, 3)
+        .map((p) => `${str(p.playerName, 60) ?? "?"} ${typeof p.price === "number" ? p.price : "?"}`)
+        .join(", ");
+      const own = players.find((p) => p.bookmakerOutcomeId !== undefined)?.bookmakerOutcomeId;
+      return [
+        `${definition.outcomes?.[id] ?? "resultado"} (id ${id}): ${players.length} jugadores` +
+          (sample ? ` (${sample})` : "") +
+          (own !== undefined ? `, id en la casa ${JSON.stringify(own).slice(0, 60)}` : "") +
+          `; campos: ${Object.keys(outcome).slice(0, 8).join(", ")}`,
+      ];
+    });
+    lines.push(
+      `«${definition.name}» (id ${definition.marketId}${definition.line !== undefined ? `, línea ${definition.line}` : ""}): ` +
+        `${outcomes.join(" · ") || "sin resultados"}. Campos del mercado: ${Object.keys(market).slice(0, 8).join(", ")}`,
+    );
+  }
+  return lines.slice(0, 16);
 }
 
 /* ---------- Fixtures and odds ---------- */
@@ -450,9 +492,8 @@ async function marketList(
     now - Number(cached.fetchedAt) < MARKETS_REFRESH &&
     Array.isArray(cached.markets) &&
     cached.markets.length &&
-    // Player markets with their outcomes (a list cached before them is read again once).
-    (!players ||
-      (Array.isArray(cached.playerMarkets) && cached.playerMarkets.every((m: PlayerMarket) => isRow(m.outcomes))))
+    // Player markets with their outcomes and lines (a list cached before them is read again once).
+    (!players || (Array.isArray(cached.playerMarkets) && cached.playerVersion === PLAYER_CATALOG_VERSION))
   )
     return {
       markets: cached.markets as MarketDefinition[],
@@ -464,7 +505,7 @@ async function marketList(
     const playerMarkets = parsePlayerMarkets(official);
     const merged = new Map([...KNOWN_MARKETS, ...parsed].map((d) => [`${d.market}|${d.line ?? ""}`, d]));
     const markets = [...merged.values()];
-    await db.doc(MARKETS_DOC).set({ fetchedAt: now, markets, playerMarkets });
+    await db.doc(MARKETS_DOC).set({ fetchedAt: now, markets, playerMarkets, playerVersion: PLAYER_CATALOG_VERSION });
     log(`OddsPapi: ${parsed.length} mercados reconocidos en la lista oficial y ${playerMarkets.length} de jugador.`);
     return { markets, playerMarkets };
   } catch (error) {
@@ -528,6 +569,8 @@ export async function fetchDayOdds(
     const fixtures = parseFixtures(await client.fixtures(tournament, iso(first - 3_600_000), iso(lastKick + 3_600_000)));
     const prices = new Map<string, MarketPrice[]>();
     const unmatched: string[] = [];
+    // Test mode: the shots markets in detail, once (they are alike in every match).
+    let shotsShown = false;
     for (const match of matches) {
       const fixture = findFixture(match, fixtures);
       if (!fixture) {
@@ -541,6 +584,12 @@ export async function fetchDayOdds(
       if (!slug) {
         unmatched.push(`${match.home} - ${match.away} (ninguna casa con cuotas al día)`);
         continue;
+      }
+      if (debug && !shotsShown) {
+        const shots = describeShotMarkets(answer, playerMarkets, slug);
+        for (const line of shots) log(`OddsPapi: tiros de jugador en ${BOOK_NAMES[slug] ?? slug}: ${line}`);
+        if (!shots.length) log(`OddsPapi: ${match.home} - ${match.away}: ${BOOK_NAMES[slug] ?? slug} no da tiros de jugador.`);
+        shotsShown = shots.length > 0;
       }
       const list = marketPrices(markets, books.get(slug)!, books.get(PINNACLE), BOOK_NAMES[slug] ?? slug);
       // Goalscorer and booking, at the same bookmaker (Pinnacle doesn't price them).

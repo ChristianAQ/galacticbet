@@ -44,7 +44,13 @@ no gestiona apuestas ni dinero.
 3. **Datos.** Se añaden la clasificación, la forma, los partidos en casa y
    fuera, los goles a favor y en contra, el porcentaje de partidos con ambos
    marcando y con más de 2,5 goles, los enfrentamientos previos y los
-   goleadores.
+   goleadores. Y, del acta de ESPN (`matchInsights`) de los 4 últimos
+   partidos de cada equipo en cualquier competición, lo que hizo cada jugador:
+   jugados y de titular, tiros, a puerta, goles, asistencias, faltas y
+   tarjetas (los 8 que más tiran; `jugadoresUltimosPartidos`). La IA lo usa
+   en las apuestas de jugador. Son como mucho 80 lecturas de Firestore por
+   día analizado, y solo sirven las fichas sincronizadas desde que se guardan
+   los números por jugador.
 4. **IA.** Claude Code se ejecuta sin interfaz con el plan de Claude del
    propietario (token de `claude setup-token`). Trabaja en una carpeta vacía,
    solo puede buscar en la web (bajas y alineaciones, al menos una búsqueda por
@@ -56,8 +62,8 @@ no gestiona apuestas ni dinero.
      Pinnacle.
    - **La recomendación de cada partido**, siempre. Es la apuesta con más valor
      esperado entre las que tienen al menos un 40 % de probabilidad, aunque su
-     valor sea negativo. La app muestra ese valor tal cual: «IA +4 %» o
-     «IA sin valor (−3 %)».
+     valor sea negativo. La app lo dice tal cual: «Paga bien · +4 %»,
+     «Paga lo justo» o «Paga poco · −3 %».
 
    Se le pide vocabulario de análisis (valor, probabilidad, cuota, margen) y
    nada coloquial.
@@ -85,9 +91,9 @@ no gestiona apuestas ni dinero.
 
 Lo importante se ve de un vistazo, con gráficas:
 
-- **De un vistazo:** el valor de la recomendación de cada partido alrededor
-  de cero, con el umbral de valor (+3 %). Tocar un partido lleva a su ficha
-  dentro del análisis.
+- **De un vistazo:** cuánto paga la recomendación de cada partido, alrededor
+  de cero, con la marca de «paga bien» (+3 %). Tocar un partido lleva a su
+  ficha dentro del análisis.
 - **Confianza:** cada apuesta lleva «Confianza muy alta / alta / media / baja»
   con su porcentaje y de una a cuatro barras. Es la probabilidad de ganarla,
   con una escala fija: muy alta desde el 70 %, alta desde el 55 %, media desde
@@ -107,10 +113,13 @@ Lo importante se ve de un vistazo, con gráficas:
 - **Forma:** los últimos cinco resultados de cada equipo.
 - **¿Compensa?:** la probabilidad que da la IA frente a la que necesita la
   cuota para compensar (1 / cuota). Si la barra pasa la marca, paga de más.
-  Un punto marca la del mercado (Pinnacle sin margen), cuando la hay.
-- **Valor:** dos etiquetas, una al lado de la otra. «IA +5 %» es lo que paga
-  la cuota según la estimación de la IA; «Mercado −3 %», según Pinnacle sin su
-  margen. Así se ve enseguida cuándo el mercado no está de acuerdo.
+  Un punto marca la del mercado (Pinnacle sin margen), cuando la hay. Debajo,
+  en una frase: cuántas veces de cada 100 hay que acertar para no perder y
+  cuánto volvería de media de cada 10 € apostados muchas veces, según la IA y
+  según el mercado. Así se ve enseguida cuándo el mercado no está de acuerdo.
+- **Cuánto paga:** una etiqueta con la cuota frente a la probabilidad de la
+  IA. «Paga bien · +5 %» desde +3 % (de cada 10 €, volverían 10,50 € de
+  media), «Paga lo justo» entre −2 % y +2 % y «Paga poco · −4 %» desde −3 %.
 
 El texto queda en segundo plano, plegado en «Por qué y de dónde sale»: la
 previa, el motivo, el riesgo y el origen de cada dato (cuotas, casa y hora;
@@ -172,6 +181,14 @@ También lista los **mercados de jugador** que da cada casa en cada partido
 está al día y qué campos trae cada cuota: las líneas «OddsPapi: … jugadores
 en …». Salen de la misma respuesta que las cuotas del partido, sin gastar
 peticiones aparte. Sirve para decidir qué mercados de jugador se pueden usar.
+
+De los **tiros de jugador** da el detalle, una vez por prueba y de la casa
+elegida: cada mercado con su línea (0,5, 1,5…), sus resultados (más/menos,
+sí…), cuántos jugadores tienen cuota, tres de ejemplo y los campos en bruto:
+las líneas «OddsPapi: tiros de jugador en …». También dice de cuántos partidos
+recientes hay números de jugador para la IA («números de jugador de X/Y
+partidos recientes»). La lista de mercados se vuelve a pedir una vez (una
+petición) para guardar las líneas.
 
 Con el modo **completo** genera y publica ya el análisis del próximo día de
 partidos, aunque falte mucho. El análisis automático de 45 minutos antes lo
