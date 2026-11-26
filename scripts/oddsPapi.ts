@@ -281,6 +281,10 @@ export function createOddsPapiClient(
   };
 }
 
+/** Bookmakers licensed in Spain (and a few big European ones), by slug. */
+export const SPANISH_BOOKS =
+  /bet365|bwin|codere|sportium|william|888|betway|marca|luckia|kirol|retabet|versus|betsson|winamax|betfair|pokerstars|leovegas|interwetten|juegging|goldenpark|casumo|paston|enracha|bet777|yaass|dazn|tonybet|unibet|betano|marathon|1xbet/i;
+
 /** How many fixtures the bookmaker has active or suspended, and its newest price change. */
 function bookStates(items: Row[], bookmaker: string) {
   let active = 0;
@@ -418,8 +422,10 @@ export async function fetchDayOdds(
       else unmatched.push(`${match.home} - ${match.away}${fixture ? " (sin cuotas de bet365)" : ""}`);
     }
     if (debug && fixtures[0]) {
-      // Which bookmakers really have fresh prices for this fixture (one request).
-      const all = await client.fixtureOdds(fixtures[0].fixtureId);
+      // Which Spanish bookmakers really have fresh prices for this fixture (one request).
+      const candidates = (account?.bookmakers ?? []).filter((slug) => SPANISH_BOOKS.test(slug)).slice(0, 45);
+      log(`OddsPapi: casas candidatas: ${candidates.join(", ")}`);
+      const all = await client.fixtureOdds(fixtures[0].fixtureId, candidates);
       const books = isRow(all) && isRow(all.bookmakerOdds) ? Object.entries(all.bookmakerOdds) : [];
       const live = books.flatMap(([slug, b]) => {
         if (!isRow(b) || b.bookmakerIsActive !== true || b.suspended === true) return [];
