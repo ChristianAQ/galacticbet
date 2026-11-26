@@ -94,6 +94,63 @@ export function parseMarketDefinitions(value: unknown): MarketDefinition[] {
   return [...unique.values()];
 }
 
+/** A player market of the official list (goalscorer, shots on target…): id → its name. */
+export interface PlayerMarket {
+  marketId: string;
+  name: string;
+}
+/** The soccer player markets of `/v4/markets`, to recognise them in a fixture's prices. */
+export function parsePlayerMarkets(value: unknown): PlayerMarket[] {
+  if (!Array.isArray(value)) return [];
+  const found = new Map<string, PlayerMarket>();
+  for (const raw of value) {
+    if (!isRow(raw) || raw.sportId !== 10 || raw.playerProp !== true) continue;
+    const id = typeof raw.marketId === "number" || typeof raw.marketId === "string" ? String(raw.marketId) : "";
+    if (!/^\d{1,9}$/.test(id)) continue;
+    const name = [str(raw.marketName, 120), str(raw.period, 30)].filter(Boolean).join(" · ") || `Mercado ${id}`;
+    found.set(id, { marketId: id, name });
+  }
+  return [...found.values()].slice(0, 600);
+}
+
+export interface PlayerPropSummary {
+  book: string;
+  /** OddsPapi is reading this bookmaker now (else its prices are old). */
+  active: boolean;
+  markets: { name: string; outcomes: number; players: number; fields: string[] }[];
+}
+/**
+ * Test mode: which player markets each bookmaker prices for a fixture, how
+ * many players, and the fields of a player's price (to see what can be used).
+ * Read from the same answer as the match prices: no extra request.
+ */
+export function describePlayerProps(value: unknown, catalog: PlayerMarket[]): PlayerPropSummary[] {
+  const names = new Map(catalog.map((m) => [m.marketId, m.name]));
+  const raw = list(value).find(isRow);
+  if (!raw || !isRow(raw.bookmakerOdds)) return [];
+  const summary: PlayerPropSummary[] = [];
+  for (const [slug, book] of Object.entries(raw.bookmakerOdds)) {
+    if (!isRow(book) || !isRow(book.markets)) continue;
+    const markets: PlayerPropSummary["markets"] = [];
+    for (const [marketId, market] of Object.entries(book.markets)) {
+      const name = names.get(marketId);
+      if (!name || !isRow(market) || !isRow(market.outcomes)) continue;
+      let players = 0;
+      let fields: string[] = [];
+      const outcomes = Object.values(market.outcomes).filter(isRow);
+      for (const outcome of outcomes) {
+        if (!isRow(outcome.players)) continue;
+        const entries = Object.values(outcome.players).filter(isRow);
+        players += entries.length;
+        if (!fields.length && entries[0]) fields = Object.keys(entries[0]).slice(0, 10);
+      }
+      markets.push({ name, outcomes: outcomes.length, players, fields });
+    }
+    if (markets.length) summary.push({ book: BOOK_NAMES[slug] ?? slug, active: book.bookmakerIsActive === true, markets });
+  }
+  return summary;
+}
+
 /* ---------- Fixtures and odds ---------- */
 
 export interface PapiFixture {
@@ -316,22 +373,43 @@ export function createOddsPapiClient(
 
 /* ---------- One match day ---------- */
 
-/** Cached market list (one request a month), falling back to the documented ids. */
-async function marketList(db: Firestore, client: OddsPapiClient, now: number, log: (m: string) => void) {
+/**
+ * Cached market list (one request a month), falling back to the documented
+ * ids. With `players`, also the catalog of player markets (fetched once if a
+ * list cached before it lacks it).
+ */
+async function marketList(
+  db: Firestore,
+  client: OddsPapiClient,
+  now: number,
+  log: (m: string) => void,
+  { players = false } = {},
+): Promise<{ markets: MarketDefinition[]; playerMarkets: PlayerMarket[] }> {
   const snap = await db.doc(MARKETS_DOC).get();
   const cached = snap.data();
-  if (cached && now - Number(cached.fetchedAt) < MARKETS_REFRESH && Array.isArray(cached.markets) && cached.markets.length)
-    return cached.markets as MarketDefinition[];
+  if (
+    cached &&
+    now - Number(cached.fetchedAt) < MARKETS_REFRESH &&
+    Array.isArray(cached.markets) &&
+    cached.markets.length &&
+    (!players || Array.isArray(cached.playerMarkets))
+  )
+    return {
+      markets: cached.markets as MarketDefinition[],
+      playerMarkets: Array.isArray(cached.playerMarkets) ? (cached.playerMarkets as PlayerMarket[]) : [],
+    };
   try {
-    const parsed = parseMarketDefinitions(await client.markets());
+    const official = await client.markets();
+    const parsed = parseMarketDefinitions(official);
+    const playerMarkets = parsePlayerMarkets(official);
     const merged = new Map([...KNOWN_MARKETS, ...parsed].map((d) => [`${d.market}|${d.line ?? ""}`, d]));
     const markets = [...merged.values()];
-    await db.doc(MARKETS_DOC).set({ fetchedAt: now, markets });
-    log(`OddsPapi: ${parsed.length} mercados reconocidos en la lista oficial.`);
-    return markets;
+    await db.doc(MARKETS_DOC).set({ fetchedAt: now, markets, playerMarkets });
+    log(`OddsPapi: ${parsed.length} mercados reconocidos en la lista oficial y ${playerMarkets.length} de jugador.`);
+    return { markets, playerMarkets };
   } catch (error) {
     log(`OddsPapi: lista de mercados no disponible (${error instanceof Error ? error.message : "error"}); se usan los conocidos.`);
-    return KNOWN_MARKETS;
+    return { markets: KNOWN_MARKETS, playerMarkets: [] };
   }
 }
 
@@ -340,6 +418,21 @@ export interface DayOdds {
   prices: Map<string, MarketPrice[]>;
   unmatched: string[];
   requests: number;
+}
+
+/** Test mode log: the player markets of a match, per bookmaker. */
+function logPlayerProps(label: string, summary: PlayerPropSummary[], log: (m: string) => void) {
+  if (!summary.length) return log(`OddsPapi: ${label}: ninguna casa da mercados de jugador.`);
+  for (const s of summary)
+    log(
+      `OddsPapi: ${label}: jugadores en ${s.book}${s.active ? "" : " (no está al día)"}: ` +
+        s.markets
+          .slice(0, 12)
+          .map((m) => `${m.name} (${m.players} ${m.players === 1 ? "jugador" : "jugadores"})`)
+          .join("; ") +
+        (s.markets.length > 12 ? `; y ${s.markets.length - 12} más` : "") +
+        (s.markets[0]?.fields.length ? `. Campos: ${s.markets[0].fields.join(", ")}` : ""),
+    );
 }
 
 /**
@@ -367,7 +460,7 @@ export async function fetchDayOdds(
     throw new OddsPapiError("presupuesto mensual alcanzado", 429, "MONTH_BUDGET");
   const before = client.spent;
   try {
-    const markets = await marketList(db, client, now, log);
+    const { markets, playerMarkets } = await marketList(db, client, now, log, { players: debug });
     const tournament = ODDSPAPI_TOURNAMENTS[competition];
     const first = Math.min(...matches.map((m) => Date.parse(m.utcDate)));
     const lastKick = Math.max(...matches.map((m) => Date.parse(m.utcDate)));
@@ -381,7 +474,9 @@ export async function fetchDayOdds(
         unmatched.push(`${match.home} - ${match.away}`);
         continue;
       }
-      const books = parseFixtureOdds(await client.fixtureOdds(fixture.fixtureId, [...SOFT_BOOKS, PINNACLE]), markets);
+      const answer = await client.fixtureOdds(fixture.fixtureId, [...SOFT_BOOKS, PINNACLE]);
+      const books = parseFixtureOdds(answer, markets);
+      if (debug) logPlayerProps(`${match.home} - ${match.away}`, describePlayerProps(answer, playerMarkets), log);
       const slug = chooseBook(books);
       if (!slug) {
         unmatched.push(`${match.home} - ${match.away} (ninguna casa con cuotas al día)`);

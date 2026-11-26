@@ -27,6 +27,8 @@ import { acceptAnalysis, clip, goalFacts } from "../scripts/bettingAnalysis";
 import {
   KNOWN_MARKETS,
   chooseBook,
+  describePlayerProps,
+  parsePlayerMarkets,
   findFixture,
   marketPrices,
   parseFixtureOdds,
@@ -51,6 +53,46 @@ const match = (over: Partial<Match>): Match => ({
 });
 const finished = (id: string, home: number, away: number, over: Partial<Match> = {}) =>
   match({ id, status: "FINISHED", homeScore: home, awayScore: away, ...over });
+
+describe("OddsPapi: mercados de jugador (modo prueba)", () => {
+  it("lists which bookmakers price player markets, and the fields of a price", () => {
+    const catalog = parsePlayerMarkets([
+      { marketId: 101, sportId: 10, playerProp: false, marketName: "1X2" },
+      { marketId: 50001, sportId: 10, playerProp: true, marketName: "Player Shots On Target", period: "fulltime" },
+      { marketId: 50002, sportId: 10, playerProp: true, marketName: "Anytime Goalscorer" },
+      { marketId: 70000, sportId: 11, playerProp: true, marketName: "Basket points" },
+    ]);
+    expect(catalog).toEqual([
+      { marketId: "50001", name: "Player Shots On Target · fulltime" },
+      { marketId: "50002", name: "Anytime Goalscorer" },
+    ]);
+    const price = (p: number) => ({ price: p, active: true, playerName: "Vinícius Júnior" });
+    const summary = describePlayerProps(
+      {
+        fixtureId: "f1",
+        bookmakerOdds: {
+          bet365: {
+            bookmakerIsActive: false,
+            markets: {
+              "101": { outcomes: { "101": { players: { "0": price(2) } } } },
+              "50002": { outcomes: { "1": { players: { "11": price(2.5), "12": price(3.1) } } } },
+            },
+          },
+          "winamax.es": { bookmakerIsActive: true, markets: { "101": { outcomes: {} } } },
+        },
+      },
+      catalog,
+    );
+    expect(summary).toEqual([
+      {
+        book: "bet365",
+        active: false,
+        markets: [{ name: "Anytime Goalscorer", outcomes: 1, players: 2, fields: ["price", "active", "playerName"] }],
+      },
+    ]);
+    expect(describePlayerProps(null, catalog)).toEqual([]);
+  });
+});
 
 describe("OddsPapi", () => {
   it("reads the soccer markets it needs from the official list", () => {

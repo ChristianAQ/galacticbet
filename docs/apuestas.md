@@ -115,7 +115,13 @@ Actions → **AI betting analysis** → Run workflow con el modo **prueba**: tra
 las cuotas y los datos del próximo día de partidos y escribe en el registro
 cuántos partidos se han emparejado, de qué casa son las cuotas y su 1X2. No
 llama a la IA ni guarda nada. Gasta una petición más que el número de
-partidos de ese día.
+partidos de ese día (dos la primera vez, para el catálogo de mercados).
+
+También lista los **mercados de jugador** que da cada casa en cada partido
+(goleador, remates a puerta…), cuántos jugadores tienen cuota, si la casa
+está al día y qué campos trae cada cuota: las líneas «OddsPapi: … jugadores
+en …». Salen de la misma respuesta que las cuotas del partido, sin gastar
+peticiones aparte. Sirve para decidir qué mercados de jugador se pueden usar.
 
 Con el modo **completo** genera y publica ya el análisis del próximo día de
 partidos, aunque falte mucho. El análisis automático de 45 minutos antes lo
