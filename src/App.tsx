@@ -1,7 +1,7 @@
 import BottomNavigation from "./components/BottomNavigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { CalendarDays, Home, Target, X } from "lucide-react";
+import { CalendarDays, Home, Sparkles, Target, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, Route, Routes, useLocation, type Location } from "react-router-dom";
 import LoginModal from "./components/LoginModal";
@@ -30,6 +30,7 @@ import { REFRESH_EVENT, RefreshContext } from "./lib/chrome";
 import { go, interceptLinks, isTabRoot } from "./lib/navigation";
 import { keepPushDevice } from "./lib/push";
 import {
+  AnalysisPage,
   CompetitionCreatePage,
   CustomMatchPage,
   GroupsPage,
@@ -48,6 +49,7 @@ const nav = [
   { to: "/", label: "Inicio", icon: Home },
   { to: "/ligas", label: "Ligas", icon: CalendarDays },
   { to: "/quiniela", label: "Quiniela", icon: Target },
+  { to: "/apuestas", label: "Apuestas", icon: Sparkles },
 ];
 const storedCalendar = () => (configured ? loadMatches.peek() ?? [] : []);
 
@@ -314,6 +316,10 @@ export default function App() {
           />
         }
       />
+      <Route
+        path="/apuestas"
+        element={<AnalysisPage matches={matches} demo={demo} loading={loading} />}
+      />
       <Route path="/clasificacion" element={<LegacyStandingsRoute />} />
       <Route
         path="/perfil"
@@ -393,7 +399,7 @@ export default function App() {
             </footer>
           </div>
           <PullToRefresh enabled={isTabRoot(pathname)} onRefresh={refreshAll} />
-          {/* The tab bar lives on the four tab roots only. Pushed screens (match
+          {/* The tab bar lives on the tab roots only. Pushed screens (match
               page, Equipos, Porra, Perfil, Grupos) get the whole height and go
               back with «‹» or the edge swipe. */}
           <BottomNavigation

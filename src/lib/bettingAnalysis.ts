@@ -242,8 +242,9 @@ export function analysisDays(matches: Match[], now: number): AnalysisDay[] {
 
 /**
  * Days whose analysis is due now: from 45 minutes before the first kick-off
- * (a run every ten minutes lands 35–45 minutes before) and, if GitHub is late,
- * until the last match of the day is about to start.
+ * still to come (a run every ten minutes lands 35–45 minutes before). If
+ * GitHub missed the first match, the next one of the day takes its place;
+ * never with the last match about to start.
  */
 export function dueAnalysisDays(matches: Match[], now: number, done: ReadonlySet<string>) {
   return analysisDays(matches, now).filter(

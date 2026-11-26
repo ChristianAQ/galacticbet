@@ -360,13 +360,17 @@ Cuotas internas: 1.800 intentos/24 h y 12.000/mes, por debajo del plan Free publ
 
 ### Página de partido, directo y cuotas
 
-Cada partido tiene su propia pantalla en `#/partido/{id}` (desde Inicio, Partidos y Quiniela): cabecera con escudos, resultado y goleadores, y un menú deslizable. Jugados o en juego: **Eventos · Alineaciones · Estadísticas · Clasificación** (la tabla resalta a ambos equipos). Por jugar: **Previa · Cuotas · Alineaciones · Clasificación**. Las secciones sin datos reales no aparecen. La barra inferior muestra Inicio, Ligas, Quiniela y Clasificación; los grupos (crear y **unirme**) están en Perfil → Más, en Inicio cuando aún no tienes grupo y en el menú lateral de escritorio.
+Cada partido tiene su propia pantalla en `#/partido/{id}` (desde Inicio, Partidos y Quiniela): cabecera con escudos, resultado y goleadores, y un menú deslizable. Jugados o en juego: **Eventos · Alineaciones · Estadísticas · Clasificación** (la tabla resalta a ambos equipos). Por jugar: **Previa · Cuotas · Alineaciones · Clasificación**. Las secciones sin datos reales no aparecen. La barra inferior muestra Inicio, Ligas, Quiniela y Apuestas; los grupos (crear y **unirme**) están en Perfil → Más, en Inicio cuando aún no tienes grupo y en el menú lateral de escritorio.
 
 **Directo:** mientras hay partidos en juego, `Update live football scores` mantiene un bucle de hasta 25 minutos: SportAPI cada minuto, goles y tarjetas de ESPN cada dos minutos y Football-Data cada 30 minutos. Publica `live/football`, un documento público pequeño que la web escucha solo cerca de los partidos y con la pestaña visible.
 
 **Cuotas 1X2 (opcional):** crea una clave gratuita en [The Odds API](https://the-odds-api.com) y guárdala como repository secret `ODDS_API_KEY`. La sincronización consulta regiones `eu,uk` (2 créditos por competición) como máximo cada 12 horas por competición y solo si hay partidos en los próximos cuatro días, con un límite interno de 440 créditos/mes (plan gratuito: 500). Se publican en `odds/football` (lectura pública, sin listados ni escrituras de cliente). Las casas disponibles dependen del proveedor; bet365 no suele estar incluida. Información orientativa: GalacticBet no gestiona apuestas.
 
 Clasificación muestra solo la del grupo (las tablas de cada competición están en la pestaña «Clasificación» de cada partido). En «Total» se añaden los puntos de la última jornada puntuada y las flechas de puestos ganados o perdidos con ella. En Quiniela, el aviso de entregas solo aparece mientras la jornada está abierta y falta alguien por guardar.
+
+### Apuestas: análisis de la IA
+
+La pestaña **Apuestas** muestra, antes del primer partido de cada día de LaLiga o Champions, las cuotas de bet365 que la IA considera más jugosas, comparadas con las de Pinnacle y con los datos de la temporada, junto con el historial de aciertos. Necesita dos repository secrets: `ODDSPAPI_KEY` (plan gratuito de OddsPapi) y `CLAUDE_CODE_OAUTH_TOKEN` (tu plan de Claude, con `claude setup-token`). [Cómo funciona, configuración y pruebas](docs/apuestas.md). Información orientativa para mayores de 18: GalacticBet no gestiona apuestas.
 
 ### Ligas: partidos, tabla, noticias y estadísticas
 

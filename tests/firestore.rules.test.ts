@@ -281,6 +281,29 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
       await assertFails(deleteDoc(doc(db, "live/football")));
     }
   });
+  it("publica el análisis de apuestas solo para lectura y oculta cuotas y presupuestos internos", async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), "analysis/football"), {
+        formatVersion: 1,
+        updatedAt: "2026-11-28T12:20:00Z",
+        analyses: [],
+      });
+      await setDoc(doc(c.firestore(), "providerBudgets/oddspapi"), { month: "2026-11", used: 3 });
+      await setDoc(doc(c.firestore(), "providerCache/oddspapiMarkets"), { fetchedAt: 1, markets: [] });
+    });
+    for (const db of [
+      env.unauthenticatedContext().firestore(),
+      env.authenticatedContext("alice").firestore(),
+    ]) {
+      await assertSucceeds(getDoc(doc(db, "analysis/football")));
+      await assertFails(getDocs(collection(db, "analysis")));
+      await assertFails(getDoc(doc(db, "analysis/other")));
+      await assertFails(setDoc(doc(db, "analysis/football"), { formatVersion: 1, analyses: [] }));
+      await assertFails(deleteDoc(doc(db, "analysis/football")));
+      await assertFails(getDoc(doc(db, "providerBudgets/oddspapi")));
+      await assertFails(getDoc(doc(db, "providerCache/oddspapiMarkets")));
+    }
+  });
   it("permite leer calendarios agregados públicos pero nunca escribir resultados desde el cliente", async () => {
     await env.withSecurityRulesDisabled((c) =>
       setDoc(doc(c.firestore(), "calendars/PD-2026"), {

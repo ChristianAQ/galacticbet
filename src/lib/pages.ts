@@ -6,6 +6,7 @@ export const pageLoaders = {
   "/ligas": () => import("../pages/MatchesPage"),
   // Quiniela and Clasificación: one tab, one chunk (switching views is instant).
   "/quiniela": () => import("../pages/QuinielaPage"),
+  "/apuestas": () => import("../pages/AnalysisPage"),
   "/perfil": () => import("../pages/ProfilePage"),
   "/grupos": () => import("../pages/GroupsPage"),
   "/porra": () => import("../pages/PorraPage"),
@@ -19,6 +20,7 @@ type PagePath = keyof typeof pageLoaders;
 export const HomePage = lazy(pageLoaders["/"]);
 export const MatchesPage = lazy(pageLoaders["/ligas"]);
 export const QuinielaPage = lazy(pageLoaders["/quiniela"]);
+export const AnalysisPage = lazy(pageLoaders["/apuestas"]);
 export const ProfilePage = lazy(pageLoaders["/perfil"]);
 export const GroupsPage = lazy(pageLoaders["/grupos"]);
 export const PorraPage = lazy(pageLoaders["/porra"]);
@@ -55,7 +57,7 @@ export function preloadTabsWhenIdle() {
     window.requestIdleCallback ||
     ((callback: () => void) => window.setTimeout(callback, 1200));
   idle(() => {
-    const first = ["/", "/ligas", "/quiniela", "/partido"];
+    const first = ["/", "/ligas", "/quiniela", "/apuestas", "/partido"];
     void Promise.allSettled(first.map(preloadPage)).then(() =>
       idle(() => {
         for (const path of Object.keys(pageLoaders)) void preloadPage(path);
