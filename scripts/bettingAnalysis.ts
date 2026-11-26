@@ -158,7 +158,7 @@ Reglas:
 - bestPick de cada partido: entre las apuestas a las que das al menos un 40 % de probabilidad, la de mayor valor esperado según tu estimación (aunque sea negativo). Puede coincidir con una de picks. No lo dejes vacío salvo que el partido no tenga cuotas.
 - confidence: "alta", "media" o "baja", según lo sólido de tus motivos.
 - reason: 1 o 2 frases en español con datos concretos (de la temporada o de lo que hayas encontrado). risk: el principal riesgo en una frase.
-- Para cada partido, una previa de 1 o 2 frases (matches) y en sources las direcciones web que hayas leído para ese partido (vacío si ninguna). headline: un titular de menos de 90 caracteres. summary: 2 o 3 frases sobre el día, sin fuentes (van en sources).
+- Para cada partido, una previa de 1 o 2 frases (matches) y en sources las direcciones web que hayas consultado para ese partido, aunque no te hayan servido (vacío solo si no buscaste nada). headline: un titular de menos de 90 caracteres. summary: 2 o 3 frases sobre el día, sin fuentes (van en sources).
 - Tono sobrio de analista: nunca prometas resultados ni animes a apostar.`;
 
 /** Shape the CLI validates the answer against (lengths are enforced afterwards). */
