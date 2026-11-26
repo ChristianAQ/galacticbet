@@ -398,6 +398,9 @@ export function claudeCodeRunner(options: { token: string; model?: string; timeo
 
 /* ---------- The job ---------- */
 
+/** An analysis older than this before the first kick-off is redone in the usual window. */
+export const EARLY_MS = 3 * 3_600_000;
+
 async function seasonScorers(db: Firestore, seasonId: string): Promise<Scorer[]> {
   try {
     const data = (await db.doc(`leagueStats/${seasonId}`).get()).data();
@@ -412,6 +415,8 @@ export interface AnalysisOptions {
   claude?: ClaudeRunner;
   /** Test mode: odds and data only (no AI, no writes); takes the next match day even if it is not due. */
   dryRun?: boolean;
+  /** Manual run: the next match day now, even if it is not due (the scheduled run refreshes it later). */
+  force?: boolean;
   now?: number;
   log?: (message: string) => void;
   client?: OddsPapiClient;
@@ -420,13 +425,23 @@ export interface AnalysisOptions {
 
 export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions) {
   const now = options.now ?? Date.now();
+  // The clock of this run: `now` plus the time spent (the AI takes minutes).
+  const started = Date.now();
+  const clock = () => now + (Date.now() - started);
   const log = options.log ?? console.log;
   const matches = options.matches ?? (await readCalendars(db, now));
   const boardRef = db.doc(ANALYSIS_DOC);
   const board = decodeAnalysisBoard((await boardRef.get()).data());
-  const done = new Set(board?.analyses.map((a) => a.id) ?? []);
+  // An analysis made long before (a manual run) does not count: the one 45
+  // minutes before kick-off, with fresh prices and line-ups, replaces it.
+  const madeAt = new Map(board?.analyses.map((a) => [a.id, Date.parse(a.generatedAt)]) ?? []);
+  const done = new Set(
+    analysisDays(matches, now)
+      .filter((d) => (madeAt.get(d.id) ?? -Infinity) >= d.firstKickoff - EARLY_MS)
+      .map((d) => d.id),
+  );
   let days = dueAnalysisDays(matches, now, done);
-  if (options.dryRun && !days.length) days = analysisDays(matches, now).slice(0, 1);
+  if ((options.dryRun || options.force) && !days.length) days = analysisDays(matches, now).slice(0, 1);
   if (!days.length) {
     log("Análisis: no toca ahora (se genera 45 minutos antes del primer partido del día de LaLiga o Champions).");
     return { generated: 0 };
@@ -477,13 +492,13 @@ export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions
       log(`Análisis ${label}: la IA no respondió (${error instanceof Error ? error.message : "error"}).`);
       continue;
     }
-    const analysis = acceptAnalysis(day, answer.output, odds.prices, Date.now());
+    const analysis = acceptAnalysis(day, answer.output, odds.prices, clock());
     if (!analysis) {
       log(`Análisis ${label}: respuesta de la IA no válida; se volverá a intentar en la próxima pasada.`);
       continue;
     }
     analyses = [analysis, ...analyses.filter((a) => a.id !== analysis.id)].slice(0, MAX_ANALYSES);
-    await boardRef.set({ formatVersion: ANALYSIS_FORMAT, updatedAt: new Date().toISOString(), analyses });
+    await boardRef.set({ formatVersion: ANALYSIS_FORMAT, updatedAt: new Date(clock()).toISOString(), analyses });
     generated++;
     log(
       `Análisis ${label}: ${analysis.picks.length} apuestas con valor publicadas` +

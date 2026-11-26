@@ -67,14 +67,16 @@ conversación normal de Claude Code; no se paga nada aparte.
 
 ## Probar
 
-Actions → **AI betting analysis** → Run workflow con «Prueba» marcado: trae
+Actions → **AI betting analysis** → Run workflow con el modo **prueba**: trae
 las cuotas y los datos del próximo día de partidos y escribe en el registro
 cuántos partidos se han emparejado, de qué casa son las cuotas y su 1X2. No
 llama a la IA ni guarda nada. Gasta una petición más que el número de
 partidos de ese día.
 
-Sin «Prueba», hace lo mismo que la tarea programada: solo genera el
-análisis si toca.
+Con el modo **completo** genera y publica ya el análisis del próximo día de
+partidos, aunque falte mucho. El análisis automático de 45 minutos antes lo
+sustituye después con cuotas y alineaciones más frescas: un análisis hecho
+más de 3 horas antes del primer partido no cuenta como hecho.
 
 ## Juego responsable
 

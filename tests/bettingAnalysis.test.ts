@@ -257,3 +257,68 @@ describe("season facts for the prompt", () => {
     expect(facts).toMatchObject({ partidos: 2, ambosMarcanPct: 50, masDe25Pct: 50, porteriasACero: 1, sinMarcar: 1, golesAFavorPorPartido: 1.5 });
   });
 });
+
+describe("the job, end to end with fakes", () => {
+  const kickoff = Date.parse("2026-11-27T20:00:00Z");
+  const fixture = match({ id: "lev", home: "Levante UD", away: "Racing Santander", utcDate: "2026-11-27T20:00:00Z" });
+  const store = new Map<string, unknown>();
+  const db = {
+    doc: (path: string) => ({
+      get: async () => ({ data: () => store.get(path) }),
+      set: async (value: unknown) => void store.set(path, value),
+    }),
+  } as unknown as import("firebase-admin/firestore").Firestore;
+  const book = (prices: number[], active = true) => ({
+    bookmakerIsActive: active,
+    suspended: !active,
+    markets: { "101": { marketActive: true, outcomes: Object.fromEntries(prices.map((p, i) => [String(101 + i), { players: { "0": { active: true, price: p } } }])) } },
+  });
+  let spent = 0;
+  const client = {
+    remaining: async () => ({ limit: 250, used: spent, bookmakers: [] }),
+    markets: async () => {
+      throw new Error("sin lista");
+    },
+    fixtures: async () => (spent++, [{ fixtureId: "f1", startTime: "2026-11-27T20:00:00Z", participant1Name: "Levante UD", participant2Name: "Racing Santander" }]),
+    fixtureOdds: async () => (spent++, {
+      fixtureId: "f1",
+      statusId: 0,
+      bookmakerOdds: { bet365: book([2.02, 3.6, 3.2], false), "winamax.es": book([2, 3.9, 3.05]), "pinnacle+30": book([2.09, 4.07, 3.27]) },
+    }),
+    get spent() {
+      return spent;
+    },
+  };
+  const claude = async () => ({
+    output: {
+      headline: "Levante favorito",
+      summary: "Poco valor.",
+      matches: [{ matchId: "lev", preview: "Partido igualado." }],
+      picks: [{ matchId: "lev", market: "1X2", selection: "1", line: null, probability: 0.54, confidence: "media", reason: "Fuerte en casa.", risk: "Racing en forma." }],
+    },
+  });
+  const run = (now: number, extra: Record<string, unknown> = {}) =>
+    import("../scripts/bettingAnalysis").then(({ runBettingAnalysis }) =>
+      runBettingAnalysis(db, { oddsKey: "k", claude, client, matches: [fixture], now, log: () => {}, ...extra }),
+    );
+
+  it("publishes once in the window, with the bookmaker that was up to date", async () => {
+    expect((await run(kickoff - 3 * 3_600_000)).generated).toBe(0);
+    expect((await run(kickoff - 40 * 60_000)).generated).toBe(1);
+    const board = decodeAnalysisBoard(store.get("analysis/football"))!;
+    expect(board.analyses[0]).toMatchObject({ id: "PD-2026-11-27", bookmaker: "Winamax" });
+    expect(board.analyses[0].picks[0]).toMatchObject({ price: 2, book: "Winamax", fair: expect.any(Number) });
+    // Already done: the next pass does nothing (and spends no requests).
+    const before = spent;
+    expect((await run(kickoff - 30 * 60_000)).generated).toBe(0);
+    expect(spent).toBe(before);
+  });
+
+  it("a manual run long before is redone in the usual window", async () => {
+    store.clear();
+    expect((await run(kickoff - 30 * 3_600_000, { force: true })).generated).toBe(1);
+    expect((await run(kickoff - 40 * 60_000)).generated).toBe(1);
+    expect((await run(kickoff - 30 * 60_000)).generated).toBe(0);
+    expect(decodeAnalysisBoard(store.get("analysis/football"))!.analyses).toHaveLength(1);
+  });
+});
