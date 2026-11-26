@@ -806,6 +806,10 @@
 }
 
 /* The day at a glance: value around zero, the value threshold at +3 %. */
+/* «2 pagan bien» on one line beside the title. */
+.bet-overview figcaption .bet-chart-note {
+  white-space: nowrap;
+}
 .bet-overview {
   padding: 12px 14px 10px;
   border-radius: var(--r-md);
@@ -1187,6 +1191,12 @@
   background: var(--paper);
   box-shadow: 0 1px 0 var(--rule);
 }
+/* Open over the page: a shadow marks where the panel ends. */
+.bet-combo-panel.is-open {
+  box-shadow:
+    0 1px 0 var(--rule),
+    0 22px 30px -20px rgb(0 0 0 / 0.45);
+}
 .bet-combo-bar {
   display: flex;
   align-items: center;
@@ -1263,6 +1273,10 @@
 }
 .bet-options-table thead th:first-child {
   text-align: left;
+}
+/* Same gap as the figures under them: «Prob.» and «Mercado» never touch. */
+.bet-options-table thead th + th {
+  padding-left: 10px;
 }
 .bet-options-table tbody tr {
   border-top: 1px solid var(--rule);

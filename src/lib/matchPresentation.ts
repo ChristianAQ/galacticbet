@@ -116,8 +116,14 @@ export function pitchRows(players: MatchPlayer[], formation?: string) {
   };
 }
 
+/** Name endings that are not a surname: «Vinícius Júnior» is «Vinícius Jr.». */
+const NAME_SUFFIX = /^(j[uú]nior|jr\.?|filho|neto|sobrinho|ii|iii)$/i;
 export function shortPlayerName(name: string) {
   const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2 && NAME_SUFFIX.test(parts[parts.length - 1])) {
+    const last = parts[parts.length - 1];
+    return `${parts[parts.length - 2]} ${/^j/i.test(last) ? "Jr." : last}`;
+  }
   let start = parts.length - 1;
   while (
     start > 1 &&

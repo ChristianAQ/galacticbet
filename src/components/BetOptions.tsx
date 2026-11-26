@@ -81,8 +81,8 @@ export function MatchOptions({
             <th scope="col">Opción</th>
             <th scope="col">Cuota</th>
             <th scope="col">Prob.</th>
-            <th scope="col" title="Lo que paga la cuota frente a su probabilidad sin margen: 0 % sería lo justo">
-              Pago
+            <th scope="col" title="Lo que paga la cuota frente a la probabilidad del mercado: 0 % sería lo justo">
+              Mercado
             </th>
           </tr>
         </thead>
@@ -105,7 +105,7 @@ export function MatchOptions({
                 </th>
                 <td className="numeral">{odds.format(o.price)}</td>
                 <td>{pct(o.probability)}</td>
-                <td className={value >= 0 ? "is-up" : undefined}>{signedPct(value)}</td>
+                <td className={value > 0 ? "is-up" : undefined}>{signedPct(value)}</td>
               </tr>
             );
           })}
@@ -117,7 +117,8 @@ export function MatchOptions({
         </button>
       ) : null}
       <p className="bet-chart-note">
-        «Pago»: lo que paga la cuota frente a su probabilidad sin margen. 0 % es lo justo; −5 % quiere decir que,
+        «Mercado»: lo que paga la cuota frente a la probabilidad sin margen {sharp ? "de Pinnacle" : "de la propia casa"},
+        no frente a la de la IA (esa es la de «Paga bien» y «¿Compensa?»). 0 % es lo justo; −5 % quiere decir que,
         apostada muchas veces, de cada 10 € volverían 9,50 €. Las casas suelen pagar algo por debajo: su margen.
       </p>
     </figure>

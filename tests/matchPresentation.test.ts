@@ -98,3 +98,14 @@ describe("Presentación de partidos", () => {
     expect(canAddMatchToCalendar(match, Date.parse(match.utcDate))).toBe(false);
   });
 });
+
+describe("short player names", () => {
+  it("keeps the surname, its particles and generational endings", async () => {
+    const { shortPlayerName } = await import("../src/lib/matchPresentation");
+    expect(shortPlayerName("Kylian Mbappé")).toBe("Mbappé");
+    expect(shortPlayerName("Frenkie de Jong")).toBe("de Jong");
+    expect(shortPlayerName("Vinícius Júnior")).toBe("Vinícius Jr.");
+    expect(shortPlayerName("Ronald Araujo Jr")).toBe("Araujo Jr.");
+    expect(shortPlayerName("Rodrygo")).toBe("Rodrygo");
+  });
+});
