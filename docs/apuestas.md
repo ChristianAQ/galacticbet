@@ -2,8 +2,10 @@
 
 La pestaña **Apuestas** (`#/apuestas`) muestra, para cada día de LaLiga o
 Champions, las apuestas de bet365 (u otra casa española si bet365 no está al
-día) que la IA considera más jugosas: las que pagan más de lo que deberían. Es información: GalacticBet no gestiona
-apuestas ni dinero.
+día) en las que la IA ve valor: las que pagan más de lo que deberían según su
+probabilidad. Para cada partido da también una recomendación, todas sus cuotas
+con su probabilidad y una etiqueta de confianza. Es información: GalacticBet
+no gestiona apuestas ni dinero.
 
 ## Cómo funciona
 
@@ -48,25 +50,28 @@ apuestas ni dinero.
    solo puede buscar en la web (bajas y alineaciones, al menos una búsqueda por
    partido) y no ve ningún otro secreto del job. Devuelve un JSON validado con
    dos cosas:
-   - **Las jugosas:** hasta 6 apuestas (como mucho 2 por partido) que pagan
+   - **Apuestas con valor:** hasta 6 apuestas (como mucho 2 por partido) que pagan
      al menos un 3 % más de lo justo según su estimación. Con casas normales
      son pocas: suelen pagar entre un 5 y un 9 % menos que el precio justo de
      Pinnacle.
-   - **La mejor opción de cada partido**, siempre. Es la apuesta con más valor
+   - **La recomendación de cada partido**, siempre. Es la apuesta con más valor
      esperado entre las que tienen al menos un 40 % de probabilidad, aunque su
-     valor sea negativo. La app muestra ese valor tal cual: «Valor +4 %» o
-     «Sin valor (−3 %)».
+     valor sea negativo. La app muestra ese valor tal cual: «IA +4 %» o
+     «IA sin valor (−3 %)».
+
+   Se le pide vocabulario de análisis (valor, probabilidad, cuota, margen) y
+   nada coloquial.
 5. **Validación.** Solo se guardan apuestas sobre mercados que existen, con
-   la cuota real de la casa (nunca la de la IA). Una jugosa tiene que mostrar
+   la cuota real de la casa (nunca la de la IA). Una apuesta con valor tiene que mostrar
    al menos «+3 %» de valor según la IA (redondeado: desde un 2,5 %) y la IA
    no puede darle más de 10 puntos por encima de la probabilidad justa de
-   Pinnacle: más que eso es exceso de confianza, no valor. La mejor opción de
+   Pinnacle: más que eso es exceso de confianza, no valor. La recomendación de
    un partido necesita al menos un 40 % de probabilidad.
 
    **Apuestas de jugador.** Pinnacle no las cotiza: no hay valor «según el
    mercado». La referencia es la probabilidad de la propia cuota (1 / cuota,
    con el margen de la casa) y la IA no puede pasarla en más de 10 puntos.
-   Como mucho 2 entre las jugosas. El job las resuelve en cada pasada con el
+   Como mucho 2 entre las apuestas con valor. El job las resuelve en cada pasada con el
    acta del partido de ESPN (`matchInsights`): marca o ve tarjeta, acertada;
    jugó y no, fallada; no jugó (ni titular ni entró), nula, como en las casas.
    Para dar por fallado un goleador hacen falta todos los goles del marcador
@@ -80,9 +85,22 @@ apuestas ni dinero.
 
 Lo importante se ve de un vistazo, con gráficas:
 
-- **De un vistazo:** el valor de la mejor opción de cada partido alrededor de
-  cero, con la línea de «jugosa» (+3 %). Tocar un partido lleva a su ficha
+- **De un vistazo:** el valor de la recomendación de cada partido alrededor
+  de cero, con el umbral de valor (+3 %). Tocar un partido lleva a su ficha
   dentro del análisis.
+- **Confianza:** cada apuesta lleva «Confianza muy alta / alta / media / baja»
+  con su porcentaje y de una a cuatro barras. Es la probabilidad de ganarla,
+  con una escala fija: muy alta desde el 70 %, alta desde el 55 %, media desde
+  el 40 % y baja por debajo. Se usa la estimación de la IA, nunca por encima
+  de la del mercado (Pinnacle sin margen) cuando la hay. La solidez de los
+  argumentos que da la IA es otra cosa y va en «Por qué y de dónde sale».
+- **Cuotas del partido:** en cada partido, todas las opciones principales
+  (1X2, doble oportunidad, empate no válido, ambos marcan y más/menos goles)
+  con su cuota, su probabilidad sin margen, su confianza y su «Pago»: lo que
+  paga la cuota frente a esa probabilidad (0 % sería lo justo; las casas
+  suelen pagar algo menos, su margen). Ordenadas de más a menos probable, con
+  la **mejor pagada** y la **recomendación** marcadas. Se guardan con el
+  análisis (`matches[].options`).
 - **¿Quién gana?:** las probabilidades de 1, X y 2 sin margen, de Pinnacle o,
   si no hay, de la casa.
 - **Goles:** probabilidad de más de 2,5 goles y de que marquen los dos.
@@ -103,7 +121,7 @@ Datos.
 
 ### Combinada
 
-- **La combinada de las jugosas.** Si un día hay jugosas de al menos dos
+- **Combinada de valor.** Si un día hay apuestas con valor de al menos dos
   partidos, se forma sola con la mejor de cada partido (como mucho tres, la
   de más valor primero). Se fija al publicar el análisis
   (`analyses[].combo`, las claves de sus apuestas) y lleva su propio
@@ -121,8 +139,8 @@ Datos.
 
 La app resuelve cada apuesta con el resultado oficial a 90 minutos y lleva
 tres historiales a una unidad por apuesta, sin reescribir nada: el de las
-jugosas, el de la mejor opción de cada partido y el de la combinada de las
-jugosas (una unidad por combinada, a su cuota total). Cuando un análisis sale del
+apuestas con valor, el de la recomendación de cada partido y el de la
+combinada de valor (una unidad por combinada, a su cuota total). Cuando un análisis sale del
 documento (se guardan los 24 últimos), sus apuestas ya resueltas se suman a
 los totales archivados de su competición: el historial no olvida ninguna e
 indica desde cuándo cuenta.

@@ -182,19 +182,37 @@
   background: var(--paper-2);
   color: var(--ink-2);
 }
-.bet-confidence::before {
-  content: "";
-  width: 7px;
+/* Confidence: four bars, filled as far as the chance of winning goes. */
+.bet-bars {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+.bet-bars i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--rule-strong);
+}
+.bet-bars i:nth-child(1) {
+  height: 5px;
+}
+.bet-bars i:nth-child(2) {
   height: 7px;
-  border-radius: 50%;
-  background: var(--ink-3);
 }
-.bet-confidence.is-alta::before {
-  background: var(--win);
+.bet-bars i:nth-child(3) {
+  height: 10px;
 }
-.bet-confidence.is-baja::before {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--ink-3);
+.bet-bars i:nth-child(4) {
+  height: 12px;
+}
+.bet-bars i.is-on {
+  background: var(--ink);
+}
+.bet-confidence.is-muy-alta,
+.bet-confidence.is-alta {
+  color: var(--ink);
 }
 .bet-result {
   background: var(--paper-2);
@@ -372,10 +390,8 @@
   background: var(--paper-2);
   box-shadow: none;
 }
-.bet-confidence.is-plain::before {
-  display: none;
-}
-.bet-juicy {
+
+.bet-tag-value {
   margin-left: 6px;
   padding: 1px 7px;
   border-radius: 999px;
@@ -797,7 +813,7 @@
   white-space: nowrap;
 }
 
-/* The day at a glance: value around zero, the «jugosa» line at +3 %. */
+/* The day at a glance: value around zero, the value threshold at +3 %. */
 .bet-overview {
   padding: 12px 14px 10px;
   border-radius: var(--r-md);
@@ -861,7 +877,7 @@
   height: 10px;
   background: transparent;
 }
-/* Zero, then the «jugosa» line. */
+/* Zero, then the value threshold. */
 .bet-overview-track::before,
 .bet-overview-track::after {
   content: "";
@@ -1073,7 +1089,7 @@
   inset: -6px 0;
 }
 
-/* La combinada de las jugosas: a card like a pick, legs then the total. */
+/* Combinada de valor: a card like a pick, legs then the total. */
 .bet-combo {
   display: grid;
   gap: 12px;
@@ -1226,4 +1242,80 @@
   align-items: center;
   gap: 6px;
   justify-self: center;
+}
+
+/* ---------- Cuotas del partido ---------- */
+.bet-tag-plain {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+.bet-options-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.bet-options-table thead th {
+  padding: 0 0 6px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: right;
+}
+.bet-options-table thead th:first-child {
+  text-align: left;
+}
+.bet-options-table tbody tr {
+  border-top: 1px solid var(--rule);
+}
+.bet-options-table tbody th {
+  display: grid;
+  gap: 2px;
+  padding: 8px 8px 8px 0;
+  font-weight: 600;
+  text-align: left;
+}
+.bet-options-table tbody th small {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.bet-options-table tbody th small em {
+  margin-left: 0;
+}
+.bet-options-table td {
+  width: 1%;
+  padding: 8px 0 8px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+.bet-options-table td.numeral {
+  font-size: 17px;
+  font-weight: 800;
+}
+.bet-options-table td.is-up {
+  color: var(--win);
+  font-weight: 700;
+}
+/* The recommendation of the analysis stands out from the rest of the rows. */
+.bet-options-table tr.is-recommended th > span {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
+}
+.bet-options-more {
+  justify-self: start;
+  min-height: 40px;
 }

@@ -7,9 +7,13 @@ import {
   archivedRecord,
   analysisDays,
   comboOf,
-  juicyCombo,
+  valueCombo,
   settleCombo,
-  isJuicy,
+  confidenceOf,
+  matchOptions,
+  optionValue,
+  winChance,
+  hasValue,
   marketValue,
   mergeAnalysis,
   decodeAnalysisBoard,
@@ -66,6 +70,49 @@ const match = (over: Partial<Match>): Match => ({
 });
 const finished = (id: string, home: number, away: number, over: Partial<Match> = {}) =>
   match({ id, status: "FINISHED", homeScore: home, awayScore: away, ...over });
+
+describe("confianza y cuotas del partido", () => {
+  it("one fixed scale: muy alta from 70 %, alta from 55 %, media from 40 %, baja below", () => {
+    expect([0.82, 0.7, 0.69, 0.55, 0.54, 0.4, 0.39, 0.12].map((p) => confidenceOf(p).label)).toEqual([
+      "muy alta", "muy alta", "alta", "alta", "media", "media", "baja", "baja",
+    ]);
+    expect(confidenceOf(0.62)).toMatchObject({ id: "alta", bars: 3 });
+    // The chance that sets it: the AI's, never above the market's.
+    expect(winChance({ probability: 0.6, fair: 0.52 })).toBe(0.52);
+    expect(winChance({ probability: 0.48, fair: 0.52 })).toBe(0.48);
+    expect(winChance({ probability: 0.33 })).toBe(0.33);
+  });
+
+  it("lists every main option with its chance and what it pays, most likely first", () => {
+    const prices: MarketPrice[] = [
+      { market: "1X2", selection: "1", price: 2.1, sharp: 2.2, fair: 0.45 },
+      { market: "1X2", selection: "X", price: 3.8, sharp: 3.9, fair: 0.25 },
+      { market: "1X2", selection: "2", price: 3.2, sharp: 3.3, fair: 0.3 },
+      // Without Pinnacle: the bookmaker's own chances, margin removed.
+      { market: "BTTS", selection: "yes", price: 1.8, book: "Winamax" },
+      { market: "BTTS", selection: "no", price: 1.9, book: "Winamax" },
+      // Incomplete market: left out.
+      { market: "OU", selection: "over", line: 2.5, price: 1.7 },
+      // Players' bets have their own place.
+      { market: "SCORER", selection: "yes", player: "Kylian Mbappé", price: 2.2 },
+    ];
+    const options = matchOptions(prices);
+    expect(options.map((o) => [o.market, o.selection, o.probability, o.sharp ?? false])).toEqual([
+      ["BTTS", "yes", expect.closeTo(0.5135, 3), false],
+      ["BTTS", "no", expect.closeTo(0.4865, 3), false],
+      ["1X2", "1", 0.45, true],
+      ["1X2", "2", 0.3, true],
+      ["1X2", "X", 0.25, true],
+    ]);
+    expect(optionValue(options[2])).toBeCloseTo(-0.055);
+    // Stored with the match and read back.
+    const day = analysisDays([match({ id: "a" })], 0)[0];
+    const analysis = acceptAnalysis(day, { headline: "H", summary: "S", matches: [{ matchId: "a", preview: "P" }], picks: [] }, new Map([["a", prices]]), 0)!;
+    expect(analysis.matches[0].options).toEqual(options);
+    const board = decodeAnalysisBoard(JSON.parse(JSON.stringify({ formatVersion: ANALYSIS_FORMAT, updatedAt: analysis.generatedAt, analyses: [analysis] })))!;
+    expect(board.analyses[0].matches[0].options).toEqual(options);
+  });
+});
 
 describe("apuestas de jugador: goleador y tarjeta", () => {
   const catalog = parsePlayerMarkets([
@@ -669,20 +716,20 @@ describe("the record never forgets and the day is analysed once", () => {
     expect(archivedRecord(board.archive, ["CL"], "value")).toBeNull();
   });
 
-  it("la combinada de las jugosas: una por partido, la de más valor, y se fija al publicar", () => {
+  it("la combinada de valor: una por partido, la de más valor, y se fija al publicar", () => {
     const leg = (matchId: string, price: number, probability: number, over: Partial<AnalysisPickLike> = {}) =>
       ({ matchId, market: "1X2", selection: "1", price, probability, confidence: "media", reason: "R", ...over }) as const;
     const picks = [
       leg("a", 2, 0.55), // +10 %
       leg("a", 1.8, 0.6, { market: "BTTS", selection: "yes" }), // +8 %: same match, the better one stays
       leg("b", 2.5, 0.43, { fair: 0.4 }), // +7,5 %
-      leg("c", 1.5, 0.67), // +0,5 %: not a jugosa
+      leg("c", 1.5, 0.67), // +0,5 %: no value
     ];
-    expect(juicyCombo(picks).map((p) => [p.matchId, p.market])).toEqual([
+    expect(valueCombo(picks).map((p) => [p.matchId, p.market])).toEqual([
       ["a", "1X2"],
       ["b", "1X2"],
     ]);
-    expect(juicyCombo([leg("a", 2, 0.55)])).toEqual([]);
+    expect(valueCombo([leg("a", 2, 0.55)])).toEqual([]);
     // Prices and chances multiply; the market's only when it priced every leg.
     expect(comboOf([leg("a", 2, 0.55, { fair: 0.5 }), leg("b", 2.5, 0.43, { fair: 0.4 })])).toEqual({
       price: 5,
@@ -708,9 +755,9 @@ describe("the record never forgets and the day is analysed once", () => {
     expect(twice.analyses[0].picks).toHaveLength(2);
   });
 
-  it("«jugosa» means +3 % as shown, and never far above the market", () => {
-    expect(isJuicy({ probability: 0.513, price: 2 })).toBe(true); // +2,6 % → «+3 %»
-    expect(isJuicy({ probability: 0.512, price: 2 })).toBe(false); // +2,4 % → «+2 %»
+  it("a value bet means +3 % as shown, and never far above the market", () => {
+    expect(hasValue({ probability: 0.513, price: 2 })).toBe(true); // +2,6 % → «+3 %»
+    expect(hasValue({ probability: 0.512, price: 2 })).toBe(false); // +2,4 % → «+2 %»
     expect(marketValue({ fair: 0.45, price: 2 })).toBeCloseTo(-0.1);
     expect(marketValue({ price: 2 })).toBeNull();
     const day = analysisDays([match({ id: "a" })], 0)[0];
@@ -732,7 +779,7 @@ describe("the record never forgets and the day is analysed once", () => {
   it("the job keeps the newest analyses on the board and archives the rest", async () => {
     const { runBettingAnalysis } = await import("../scripts/bettingAnalysis");
     const fixture = match({ id: "lev", home: "Levante UD", away: "Racing Santander", utcDate: "2026-11-27T20:00:00Z" });
-    // A full board of past days, each with one «jugosa» that lost.
+    // A full board of past days, each with one value bet that lost.
     const past = Array.from({ length: MAX_ANALYSES }, (_, i) => {
       const date = new Date(Date.parse("2026-09-01T12:00:00Z") + i * 86_400_000).toISOString().slice(0, 10);
       return analysis({

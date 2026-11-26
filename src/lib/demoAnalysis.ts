@@ -1,4 +1,25 @@
-import { pickKey, type AnalysisBoard, type AnalysisPick, type MatchMarket } from "./bettingAnalysis";
+import {
+  matchOptions,
+  pickKey,
+  type AnalysisBoard,
+  type AnalysisPick,
+  type BetMarket,
+  type MarketPrice,
+  type MatchMarket,
+} from "./bettingAnalysis";
+
+/** Example prices of a match: [market, selection, line, price, chance without margin]. */
+function demoOptions(rows: [BetMarket, string, number | null, number, number][]) {
+  const prices: MarketPrice[] = rows.map(([market, selection, line, price, fair]) => ({
+    market,
+    selection,
+    ...(line !== null ? { line } : {}),
+    price,
+    sharp: Math.round(price * 103) / 100,
+    fair,
+  }));
+  return matchOptions(prices);
+}
 import { demoMatches } from "./demo";
 
 /**
@@ -13,6 +34,7 @@ export function demoAnalysisBoard(): AnalysisBoard {
     pick: AnalysisPick,
     market: MatchMarket,
     sources: string[],
+    options: ReturnType<typeof demoOptions>,
   ) => ({
     matchId: m.id,
     home: m.home,
@@ -24,6 +46,7 @@ export function demoAnalysisBoard(): AnalysisBoard {
     pick,
     market,
     sources,
+    options,
   });
   const btts: AnalysisPick = {
     matchId: clasico.id,
@@ -81,6 +104,12 @@ export function demoAnalysisBoard(): AnalysisBoard {
             btts,
             { home: 0.45, draw: 0.25, away: 0.3, over25: 0.62, btts: 0.6, source: "Pinnacle" },
             ["marca.com", "as.com"],
+            demoOptions([
+              ["1X2", "1", null, 2.1, 0.45], ["1X2", "X", null, 3.8, 0.25], ["1X2", "2", null, 3.2, 0.3],
+              ["DC", "1X", null, 1.36, 0.7], ["DC", "12", null, 1.27, 0.75], ["DC", "X2", null, 1.73, 0.55],
+              ["BTTS", "yes", null, 1.62, 0.6], ["BTTS", "no", null, 2.35, 0.4],
+              ["OU", "over", 2.5, 1.55, 0.62], ["OU", "under", 2.5, 2.45, 0.38],
+            ]),
           ),
           game(
             atleti,
@@ -88,6 +117,12 @@ export function demoAnalysisBoard(): AnalysisBoard {
             atletiWin,
             { home: 0.5, draw: 0.27, away: 0.23, over25: 0.44, btts: 0.45, source: "Pinnacle" },
             ["mundodeportivo.com"],
+            demoOptions([
+              ["1X2", "1", null, 1.95, 0.5], ["1X2", "X", null, 3.5, 0.27], ["1X2", "2", null, 4.1, 0.23],
+              ["DC", "1X", null, 1.27, 0.77], ["DC", "12", null, 1.32, 0.73], ["DC", "X2", null, 1.97, 0.5],
+              ["BTTS", "yes", null, 2.1, 0.45], ["BTTS", "no", null, 1.7, 0.55],
+              ["OU", "over", 2.5, 2.15, 0.44], ["OU", "under", 2.5, 1.7, 0.56],
+            ]),
           ),
           game(derbi, "Derbi vasco igualado y de pocos goles: el mercado lo ve parejo y no hay valor claro.", {
             matchId: derbi.id,
@@ -100,10 +135,15 @@ export function demoAnalysisBoard(): AnalysisBoard {
             confidence: "media",
             reason: "Siete de los últimos ocho derbis acabaron con menos de tres goles y los dos llegan con bajas en ataque.",
             risk: "Si hay un gol pronto, el partido puede abrirse.",
-          }, { home: 0.38, draw: 0.32, away: 0.3, over25: 0.42, btts: 0.47, source: "Pinnacle" }, []),
+          }, { home: 0.38, draw: 0.32, away: 0.3, over25: 0.42, btts: 0.47, source: "Pinnacle" }, [], demoOptions([
+            ["1X2", "1", null, 2.5, 0.38], ["1X2", "X", null, 3, 0.32], ["1X2", "2", null, 3.2, 0.3],
+            ["DC", "1X", null, 1.4, 0.7], ["DC", "12", null, 1.47, 0.68], ["DC", "X2", null, 1.55, 0.62],
+            ["BTTS", "yes", null, 2, 0.47], ["BTTS", "no", null, 1.75, 0.53],
+            ["OU", "over", 2.5, 2.3, 0.42], ["OU", "under", 2.5, 1.7, 0.58],
+          ])),
         ],
         picks: [btts, atletiWin, scorer],
-        // Two jugosas of different matches: the day's combinada.
+        // Two value bets of different matches: the day's combinada.
         combo: [pickKey(btts), pickKey(atletiWin)],
       },
     ],

@@ -13,6 +13,7 @@ import {
   comboLegs,
   comboOf,
   isPlayerMarket,
+  winChance,
   nextAnalysis,
   pickKey,
   pickLabel,
@@ -31,6 +32,7 @@ import { competitionName } from "../lib/competitions";
 import type { Match } from "../lib/domain";
 import { BreakEven, GoalChances, OutcomeChances, ValueOverview } from "../components/BetCharts";
 import { ComboCard, ComboPanel, ComboResult, ComboToggle, ValueChip } from "../components/BetCombo";
+import { ConfidenceChip, MatchOptions } from "../components/BetOptions";
 import TeamForm from "../components/TeamForm";
 import { demoAnalysisBoard } from "../lib/demoAnalysis";
 import { haptic, prefersReducedMotion } from "../lib/motion";
@@ -46,8 +48,8 @@ const hour = new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit" 
 const when = new Intl.DateTimeFormat("es", { weekday: "long", hour: "2-digit", minute: "2-digit" });
 const ago = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
 const pct = (p: number) => `${Math.round(p * 100)} %`;
-/** The «jugosa» threshold as the texts say it. */
-const JUICY = pct(MIN_VALUE);
+/** The value threshold as the texts say it. */
+const VALUE_LINE = pct(MIN_VALUE);
 /** The day of an analysis, at noon in Spain so no time zone moves it. */
 const dayOf = (a: BettingAnalysis) => new Date(`${a.date}T12:00:00`);
 
@@ -125,6 +127,12 @@ function Why({
         )}
         {pick?.fair !== undefined && (
           <p className="bet-why-muted">Pinnacle, la casa de referencia, le da un {pct(pick.fair)}.</p>
+        )}
+        {pick && (
+          <p className="bet-why-muted">
+            Solidez de los argumentos, según la IA: {pick.confidence}. La confianza de la etiqueta es otra cosa: la
+            probabilidad de ganarla.
+          </p>
         )}
         {pick && isPlayerMarket(pick.market) && (
           <p className="bet-why-muted">
@@ -214,7 +222,7 @@ function PickCard({
       </div>
       <div className="bet-pick-tags">
         <ValueChip pick={pick} />
-        <span className={`bet-confidence is-${pick.confidence}`}>Confianza {pick.confidence}</span>
+        <ConfidenceChip chance={winChance(pick)} />
         <ResultBadge pick={pick} match={match} />
         {slip && <ComboToggle pick={pick} inSlip={slip.has(pick)} onToggle={slip.toggle} />}
       </div>
@@ -231,7 +239,7 @@ function GameCard({
   match,
   matches,
   index,
-  juicy,
+  valued,
   slip,
 }: {
   analysis: BettingAnalysis;
@@ -239,7 +247,7 @@ function GameCard({
   match?: Match;
   matches: Match[];
   index: number;
-  juicy: boolean;
+  valued: boolean;
   slip?: Slip;
 }) {
   const pick = game.pick;
@@ -272,7 +280,7 @@ function GameCard({
         <div className="bet-best">
           <div className="bet-best-main">
             <span>
-              <span className="eyebrow">Mejor opción · {MARKET_NAMES[pick.market]}</span>
+              <span className="eyebrow">Recomendación · {MARKET_NAMES[pick.market]}</span>
               <strong>{pickLabel(pick, game.home, game.away)}</strong>
             </span>
             <span className="bet-best-price">
@@ -282,18 +290,18 @@ function GameCard({
           </div>
           <div className="bet-pick-tags">
             <ValueChip pick={pick} />
-            {juicy ? (
-              <span className="bet-confidence is-plain">Está entre las jugosas</span>
-            ) : (
-              <span className={`bet-confidence is-${pick.confidence}`}>Confianza {pick.confidence}</span>
-            )}
+            <ConfidenceChip chance={winChance(pick)} />
+            {valued && <span className="bet-confidence is-plain">Apuesta con valor</span>}
             <ResultBadge pick={pick} match={match} />
             {slip && <ComboToggle pick={pick} inSlip={slip.has(pick)} onToggle={slip.toggle} />}
           </div>
           <BreakEven pick={pick} />
         </div>
       )}
-      <Why analysis={analysis} game={game} pick={juicy ? undefined : pick} />
+      {game.options?.length ? (
+        <MatchOptions options={game.options} home={game.home} away={game.away} recommended={pick} />
+      ) : null}
+      <Why analysis={analysis} game={game} pick={valued ? undefined : pick} />
     </li>
   );
 }
@@ -337,7 +345,7 @@ function AnalysisDay({
       <ValueOverview matches={analysis.matches} onOpen={open} />
       <p className="bet-summary">{analysis.summary}</p>
       <h3 className="bet-subhead">
-        Las más jugosas <small>{analysis.picks.length || "ninguna hoy"}</small>
+        Apuestas con valor <small>{analysis.picks.length || "ninguna hoy"}</small>
       </h3>
       {analysis.picks.length ? (
         <ol className="bet-picks">
@@ -355,8 +363,8 @@ function AnalysisDay({
         </ol>
       ) : (
         <p className="bet-note">
-          Ninguna cuota paga hoy al menos un {JUICY} más de lo justo. Debajo tienes la mejor opción de cada partido, con su
-          valor real.
+          Ninguna cuota supera hoy en un {VALUE_LINE} la probabilidad estimada. Debajo, la recomendación de cada partido con su
+          valor real y todas sus cuotas.
         </p>
       )}
       {combo.length >= 2 && <ComboCard legs={combo} games={games} byId={byId} />}
@@ -372,7 +380,7 @@ function AnalysisDay({
             match={byId.get(m.matchId)}
             matches={matches}
             index={i}
-            juicy={Boolean(m.pick && analysis.picks.some((p) => pickKey(p) === pickKey(m.pick!)))}
+            valued={Boolean(m.pick && analysis.picks.some((p) => pickKey(p) === pickKey(m.pick!)))}
             slip={slip}
           />
         ))}
@@ -402,7 +410,7 @@ function Record({
   return (
     <div className="bet-record-block">
       <h3 className="bet-subhead">
-        {kind === "value" ? "Las jugosas" : kind === "best" ? "La mejor opción de cada partido" : "La combinada de las jugosas"}
+        {kind === "value" ? "Apuestas con valor" : kind === "best" ? "Recomendación de cada partido" : "Combinada de valor"}
         <small>
           {r.picks} {kind === "combo" ? (r.picks === 1 ? "combinada" : "combinadas") : r.picks === 1 ? "apuesta" : "apuestas"}
         </small>
@@ -439,8 +447,8 @@ function Record({
 }
 
 function PastDay({ analysis, byId }: { analysis: BettingAnalysis; byId: Map<string, Match> }) {
-  const juicy = new Set(analysis.picks.map(pickKey));
-  const all = [...analysis.picks, ...picksOf(analysis, "best").filter((p) => !juicy.has(pickKey(p)))];
+  const valued = new Set(analysis.picks.map(pickKey));
+  const all = [...analysis.picks, ...picksOf(analysis, "best").filter((p) => !valued.has(pickKey(p)))];
   const results = all.map((p) => settlePick(p, byId.get(p.matchId)));
   const combo = comboLegs(analysis);
   const [open, setOpen] = useState(false);
@@ -471,7 +479,7 @@ function PastDay({ analysis, byId }: { analysis: BettingAnalysis; byId: Map<stri
                 <span>
                   <strong>
                     {pickLabel(p, game?.home ?? "", game?.away ?? "")}
-                    {juicy.has(pickKey(p)) && <em className="bet-juicy">Jugosa</em>}
+                    {valued.has(pickKey(p)) && <em className="bet-tag-value">Valor</em>}
                   </strong>
                   <small>
                     {game ? `${game.home} – ${game.away}` : ""} · {odds.format(p.price)} {p.book ?? "bet365"}
@@ -486,7 +494,7 @@ function PastDay({ analysis, byId }: { analysis: BettingAnalysis; byId: Map<stri
               <span>
                 <strong>
                   Combinada de {combo.length}
-                  <em className="bet-juicy">Jugosas</em>
+                  <em className="bet-tag-value">Valor</em>
                 </strong>
                 <small>Cuota {odds.format(comboOf(combo).price)}</small>
               </span>

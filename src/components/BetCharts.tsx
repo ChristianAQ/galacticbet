@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { edge, isJuicy, MIN_VALUE, type AnalysisMatch, type AnalysisPick, type MatchMarket } from "../lib/bettingAnalysis";
+import { edge, hasValue, MIN_VALUE, type AnalysisMatch, type AnalysisPick, type MatchMarket } from "../lib/bettingAnalysis";
 import "../styles/charts.css";
 
 /**
@@ -93,7 +93,7 @@ export function BreakEven({ pick }: { pick: Pick<AnalysisPick, "price" | "probab
       <figcaption>
         <span className="bet-chart-title">¿Compensa?</span>
         <span className={`bet-chart-note${pays ? " is-good" : ""}`}>
-          {isJuicy(pick) ? `Sí, ${signed(value)} de valor` : pays ? `Por poco, ${signed(value)}` : `No, ${signed(value)}`}
+          {hasValue(pick) ? `Sí, ${signed(value)} de valor` : pays ? `Por poco, ${signed(value)}` : `No, ${signed(value)}`}
         </span>
       </figcaption>
       <div
@@ -129,7 +129,7 @@ export function BreakEven({ pick }: { pick: Pick<AnalysisPick, "price" | "probab
 
 /**
  * The day at a glance: the value of every match's best option around zero,
- * with the «jugosa» line. Tapping a row goes to its match.
+ * with the value threshold. Tapping a row goes to its match.
  */
 export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; onOpen: (matchId: string) => void }) {
   const rows = matches.flatMap((m) => (m.pick ? [{ m, value: edge(m.pick.probability, m.pick.price) }] : []));
@@ -137,13 +137,13 @@ export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; o
   // Symmetric scale in steps of 5 %, never narrower than ±10 %.
   const span = Math.max(0.1, Math.ceil((Math.max(...rows.map((r) => Math.abs(r.value))) + 0.005) * 20) / 20);
   const x = (v: number) => 50 + (Math.max(-span, Math.min(span, v)) / span) * 50;
-  const juicy = rows.filter((r) => isJuicy(r.m.pick!)).length;
+  const valued = rows.filter((r) => hasValue(r.m.pick!)).length;
   return (
     <figure className="bet-chart bet-overview">
       <figcaption>
         <span className="bet-chart-title">De un vistazo: valor de cada partido</span>
-        <span className={`bet-chart-note${juicy ? " is-good" : ""}`}>
-          {juicy ? `${juicy} ${juicy === 1 ? "jugosa" : "jugosas"}` : "ninguna jugosa"}
+        <span className={`bet-chart-note${valued ? " is-good" : ""}`}>
+          {valued ? `${valued} con valor` : "ninguna con valor"}
         </span>
       </figcaption>
       <div className="bet-overview-axis" aria-hidden="true">
@@ -171,13 +171,13 @@ export function ValueOverview({ matches, onOpen }: { matches: AnalysisMatch[]; o
                   }}
                 />
               </span>
-              <strong className={isJuicy(m.pick!) ? "is-good" : undefined}>{signed(value)}</strong>
+              <strong className={hasValue(m.pick!) ? "is-good" : undefined}>{signed(value)}</strong>
             </button>
           </li>
         ))}
       </ul>
       <p className="bet-overview-key" aria-hidden="true">
-        <i /> línea de «jugosa»: +{Math.round(MIN_VALUE * 100)} %
+        <i /> umbral de valor: +{Math.round(MIN_VALUE * 100)} %
       </p>
     </figure>
   );

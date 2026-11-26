@@ -2,17 +2,19 @@ import { Check, ChevronDown, Layers, Minus, Plus, Trash2, X } from "lucide-react
 import { useState } from "react";
 import {
   comboOf,
-  isJuicy,
+  hasValue,
   marketValue,
   pickKey,
   pickLabel,
   settleCombo,
   valuePercent,
+  winChance,
   type AnalysisMatch,
   type AnalysisPick,
 } from "../lib/bettingAnalysis";
 import type { Match } from "../lib/domain";
 import { BreakEven } from "./BetCharts";
+import { ConfidenceChip } from "./BetOptions";
 
 const odds = new Intl.NumberFormat("es", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const units = new Intl.NumberFormat("es", { minimumFractionDigits: 1, maximumFractionDigits: 2, signDisplay: "exceptZero" });
@@ -23,7 +25,7 @@ const signedPct = (n: number) => (n > 0 ? `+${n} %` : n < 0 ? `−${Math.abs(n)}
 
 /**
  * The value of a price, as it is: by the AI's estimate and, when Pinnacle
- * priced it, by the market. Both side by side, so a «jugosa» the market
+ * priced it, by the market. Both side by side, so a value bet the market
  * disagrees with is plain to see.
  */
 export function ValueChip({ pick }: { pick: Pick<AnalysisPick, "price" | "probability" | "fair"> }) {
@@ -32,7 +34,7 @@ export function ValueChip({ pick }: { pick: Pick<AnalysisPick, "price" | "probab
   const marketPct = market === null ? null : Math.round(market * 100);
   return (
     <>
-      {isJuicy(pick) ? (
+      {hasValue(pick) ? (
         <span className="bet-value" title="Lo que paga la cuota por encima de lo justo, según la estimación de la IA">
           IA {signedPct(value)}
         </span>
@@ -120,6 +122,7 @@ function ComboSummary({
       </div>
       <div className="bet-pick-tags">
         <ValueChip pick={combo} />
+        <ConfidenceChip chance={winChance(combo)} />
       </div>
       <BreakEven pick={combo} />
       <p className="bet-combo-note">{MARGIN_NOTE}</p>
@@ -142,7 +145,7 @@ export function ComboResult({ legs, byId }: { legs: AnalysisPick[]; byId: Map<st
   );
 }
 
-/** «La combinada de las jugosas»: fixed with the analysis, with its own record. */
+/** «Combinada de valor»: fixed with the analysis, with its own record. */
 export function ComboCard({
   legs,
   games,
@@ -153,10 +156,10 @@ export function ComboCard({
   byId: Map<string, Match>;
 }) {
   return (
-    <section className="bet-combo" aria-label="La combinada de las jugosas">
+    <section className="bet-combo" aria-label="Combinada de valor">
       <header className="bet-combo-head">
         <span className="eyebrow">
-          <Layers size={13} aria-hidden="true" /> La combinada de las jugosas
+          <Layers size={13} aria-hidden="true" /> Combinada de valor
         </span>
         <ComboResult legs={legs} byId={byId} />
       </header>

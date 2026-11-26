@@ -18,13 +18,13 @@ export const MAX_PICKS = 6;
 /** Picks a stored analysis may hold: the AI's, plus those of matches kept from an earlier run of the day. */
 export const MAX_STORED_PICKS = 12;
 /**
- * «Jugosa»: pays at least 3 % over the fair price by the AI's estimate, as
+ * With value: pays at least 3 % over the fair price by the AI's estimate, as
  * shown (rounded to a whole percent). The same rule everywhere: the job, the
  * chips, the chart line and the texts.
  */
 export const MIN_VALUE = 0.03;
 /**
- * The AI may not see much more than the market: a «jugosa» it rates more than
+ * The AI may not see much more than the market: a value bet it rates more than
  * 10 points above Pinnacle's fair chance is an overconfident guess, not value.
  */
 export const MAX_MARKET_GAP = 0.1;
@@ -51,8 +51,27 @@ export const PLAYER_MARKETS: readonly BetMarket[] = ["SCORER", "CARD"];
 export const isPlayerMarket = (market: BetMarket) => PLAYER_MARKETS.includes(market);
 /** Goal lines offered to the AI (half goals: no pushes, easy to read). */
 export const GOAL_LINES = [1.5, 2.5, 3.5] as const;
+/** How solid the AI finds its own reasons (shown as such, never as the chance of winning). */
 export const CONFIDENCE = ["alta", "media", "baja"] as const;
 export type Confidence = (typeof CONFIDENCE)[number];
+
+/* ---------- Confidence: the chance a bet wins ---------- */
+
+export type ConfidenceLevel = "muy-alta" | "alta" | "media" | "baja";
+/** One fixed scale for every bet: the chance of winning it, not how it pays. */
+export const CONFIDENCE_LEVELS: readonly { id: ConfidenceLevel; label: string; min: number; bars: number }[] = [
+  { id: "muy-alta", label: "muy alta", min: 0.7, bars: 4 },
+  { id: "alta", label: "alta", min: 0.55, bars: 3 },
+  { id: "media", label: "media", min: 0.4, bars: 2 },
+  { id: "baja", label: "baja", min: 0, bars: 1 },
+];
+export const confidenceOf = (chance: number) => CONFIDENCE_LEVELS.find((l) => chance >= l.min)!;
+/**
+ * The chance a bet wins, prudently: the AI's estimate, never above the
+ * market's (Pinnacle without margin) when it priced it.
+ */
+export const winChance = (p: { probability: number; fair?: number }) =>
+  p.fair !== undefined ? Math.min(p.probability, p.fair) : p.probability;
 
 /**
  * One price of a match: bet365's (or, when bet365 is not up to date, another
@@ -106,14 +125,32 @@ export interface AnalysisMatch {
   preview: string;
   /**
    * The AI's best option for this match, value or not (its value is shown as
-   * it is, even negative). The «jugosas» are in `picks`.
+   * it is, even negative). The value bets are in `picks`.
    */
   pick?: AnalysisPick;
   /** What the market expects, for the charts. */
   market?: MatchMarket;
+  /** Every main option with its price, its chance and what it pays («Cuotas del partido»). */
+  options?: MatchOption[];
   /** Websites the AI read for this match (host names only). */
   sources?: string[];
 }
+
+/**
+ * One option of a match as the market prices it: the bookmaker's price, the
+ * chance with the margin removed, and so what it pays against that chance.
+ */
+export interface MatchOption {
+  market: BetMarket;
+  selection: string;
+  line?: number;
+  price: number;
+  /** Chance without margin (0–1): Pinnacle's when `sharp`, else the bookmaker's own. */
+  probability: number;
+  sharp?: true;
+}
+/** What the option pays against its chance: 0 is fair, −0.05 pays 5 % less. */
+export const optionValue = (o: Pick<MatchOption, "price" | "probability">) => edge(o.probability, o.price);
 
 /** The market's chances for a match, margin removed (0–1). */
 export interface MatchMarket {
@@ -140,6 +177,37 @@ function chances(prices: MarketPrice[], market: BetMarket, selections: readonly 
   const total = own.reduce((sum, p) => sum + 1 / p!.price, 0);
   return { values: own.map((p) => round4(1 / p!.price / total)), sharp: false };
 }
+/** Groups of options shown for every match (players' bets have their own place). */
+const OPTION_GROUPS: { market: BetMarket; selections: readonly string[]; line?: number }[] = [
+  { market: "1X2", selections: MARKET_SELECTIONS["1X2"] },
+  { market: "DC", selections: MARKET_SELECTIONS.DC },
+  { market: "DNB", selections: MARKET_SELECTIONS.DNB },
+  { market: "BTTS", selections: MARKET_SELECTIONS.BTTS },
+  ...GOAL_LINES.map((line) => ({ market: "OU" as const, selections: MARKET_SELECTIONS.OU, line })),
+];
+export const MAX_OPTIONS = 18;
+/** The match's main options with their chance (no margin), most likely first. */
+export function matchOptions(prices: MarketPrice[] | undefined): MatchOption[] {
+  if (!prices?.length) return [];
+  const options: MatchOption[] = [];
+  for (const group of OPTION_GROUPS) {
+    const result = chances(prices, group.market, group.selections, group.line);
+    if (!result) continue;
+    group.selections.forEach((selection, i) => {
+      const own = prices.find((p) => p.market === group.market && p.selection === selection && p.line === group.line)!;
+      options.push({
+        market: group.market,
+        selection,
+        ...(group.line !== undefined ? { line: group.line } : {}),
+        price: own.price,
+        probability: result.values[i],
+        ...(result.sharp ? { sharp: true as const } : {}),
+      });
+    });
+  }
+  return options.sort((a, b) => b.probability - a.probability).slice(0, MAX_OPTIONS);
+}
+
 export function marketView(prices: MarketPrice[] | undefined): MatchMarket | null {
   if (!prices?.length) return null;
   const result = chances(prices, "1X2", ["1", "X", "2"]);
@@ -185,7 +253,7 @@ export interface BettingAnalysis {
   matches: AnalysisMatch[];
   picks: AnalysisPick[];
   /**
-   * «La combinada de las jugosas», fixed when the analysis is published: the
+   * «Combinada de valor», fixed when the analysis is published: the
    * keys (pickKey) of its legs, all among `picks`, from different matches.
    */
   combo?: string[];
@@ -229,8 +297,8 @@ export const analysisId = (competition: AnalysisCompetition, date: string) => `$
 export const edge = (probability: number, price: number) => probability * price - 1;
 /** Value as the app shows it, in whole percent. */
 export const valuePercent = (probability: number, price: number) => Math.round(edge(probability, price) * 100);
-/** A «jugosa» by the AI's estimate (see MIN_VALUE). */
-export const isJuicy = (p: Pick<AnalysisPick, "probability" | "price">) =>
+/** A value bet by the AI's estimate (see MIN_VALUE). */
+export const hasValue = (p: Pick<AnalysisPick, "probability" | "price">) =>
   valuePercent(p.probability, p.price) >= Math.round(MIN_VALUE * 100);
 /** What the market (Pinnacle without its margin) says the price is worth, when it priced it. */
 export const marketValue = (p: Pick<AnalysisPick, "fair" | "price">) =>
@@ -379,7 +447,7 @@ export interface TrackRecord {
   /** Profit per unit staked (void picks return the stake). */
   yield: number | null;
 }
-/** The picks of a kind: the «jugosas» (value) or every match's best option. */
+/** The picks of a kind: the value bets or every match's recommendation. */
 export const picksOf = (analysis: BettingAnalysis, kind: "value" | "best") =>
   kind === "value" ? analysis.picks : analysis.matches.flatMap((m) => (m.pick ? [m.pick] : []));
 
@@ -401,12 +469,12 @@ export function comboOf(legs: Pick<AnalysisPick, "price" | "probability" | "fair
   };
 }
 /**
- * «La combinada de las jugosas»: the best jugosa of each match, up to three,
+ * «Combinada de valor»: the best value bet of each match, up to three,
  * most value first; none with fewer than two matches.
  */
-export function juicyCombo(picks: AnalysisPick[]): AnalysisPick[] {
+export function valueCombo(picks: AnalysisPick[]): AnalysisPick[] {
   const best = new Map<string, AnalysisPick>();
-  for (const p of picks.filter(isJuicy)) {
+  for (const p of picks.filter(hasValue)) {
     const current = best.get(p.matchId);
     if (!current || edge(p.probability, p.price) > edge(current.probability, current.price)) best.set(p.matchId, p);
   }
@@ -676,6 +744,24 @@ function decodeMarket(raw: unknown): MatchMarket | null {
   };
 }
 
+function decodeOptions(raw: unknown): MatchOption[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, MAX_OPTIONS).flatMap((o): MatchOption[] => {
+    if (!isRow(o) || !validMarketChoice(o.market, o.selection, o.line ?? undefined)) return [];
+    if (isPlayerMarket(o.market) || !decimalPrice(o.price) || !probability(o.probability)) return [];
+    return [
+      {
+        market: o.market,
+        selection: o.selection as string,
+        ...(o.market === "OU" ? { line: o.line as number } : {}),
+        price: o.price,
+        probability: o.probability,
+        ...(o.sharp === true ? { sharp: true as const } : {}),
+      },
+    ];
+  });
+}
+
 export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
   if (!isRow(raw)) return null;
   const { id, competition, generatedAt, oddsAt, bookmaker, headline, summary } = raw;
@@ -691,6 +777,7 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
     const pick = decodePick(m.pick, new Set([m.matchId]));
     const market = decodeMarket(m.market);
     const sources = sourceHosts(m.sources);
+    const options = decodeOptions(m.options);
     return [
       {
         matchId: m.matchId,
@@ -702,6 +789,7 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
         preview: m.preview,
         ...(pick ? { pick } : {}),
         ...(market ? { market } : {}),
+        ...(options.length ? { options } : {}),
         ...(sources.length ? { sources } : {}),
       },
     ];
