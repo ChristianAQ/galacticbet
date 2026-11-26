@@ -14,6 +14,8 @@ export type AnalysisCompetition = (typeof ANALYSIS_COMPETITIONS)[number];
 /** The newest ones the app keeps (about a month of match days). */
 export const MAX_ANALYSES = 24;
 export const MAX_PICKS = 6;
+/** «Jugosa»: at least this much over the fair price by the AI's estimate (it is asked for 3 %). */
+export const MIN_VALUE = 0.02;
 /** The analysis runs from this long before the day's first kick-off… */
 export const ANALYSIS_LEAD_MS = 45 * 60_000;
 /** …and is skipped once even the last match of the day is about to start. */
@@ -76,6 +78,11 @@ export interface AnalysisMatch {
   homeCrest?: string;
   awayCrest?: string;
   preview: string;
+  /**
+   * The AI's best option for this match, value or not (its value is shown as
+   * it is, even negative). The «jugosas» are in `picks`.
+   */
+  pick?: AnalysisPick;
 }
 export interface BettingAnalysis {
   /** Competition and day in Madrid: `PD-2026-11-28`. */
@@ -186,12 +193,16 @@ export interface TrackRecord {
   /** Profit per unit staked (void picks return the stake). */
   yield: number | null;
 }
-/** Honest scoreboard of every pick on the board, one unit each. */
-export function trackRecord(analyses: BettingAnalysis[], matches: Match[]): TrackRecord {
+/** The picks of a kind: the «jugosas» (value) or every match's best option. */
+export const picksOf = (analysis: BettingAnalysis, kind: "value" | "best") =>
+  kind === "value" ? analysis.picks : analysis.matches.flatMap((m) => (m.pick ? [m.pick] : []));
+
+/** Honest scoreboard of every pick of a kind on the board, one unit each. */
+export function trackRecord(analyses: BettingAnalysis[], matches: Match[], kind: "value" | "best" = "value"): TrackRecord {
   const byId = new Map(matches.map((m) => [m.id, m]));
   const record: TrackRecord = { picks: 0, settled: 0, won: 0, lost: 0, void: 0, units: 0, yield: null };
   for (const analysis of analyses)
-    for (const pick of analysis.picks) {
+    for (const pick of picksOf(analysis, kind)) {
       record.picks++;
       const result = settlePick(pick, byId.get(pick.matchId));
       if (!result) continue;
@@ -316,6 +327,7 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
     if (!isRow(m) || typeof m.matchId !== "string" || !ID.test(m.matchId)) return [];
     if (!text(m.home, 100) || !text(m.away, 100) || !date(m.utcDate) || !text(m.preview, 600)) return [];
     if (!CREST(m.homeCrest) || !CREST(m.awayCrest)) return [];
+    const pick = decodePick(m.pick, new Set([m.matchId]));
     return [
       {
         matchId: m.matchId,
@@ -325,6 +337,7 @@ export function decodeAnalysis(raw: unknown): BettingAnalysis | null {
         ...(m.homeCrest ? { homeCrest: m.homeCrest as string } : {}),
         ...(m.awayCrest ? { awayCrest: m.awayCrest as string } : {}),
         preview: m.preview,
+        ...(pick ? { pick } : {}),
       },
     ];
   });

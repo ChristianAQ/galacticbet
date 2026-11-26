@@ -158,6 +158,9 @@ describe("picks and results", () => {
     const record = trackRecord([analysis], [finished("a", 1, 0), finished("b", 1, 0), finished("c", 0, 0), match({ id: "d" })]);
     expect(record).toMatchObject({ picks: 4, settled: 3, won: 1, lost: 1, void: 1, units: 0.5 });
     expect(record.yield).toBeCloseTo(0.25);
+    // The best option of each match keeps its own record.
+    const withBest = { ...analysis, matches: [{ pick: { matchId: "a", market: "OU", selection: "under", line: 2.5, price: 1.7 } }, {}] } as unknown as BettingAnalysis;
+    expect(trackRecord([withBest], [finished("a", 1, 0)], "best")).toMatchObject({ picks: 1, won: 1, units: 0.7 });
   });
 });
 
@@ -214,7 +217,12 @@ describe("accepting the AI's answer", () => {
     const analysis = acceptAnalysis(day, {
       headline: "Goles en el Bernabéu",
       summary: "Un día con poco valor.",
-      matches: [{ matchId: "a", preview: "El Madrid llega en racha." }],
+      matches: [
+        // Best option without value (−6 %): kept, as it is.
+        { matchId: "a", preview: "El Madrid llega en racha.", bestPick: pick({ market: "1X2", selection: "1", line: null, probability: 0.63 }) },
+        // Below 40 %: not a «best option».
+        { matchId: "b", preview: "", bestPick: pick({ matchId: undefined, market: "BTTS", selection: "yes", line: null, probability: 0.3 }) },
+      ],
       picks: [
         pick({}),
         // Same pick twice, invented market, no value, unknown match.
@@ -234,10 +242,12 @@ describe("accepting the AI's answer", () => {
     expect(analysis.picks[1]).toMatchObject({ confidence: "baja", book: "Winamax" });
     expect(analysis.bookmaker).toBe("Winamax");
     expect(edge(0.6, 1.8)).toBeCloseTo(0.08);
-    expect(analysis.matches.map((m) => [m.matchId, m.preview])).toEqual([
-      ["a", "El Madrid llega en racha."],
-      ["b", "Sin previa."],
+    expect(analysis.matches.map((m) => [m.matchId, m.preview, m.pick?.market])).toEqual([
+      ["a", "El Madrid llega en racha.", "1X2"],
+      ["b", "Sin previa.", undefined],
     ]);
+    expect(analysis.matches[0].pick).toMatchObject({ matchId: "a", price: 1.5, probability: 0.63, fair: 0.63 });
+    expect(edge(analysis.matches[0].pick!.probability, analysis.matches[0].pick!.price)).toBeLessThan(0);
     // The stored board decodes back to the same analysis.
     const board = decodeAnalysisBoard(JSON.parse(JSON.stringify({ formatVersion: ANALYSIS_FORMAT, updatedAt: analysis.generatedAt, analyses: [analysis] })));
     expect(board?.analyses[0]).toEqual(analysis);

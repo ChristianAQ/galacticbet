@@ -39,17 +39,27 @@ apuestas ni dinero.
    goleadores.
 4. **IA.** Claude Code se ejecuta sin interfaz con el plan de Claude del
    propietario (token de `claude setup-token`). Trabaja en una carpeta vacía,
-   solo puede buscar en la web (bajas y alineaciones) y no ve ningún otro
-   secreto del job. Devuelve un JSON validado con hasta 6 apuestas, como mucho
-   2 por partido.
+   solo puede buscar en la web (bajas y alineaciones, al menos una búsqueda por
+   partido) y no ve ningún otro secreto del job. Devuelve un JSON validado con
+   dos cosas:
+   - **Las jugosas:** hasta 6 apuestas (como mucho 2 por partido) que pagan
+     al menos un 3 % más de lo justo según su estimación. Con casas normales
+     son pocas: suelen pagar entre un 5 y un 9 % menos que el precio justo de
+     Pinnacle.
+   - **La mejor opción de cada partido**, siempre. Es la apuesta con más valor
+     esperado entre las que tienen al menos un 40 % de probabilidad, aunque su
+     valor sea negativo. La app muestra ese valor tal cual: «Valor +4 %» o
+     «Sin valor (−3 %)».
 5. **Validación.** Solo se guardan apuestas sobre mercados que existen, con
-   la cuota real de bet365 (nunca la de la IA) y con al menos un 2 % de
-   valor según la estimación de la IA. El resultado se publica en
+   la cuota real de la casa (nunca la de la IA). Las jugosas necesitan al
+   menos un 2 % de valor según la estimación de la IA, y la mejor opción de un
+   partido, al menos un 40 % de probabilidad. El resultado se publica en
    `analysis/football`, un documento público de solo lectura que guarda los
    24 últimos análisis.
 
 La app resuelve cada apuesta con el resultado oficial a 90 minutos y lleva
-el historial a una unidad por apuesta, sin reescribir nada.
+dos historiales a una unidad por apuesta, sin reescribir nada: el de las
+jugosas y el de la mejor opción de cada partido.
 
 ## Configurar
 

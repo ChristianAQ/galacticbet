@@ -7,9 +7,12 @@ import { SkeletonRows } from "../components/Skeleton";
 import { Crest, Empty, PageTitle } from "../components/ui";
 import {
   MARKET_NAMES,
+  MIN_VALUE,
   edge,
   nextAnalysis,
+  pickKey,
   pickLabel,
+  picksOf,
   settlePick,
   trackRecord,
   type AnalysisCompetition,
@@ -97,7 +100,6 @@ function ValueBars({ pick }: { pick: AnalysisPick }) {
 }
 
 function PickCard({ pick, game, match, index }: { pick: AnalysisPick; game?: AnalysisMatch; match?: Match; index: number }) {
-  const value = edge(pick.probability, pick.price);
   const home = game?.home ?? match?.home ?? "Local";
   const away = game?.away ?? match?.away ?? "Visitante";
   return (
@@ -121,7 +123,7 @@ function PickCard({ pick, game, match, index }: { pick: AnalysisPick; game?: Ana
         </div>
       </div>
       <div className="bet-pick-tags">
-        <span className="bet-value">Valor +{Math.round(value * 100)} %</span>
+        <ValueChip pick={pick} />
         <span className={`bet-confidence is-${pick.confidence}`}>Confianza {pick.confidence}</span>
         <ResultBadge pick={pick} match={match} />
       </div>
@@ -132,6 +134,67 @@ function PickCard({ pick, game, match, index }: { pick: AnalysisPick; game?: Ana
           <AlertTriangle size={15} aria-hidden="true" />
           {pick.risk}
         </p>
+      )}
+    </li>
+  );
+}
+
+/** The value of a price, as it is: «+8 %» when it pays more than it should, «−4 %» when less. */
+function ValueChip({ pick }: { pick: AnalysisPick }) {
+  const value = Math.round(edge(pick.probability, pick.price) * 100);
+  return value * 0.01 >= MIN_VALUE ? (
+    <span className="bet-value">Valor +{value} %</span>
+  ) : (
+    <span className="bet-value is-flat" title="Según la IA, la cuota paga menos de lo justo o casi lo justo">
+      {value > 0 ? `Valor +${value} %` : value === 0 ? "Valor 0 %" : `Sin valor (${value} %)`.replace("-", "−")}
+    </span>
+  );
+}
+
+/** One match: the preview and, always, the AI's best option for it. */
+function GameCard({ game, match, index, juicy }: { game: AnalysisMatch; match?: Match; index: number; juicy: boolean }) {
+  const pick = game.pick;
+  return (
+    <li className="bet-game" style={{ "--i": index } as CSSProperties}>
+      <Link to={`/partido/${encodeURIComponent(game.matchId)}`} className="bet-game-head">
+        <Crest src={game.homeCrest} />
+        <Crest src={game.awayCrest} />
+        <strong>
+          {game.home} – {game.away}
+        </strong>
+        <time dateTime={game.utcDate}>{hour.format(new Date(game.utcDate))}</time>
+      </Link>
+      <p className="bet-game-preview">{game.preview}</p>
+      {pick && (
+        <div className="bet-best">
+          <div className="bet-best-main">
+            <span>
+              <span className="eyebrow">Mejor opción · {MARKET_NAMES[pick.market]}</span>
+              <strong>{pickLabel(pick, game.home, game.away)}</strong>
+            </span>
+            <span className="bet-best-price">
+              <b className="numeral">{odds.format(pick.price)}</b>
+              <small>{pick.book ?? "bet365"}</small>
+            </span>
+          </div>
+          <div className="bet-pick-tags">
+            <ValueChip pick={pick} />
+            <span className="bet-confidence is-plain">IA {pct(pick.probability)}</span>
+            {juicy ? (
+              <span className="bet-confidence is-plain">Está entre las jugosas, arriba</span>
+            ) : (
+              <span className={`bet-confidence is-${pick.confidence}`}>Confianza {pick.confidence}</span>
+            )}
+            <ResultBadge pick={pick} match={match} />
+          </div>
+          {!juicy && <p className="bet-reason">{pick.reason}</p>}
+          {!juicy && pick.risk && (
+            <p className="bet-risk">
+              <AlertTriangle size={15} aria-hidden="true" />
+              {pick.risk}
+            </p>
+          )}
+        </div>
       )}
     </li>
   );
@@ -152,76 +215,83 @@ function AnalysisDay({ analysis, byId, latest }: { analysis: BettingAnalysis; by
       </header>
       <h2 id={`bet-${analysis.id}`}>{analysis.headline}</h2>
       <p className="bet-summary">{analysis.summary}</p>
+      <h3 className="bet-subhead">
+        Las más jugosas <small>{analysis.picks.length || "ninguna hoy"}</small>
+      </h3>
       {analysis.picks.length ? (
         <ol className="bet-picks">
           {analysis.picks.map((pick, i) => (
-            <PickCard key={`${pick.matchId}-${pick.market}-${pick.selection}-${pick.line ?? ""}`} pick={pick} game={games.get(pick.matchId)} match={byId.get(pick.matchId)} index={i} />
+            <PickCard key={pickKey(pick)} pick={pick} game={games.get(pick.matchId)} match={byId.get(pick.matchId)} index={i} />
           ))}
         </ol>
       ) : (
-        <p className="bet-note">Hoy la IA no ve valor claro en ninguna cuota: mejor no forzar.</p>
+        <p className="bet-note">
+          Ninguna cuota paga hoy al menos un 3 % más de lo justo. Debajo tienes la mejor opción de cada partido, con su valor
+          real.
+        </p>
       )}
-      <details className="bet-previews">
-        <summary>
-          Partido a partido <small>{analysis.matches.length}</small>
-          <ChevronDown size={18} aria-hidden="true" />
-        </summary>
-        <ul>
-          {analysis.matches.map((m) => (
-            <li key={m.matchId}>
-              <Link to={`/partido/${encodeURIComponent(m.matchId)}`} className="bet-preview">
-                <span className="bet-preview-teams">
-                  <Crest src={m.homeCrest} />
-                  <strong>
-                    {m.home} – {m.away}
-                  </strong>
-                  <time dateTime={m.utcDate}>{hour.format(new Date(m.utcDate))}</time>
-                </span>
-                <span className="bet-preview-text">{m.preview}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </details>
+      <h3 className="bet-subhead">
+        Partido a partido <small>{analysis.matches.length}</small>
+      </h3>
+      <ul className="bet-games">
+        {analysis.matches.map((m, i) => (
+          <GameCard
+            key={m.matchId}
+            game={m}
+            match={byId.get(m.matchId)}
+            index={i}
+            juicy={Boolean(m.pick && analysis.picks.some((p) => pickKey(p) === pickKey(m.pick!)))}
+          />
+        ))}
+      </ul>
     </article>
   );
 }
 
-function Record({ analyses, matches }: { analyses: BettingAnalysis[]; matches: Match[] }) {
-  const r = useMemo(() => trackRecord(analyses, matches), [analyses, matches]);
-  if (!r.settled)
-    return <p className="bet-source">El historial empieza cuando terminen los primeros partidos analizados.</p>;
+function Record({ analyses, matches, kind }: { analyses: BettingAnalysis[]; matches: Match[]; kind: "value" | "best" }) {
+  const r = useMemo(() => trackRecord(analyses, matches, kind), [analyses, matches, kind]);
+  if (!r.picks) return null;
   const staked = r.won + r.lost;
   return (
-    <>
-      <div className="bet-record">
-        <div className="bet-tile">
-          <span className="bet-tile-label">Acertadas</span>
-          <span className="bet-tile-value">
-            <strong className="numeral">{r.won}</strong>
-            <small>de {staked}</small>
-          </span>
-          <small>{staked ? Math.round((r.won / staked) * 100) : 0} % de acierto</small>
+    <div className="bet-record-block">
+      <h3 className="bet-subhead">
+        {kind === "value" ? "Las jugosas" : "La mejor opción de cada partido"}
+        <small>{r.picks} {r.picks === 1 ? "apuesta" : "apuestas"}</small>
+      </h3>
+      {r.settled ? (
+        <div className="bet-record">
+          <div className="bet-tile">
+            <span className="bet-tile-label">Acertadas</span>
+            <span className="bet-tile-value">
+              <strong className="numeral">{r.won}</strong>
+              <small>de {staked}</small>
+            </span>
+            <small>{staked ? Math.round((r.won / staked) * 100) : 0} % de acierto</small>
+          </div>
+          <div className={`bet-tile ${r.units >= 0 ? "is-up" : "is-down"}`}>
+            <span className="bet-tile-label">Balance</span>
+            <span className="bet-tile-value">
+              <strong className="numeral">{units.format(r.units)}</strong>
+              <small>u</small>
+            </span>
+            <small>{r.yield !== null ? `${units.format(Math.round(r.yield * 100))} % por unidad` : "—"}</small>
+          </div>
         </div>
-        <div className={`bet-tile ${r.units >= 0 ? "is-up" : "is-down"}`}>
-          <span className="bet-tile-label">Balance</span>
-          <span className="bet-tile-value">
-            <strong className="numeral">{units.format(r.units)}</strong>
-            <small>u</small>
-          </span>
-          <small>{r.yield !== null ? `${units.format(Math.round(r.yield * 100))} % por unidad` : "—"}</small>
-        </div>
-      </div>
+      ) : null}
       <p className="bet-source">
-        Una unidad por apuesta a la cuota de bet365 del análisis{r.void ? `; ${r.void} nulas devuelven la apuesta` : ""}.
-        {r.picks > r.settled && ` ${r.picks - r.settled} por resolver.`}
+        {r.settled
+          ? `Una unidad por apuesta a la cuota del análisis${r.void ? `; ${r.void} nulas devuelven la apuesta` : ""}.`
+          : "Se resolverán cuando terminen los partidos."}
+        {r.settled > 0 && r.picks > r.settled && ` ${r.picks - r.settled} por resolver.`}
       </p>
-    </>
+    </div>
   );
 }
 
 function PastDay({ analysis, byId }: { analysis: BettingAnalysis; byId: Map<string, Match> }) {
-  const results = analysis.picks.map((p) => settlePick(p, byId.get(p.matchId)));
+  const juicy = new Set(analysis.picks.map(pickKey));
+  const all = [...analysis.picks, ...picksOf(analysis, "best").filter((p) => !juicy.has(pickKey(p)))];
+  const results = all.map((p) => settlePick(p, byId.get(p.matchId)));
   const [open, setOpen] = useState(false);
   return (
     <li className={`bet-past${open ? " is-open" : ""}`}>
@@ -242,13 +312,16 @@ function PastDay({ analysis, byId }: { analysis: BettingAnalysis; byId: Map<stri
       </button>
       {open && (
         <ol className="bet-past-picks">
-          {analysis.picks.map((p) => {
+          {all.map((p) => {
             const game = analysis.matches.find((m) => m.matchId === p.matchId);
             const match = byId.get(p.matchId);
             return (
-              <li key={`${p.matchId}-${p.market}-${p.selection}-${p.line ?? ""}`}>
+              <li key={pickKey(p)}>
                 <span>
-                  <strong>{pickLabel(p, game?.home ?? "", game?.away ?? "")}</strong>
+                  <strong>
+                    {pickLabel(p, game?.home ?? "", game?.away ?? "")}
+                    {juicy.has(pickKey(p)) && <em className="bet-juicy">Jugosa</em>}
+                  </strong>
                   <small>
                     {game ? `${game.home} – ${game.away}` : ""} · {odds.format(p.price)} {p.book ?? "bet365"}
                   </small>
@@ -257,7 +330,7 @@ function PastDay({ analysis, byId }: { analysis: BettingAnalysis; byId: Map<stri
               </li>
             );
           })}
-          {!analysis.picks.length && <li className="bet-past-none">Sin apuestas: no había valor.</li>}
+          {!all.length && <li className="bet-past-none">Sin apuestas.</li>}
         </ol>
       )}
     </li>
@@ -344,7 +417,8 @@ export default function AnalysisPage({ matches, demo, loading }: { matches: Matc
               <div className="section-heading">
                 <h2 id="bet-record-title">Historial</h2>
               </div>
-              <Record analyses={analyses} matches={matches} />
+              <Record analyses={analyses} matches={matches} kind="value" />
+              <Record analyses={analyses} matches={matches} kind="best" />
               {(fresh ? past : analyses).length > 0 && (
                 <ul className="bet-past-list">
                   {(fresh ? past : analyses).map((a) => (
