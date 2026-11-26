@@ -30,8 +30,8 @@ jobs:
       - run: npm run analysis
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          # The OddsPapi key under any of these names.
-          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY || secrets.ODDSPAPI_API_KEY || secrets.ODDS_PAPI_KEY || secrets.ODDSPAPI }}
+          # The OddsPapi key (bet365 and Pinnacle prices).
+          ODDSPAPI_KEY: ${{ secrets.BET365_ODDS_KEY || secrets.ODDSPAPI_KEY }}
           # Long-lived token of the owner's Claude plan (`claude setup-token`).
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}

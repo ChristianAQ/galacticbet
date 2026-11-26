@@ -370,7 +370,7 @@ Clasificación muestra solo la del grupo (las tablas de cada competición están
 
 ### Apuestas: análisis de la IA
 
-La pestaña **Apuestas** muestra, antes del primer partido de cada día de LaLiga o Champions, las cuotas de bet365 que la IA considera más jugosas, comparadas con las de Pinnacle y con los datos de la temporada, junto con el historial de aciertos. Necesita dos repository secrets: `ODDSPAPI_KEY` (plan gratuito de OddsPapi) y `CLAUDE_CODE_OAUTH_TOKEN` (tu plan de Claude, con `claude setup-token`). [Cómo funciona, configuración y pruebas](docs/apuestas.md). Información orientativa para mayores de 18: GalacticBet no gestiona apuestas.
+La pestaña **Apuestas** muestra, antes del primer partido de cada día de LaLiga o Champions, las cuotas de bet365 que la IA considera más jugosas, comparadas con las de Pinnacle y con los datos de la temporada, junto con el historial de aciertos. Necesita dos repository secrets: `BET365_ODDS_KEY` (plan gratuito de OddsPapi) y `CLAUDE_CODE_OAUTH_TOKEN` (tu plan de Claude, con `claude setup-token`). [Cómo funciona, configuración y pruebas](docs/apuestas.md). Información orientativa para mayores de 18: GalacticBet no gestiona apuestas.
 
 ### Ligas: partidos, tabla, noticias y estadísticas
 

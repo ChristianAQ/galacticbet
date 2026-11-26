@@ -428,7 +428,7 @@ export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions
     return { generated: 0 };
   }
   if (!options.oddsKey) {
-    log("Análisis: configura el repository secret ODDSPAPI_KEY para traer las cuotas de bet365.");
+    log("Análisis: configura el repository secret BET365_ODDS_KEY (clave de OddsPapi) para traer las cuotas de bet365.");
     return { generated: 0 };
   }
   if (!options.dryRun && !options.claude) {

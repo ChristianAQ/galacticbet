@@ -50,7 +50,7 @@ secrets**:
 
 | Secreto | Qué es |
 | - | - |
-| `ODDSPAPI_KEY` | La clave de tu cuenta de [OddsPapi](https://oddspapi.io) (también vale `ODDSPAPI_API_KEY`). |
+| `BET365_ODDS_KEY` | La clave de tu cuenta de [OddsPapi](https://oddspapi.io) (también vale `ODDSPAPI_KEY`). |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Token de tu plan de Claude (Pro o superior). Créalo una vez en tu ordenador con `claude setup-token` (Claude Code instalado). Dura un año. |
 
 Opcional, en **Variables**: `CLAUDE_MODEL` para elegir el modelo (si no, el
