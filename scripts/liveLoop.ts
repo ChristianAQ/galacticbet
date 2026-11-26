@@ -44,7 +44,7 @@ interface LiveLoopOptions {
   runId?: string;
 }
 
-async function readCalendars(db: Firestore, now: number) {
+export async function readCalendars(db: Firestore, now: number) {
   const seasonYear =
     new Date(now).getUTCFullYear() - (new Date(now).getUTCMonth() < 6 ? 1 : 0);
   const snapshots = await db.getAll(

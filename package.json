@@ -10,6 +10,7 @@
     "test": "vitest run",
     "sync": "tsx scripts/sync.ts",
     "sync:live": "tsx scripts/sync-live.ts",
+    "analysis": "tsx scripts/analysis.ts",
     "test:rules": "firebase emulators:exec --only firestore --project demo-galacticbet \"vitest run tests/firestore.rules.test.ts tests/calendarSync.firestore.test.ts tests/sportApi.firestore.test.ts tests/notifications.firestore.test.ts tests/customCompetition.rules.test.ts\"",
     "deploy:firestore": "tsx scripts/deploy-firestore.ts"
   },

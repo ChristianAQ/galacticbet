@@ -1,0 +1,38 @@
+name: AI betting analysis
+on:
+  schedule:
+    # Every ten minutes while matches can be close (08:00–22:00 UTC). The job
+    # exits in seconds unless a LaLiga or Champions day starts within 45 min.
+    - cron: "6-56/10 8-21 * * *"
+      timezone: "UTC"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Prueba: trae cuotas y datos del próximo día, sin IA y sin guardar"
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: betting-analysis
+  cancel-in-progress: false
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run analysis
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          # The OddsPapi key under any of these names.
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY || secrets.ODDSPAPI_API_KEY || secrets.ODDS_PAPI_KEY || secrets.ODDSPAPI }}
+          # Long-lived token of the owner's Claude plan (`claude setup-token`).
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+          ANALYSIS_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
