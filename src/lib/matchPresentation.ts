@@ -1,6 +1,6 @@
 import { competitionName } from "./competitions";
 import type { Match } from "./domain";
-import type { MatchPlayer } from "./matchInsightsData";
+import type { MatchPlayer, PlayerStat } from "./matchInsightsData";
 
 export function chronologicalGoals<T extends { minute: string }>(goals: T[]) {
   const key = (minute: string) => {
@@ -127,6 +127,23 @@ export function shortPlayerName(name: string) {
   )
     start--;
   return parts.length > 1 ? parts.slice(start).join(" ") : name;
+}
+
+/** A published minute ("70", "70'", "90+2’") with a single apostrophe. */
+export const minuteMark = (minute: string) =>
+  `${minute.replace(/[’′']$/, "")}'`;
+
+/** Players who took part, most shots first; ties keep the lineup order. */
+export function playersByShots(players: MatchPlayer[]) {
+  const n = (p: MatchPlayer, stat: PlayerStat) => p.stats?.[stat] ?? 0;
+  return players
+    .filter((p) => p.stats)
+    .sort(
+      (a, b) =>
+        n(b, "shots") - n(a, "shots") ||
+        n(b, "shotsOnTarget") - n(a, "shotsOnTarget") ||
+        n(b, "goals") - n(a, "goals"),
+    );
 }
 
 export function statisticShares(home: string, away: string) {

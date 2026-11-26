@@ -165,5 +165,18 @@ describe("Menú de la página del partido", () => {
       matchPageTabs(played, { ...insight, lineups, statistics }, true, now),
     ).toEqual(["events", "lineups", "statistics", "table"]);
     expect(matchPageTabs(played, null, false, now)).toEqual(["events"]);
+    // Players' numbers alone are enough for the statistics tab.
+    const withStats = [
+      {
+        side: "home" as const,
+        players: [{ name: "A", starter: true, stats: { shots: 2 } }],
+      },
+    ];
+    expect(
+      matchPageTabs(played, { ...insight, lineups: withStats }, false, now),
+    ).toEqual(["events", "lineups", "statistics"]);
+    expect(
+      matchPageTabs(played, { ...insight, lineups }, false, now),
+    ).toEqual(["events", "lineups"]);
   });
 });

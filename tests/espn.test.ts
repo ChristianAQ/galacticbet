@@ -313,6 +313,135 @@ describe("ESPN: asociación y datos complementarios", () => {
       },
     ]);
   });
+  it("guarda los números de quien ha jugado y el minuto de sus cambios, nunca de un suplente sin jugar", () => {
+    const stat = (name: string, value: number | string) =>
+      typeof value === "number"
+        ? { name, value, displayValue: String(value) }
+        : { name, displayValue: value };
+    const change = (minute: string) => ({
+      clock: { displayValue: minute },
+      substitution: true,
+    });
+    const data = normalizeEspnSummary(
+      summary({
+        rosters: [
+          {
+            team: { id: "83" },
+            roster: [
+              {
+                ...athlete("Extremo"),
+                starter: true,
+                subbedOut: true,
+                plays: [
+                  { clock: { displayValue: "7'" }, scoringPlay: true },
+                  change("70'"),
+                ],
+                stats: [
+                  stat("appearances", 1),
+                  stat("totalShots", 6),
+                  stat("shotsOnTarget", "3"),
+                  stat("totalGoals", 1),
+                  stat("yellowCards", 1),
+                  stat("ownGoals", 0),
+                  stat("foulsCommitted", "--"),
+                ],
+              },
+              {
+                ...athlete("Revulsivo"),
+                starter: false,
+                subbedIn: true,
+                plays: [change("70'")],
+                stats: [stat("appearances", 1), stat("totalShots", 0)],
+              },
+              {
+                ...athlete("Sin jugar"),
+                starter: false,
+                stats: [stat("appearances", 0), stat("totalShots", 0)],
+              },
+              {
+                ...athlete("Portero"),
+                starter: true,
+                stats: [stat("appearances", 1), stat("saves", 5)],
+              },
+            ],
+          },
+        ],
+      }),
+      match,
+      event,
+    )!;
+    expect(data.lineups[0].players).toEqual([
+      {
+        name: "Extremo",
+        starter: true,
+        subOut: "70'",
+        stats: { shots: 6, shotsOnTarget: 3, goals: 1, yellowCards: 1 },
+      },
+      { name: "Revulsivo", starter: false, subIn: "70'", stats: { shots: 0 } },
+      { name: "Sin jugar", starter: false },
+      { name: "Portero", starter: true, stats: { saves: 5 } },
+    ]);
+    expect(validMatchInsight(data)).toBe(true);
+    const player = (extra: Record<string, unknown>) => ({
+      ...data,
+      lineups: [
+        { side: "home", players: [{ name: "A", starter: true, ...extra }] },
+      ],
+    });
+    expect(validMatchInsight(player({ stats: { shots: -1 } }))).toBe(false);
+    expect(validMatchInsight(player({ stats: { shots: 1.5 } }))).toBe(false);
+    expect(validMatchInsight(player({ stats: { rating: 7 } }))).toBe(false);
+    expect(validMatchInsight(player({ subIn: "" }))).toBe(false);
+  });
+  it("lee córners y la precisión de pase reales, y ordena las estadísticas", () => {
+    const team = (id: string, stats: Record<string, string>) => ({
+      team: { id },
+      statistics: Object.entries(stats).map(([name, displayValue]) => ({
+        name,
+        displayValue,
+      })),
+    });
+    const data = normalizeEspnSummary(
+      summary({
+        boxscore: {
+          teams: [
+            team("83", {
+              foulsCommitted: "14",
+              wonCorners: "4",
+              possessionPct: "64.8",
+              accuratePasses: "552",
+              totalPasses: "603",
+              passPct: "0.9",
+              totalCrosses: "10",
+              totalTackles: "18",
+              totalClearance: "23",
+            }),
+            team("86", {
+              foulsCommitted: "9",
+              wonCorners: "8",
+              possessionPct: "35.2",
+              passPct: "0.8",
+              totalCrosses: "11",
+              totalTackles: "18",
+              totalClearance: "12",
+            }),
+          ],
+        },
+      }),
+      match,
+      event,
+    )!;
+    // With the pass counts the figure is exact; without them, the ratio as a percentage.
+    expect(data.statistics).toEqual([
+      { label: "Posesión", home: "64.8%", away: "35.2%" },
+      { label: "Córners", home: "4", away: "8" },
+      { label: "Precisión de pase", home: "92%", away: "80%" },
+      { label: "Centros", home: "10", away: "11" },
+      { label: "Entradas", home: "18", away: "18" },
+      { label: "Despejes", home: "23", away: "12" },
+      { label: "Faltas", home: "14", away: "9" },
+    ]);
+  });
   it("publica solo estadísticas numéricas presentes en ambos equipos y no inventa ceros", () => {
     const data = normalizeEspnSummary(
       summary({

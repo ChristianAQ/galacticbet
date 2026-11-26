@@ -39,7 +39,8 @@ export const matchPageTabLabels: Record<MatchPageTab, string> = {
 
 /**
  * Full-page match menu. Upcoming fixtures open on the preview and odds; started
- * ones on events. Lineups and statistics only appear with real data.
+ * ones on events. Lineups and statistics only appear with real data (team
+ * totals or players' numbers).
  */
 export function matchPageTabs(
   match: Match,
@@ -54,7 +55,13 @@ export function matchPageTabs(
   const tabs: MatchPageTab[] = upcoming ? ["preview", "odds"] : ["events"];
   if (fits && insight!.lineups.some((l) => l.players.length > 0))
     tabs.push("lineups");
-  if (!upcoming && fits && insight!.statistics.length) tabs.push("statistics");
+  if (
+    !upcoming &&
+    fits &&
+    (insight!.statistics.length ||
+      insight!.lineups.some((l) => l.players.some((p) => p.stats)))
+  )
+    tabs.push("statistics");
   if (hasTable) tabs.push("table");
   return tabs;
 }

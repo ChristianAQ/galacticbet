@@ -17,6 +17,8 @@ import {
   type MatchLineup,
   type MatchPlayer,
   type MatchStatistic,
+  type PlayerStat,
+  type PlayerStats,
 } from "../src/lib/matchInsightsData";
 
 export const ESPN_LEAGUES = Object.fromEntries(
@@ -254,6 +256,40 @@ function playerName(value: unknown) {
     text(player.fullName)
   );
 }
+// Roster stat names → ours. "appearances" says whether the player took part.
+const playerStatNames: Record<string, PlayerStat> = {
+  totalShots: "shots",
+  shotsOnTarget: "shotsOnTarget",
+  totalGoals: "goals",
+  goalAssists: "assists",
+  foulsCommitted: "foulsCommitted",
+  foulsSuffered: "foulsSuffered",
+  yellowCards: "yellowCards",
+  redCards: "redCards",
+  saves: "saves",
+};
+function count(stat: Row): number | undefined {
+  const value =
+    typeof stat.value === "number"
+      ? stat.value
+      : Number(text(stat.displayValue, 4));
+  return Number.isInteger(value) && value >= 0 && value <= 99
+    ? value
+    : undefined;
+}
+/** A player's numbers, only once ESPN counts an appearance (never for an unused sub). */
+function playerStats(entry: Row): PlayerStats | undefined {
+  const stats: PlayerStats = {};
+  let appearances = 0;
+  for (const stat of rows(entry.stats)) {
+    const name = String(stat.name || ""),
+      value = count(stat);
+    if (value === undefined) continue;
+    if (name === "appearances") appearances = value;
+    else if (playerStatNames[name]) stats[playerStatNames[name]] = value;
+  }
+  return appearances > 0 && Object.keys(stats).length ? stats : undefined;
+}
 function normalizeLineups(data: Row, event: EspnEvent): MatchLineup[] {
   // Soccer summary.rosters[].roster contains athlete, jersey, position and starter.
   // Only explicit starter flags are accepted; an available squad is not a confirmed XI.
@@ -275,11 +311,24 @@ function normalizeLineups(data: Row, event: EspnEvent): MatchLineup[] {
       const position =
         text(row(entry.position).abbreviation, 30) ||
         text(row(entry.position).displayName, 50);
+      // plays[] are the player's own events; substitutions carry the minute.
+      const changes = rows(entry.plays)
+        .filter((play) => play.substitution === true)
+        .map((play) => text(row(play.clock).displayValue, 30));
+      const subIn = entry.subbedIn === true ? changes[0] : undefined;
+      const subOut =
+        entry.subbedOut === true
+          ? changes[entry.subbedIn === true ? 1 : 0]
+          : undefined;
+      const stats = playerStats(entry);
       players.push({
         name,
         starter: entry.starter,
         ...(number ? { number } : {}),
         ...(position ? { position } : {}),
+        ...(subIn ? { subIn } : {}),
+        ...(subOut ? { subOut } : {}),
+        ...(stats ? { stats } : {}),
       });
       names.add(name);
     }
@@ -477,6 +526,7 @@ const statisticNames: Record<string, string> = {
   fouls: "Faltas",
   cornerkicks: "Córners",
   corners: "Córners",
+  woncorners: "Córners",
   offsides: "Fueras de juego",
   saves: "Paradas",
   yellowcards: "Tarjetas amarillas",
@@ -489,10 +539,46 @@ const statisticNames: Record<string, string> = {
   shotswide: "Remates fuera",
   shotsofftarget: "Remates fuera",
   tackles: "Entradas",
+  totaltackles: "Entradas",
   interceptions: "Intercepciones",
   passpct: "Precisión de pase",
   passcompletionpct: "Precisión de pase",
+  crosses: "Centros",
+  totalcrosses: "Centros",
+  longballs: "Balones largos",
+  totallongballs: "Balones largos",
+  clearances: "Despejes",
+  totalclearance: "Despejes",
 };
+// Display order; it also caps the list (the document allows 20).
+const statisticOrder = [
+  "Posesión",
+  "Goles esperados (xG)",
+  "Remates",
+  "Remates a puerta",
+  "Remates fuera",
+  "Remates bloqueados",
+  "Córners",
+  "Pases",
+  "Pases completados",
+  "Precisión de pase",
+  "Centros",
+  "Balones largos",
+  "Entradas",
+  "Intercepciones",
+  "Despejes",
+  "Paradas",
+  "Faltas",
+  "Fueras de juego",
+  "Tarjetas amarillas",
+  "Tarjetas rojas",
+];
+/** Some feeds give a ratio (0.9) where the label is a percentage. */
+function percent(value: string) {
+  if (value.endsWith("%")) return value;
+  const n = Number(value.replace(",", "."));
+  return `${n <= 1 ? Math.round(n * 100) : value}%`;
+}
 function statValue(value: unknown): string | undefined {
   const formatted =
     typeof value === "number" && Number.isFinite(value) && value >= 0
@@ -522,18 +608,31 @@ function normalizeStatistics(data: Row, event: EspnEvent): MatchStatistic[] {
       if (label && value !== undefined)
         bySide[side].set(
           label,
-          ["Posesión", "Precisión de pase"].includes(label) &&
-            !value.endsWith("%")
-            ? `${value}%`
+          ["Posesión", "Precisión de pase"].includes(label)
+            ? percent(value)
             : value,
         );
     }
+  }
+  // ESPN rounds its pass ratio to one decimal (0.9); the counts give the real figure.
+  for (const stats of Object.values(bySide)) {
+    const total = Number(stats.get("Pases")),
+      accurate = Number(stats.get("Pases completados"));
+    if (total > 0 && accurate <= total)
+      stats.set(
+        "Precisión de pase",
+        `${Math.round((accurate / total) * 100)}%`,
+      );
   }
   return [...bySide.home]
     .flatMap(([label, home]) => {
       const away = bySide.away.get(label);
       return away === undefined ? [] : [{ label, home, away }];
     })
+    .sort(
+      (a, b) =>
+        statisticOrder.indexOf(a.label) - statisticOrder.indexOf(b.label),
+    )
     .slice(0, 20);
 }
 /** Only the provider's head-to-head block is accepted, never each team's recent form. */

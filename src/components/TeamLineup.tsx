@@ -1,24 +1,32 @@
 import { ChevronDown } from "lucide-react";
 import type { MatchLineup, MatchPlayer } from "../lib/matchInsightsData";
+import { minuteMark } from "../lib/matchPresentation";
 import "../styles/matchExtras.css";
 
 function PlayerList({ players }: { players: MatchPlayer[] }) {
   return (
     <ul className="match-extra-players">
-      {players.map((player, index) => (
-        <li key={`${player.name}-${player.number || index}`}>
-          <span
-            className="match-extra-dorsal"
-            aria-label={
-              player.number ? `Dorsal ${player.number}` : "Sin dorsal"
-            }
-          >
-            {player.number || "—"}
-          </span>
-          <strong>{player.name}</strong>
-          {player.position && <small>{player.position}</small>}
-        </li>
-      ))}
+      {players.map((player, index) => {
+        const details = [
+          player.position,
+          player.subIn && `Entra ${minuteMark(player.subIn)}`,
+          player.subOut && `Sale ${minuteMark(player.subOut)}`,
+        ].filter(Boolean);
+        return (
+          <li key={`${player.name}-${player.number || index}`}>
+            <span
+              className="match-extra-dorsal"
+              aria-label={
+                player.number ? `Dorsal ${player.number}` : "Sin dorsal"
+              }
+            >
+              {player.number || "—"}
+            </span>
+            <strong>{player.name}</strong>
+            {details.length > 0 && <small>{details.join(" · ")}</small>}
+          </li>
+        );
+      })}
     </ul>
   );
 }

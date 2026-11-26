@@ -4,10 +4,35 @@ import {
   positionLines,
   statisticShares,
   matchCalendarFile,
+  minuteMark,
+  playersByShots,
   canAddMatchToCalendar,
 } from "../src/lib/matchPresentation";
 import { demoMatches } from "../src/lib/demo";
 describe("Presentación de partidos", () => {
+  it("lista solo a quien ha jugado, con más tiros primero y el orden del once en los empates", () => {
+    const players = [
+      { name: "Portero", starter: true, stats: { saves: 3 } },
+      { name: "Suplente", starter: false },
+      { name: "Lateral", starter: true, stats: { shots: 2, shotsOnTarget: 0 } },
+      { name: "Delantero", starter: true, stats: { shots: 2, shotsOnTarget: 1 } },
+      { name: "Central", starter: true, stats: { shots: 0 } },
+      { name: "Extremo", starter: true, stats: { shots: 5 } },
+    ];
+    expect(playersByShots(players).map((p) => p.name)).toEqual([
+      "Extremo",
+      "Delantero",
+      "Lateral",
+      "Portero",
+      "Central",
+    ]);
+    expect(players[0].name).toBe("Portero");
+    expect(["70'", "70", "90+2’"].map(minuteMark)).toEqual([
+      "70'",
+      "70'",
+      "90+2'",
+    ]);
+  });
   it("ordena descuentos antes de la segunda parte sin modificar los eventos originales", () => {
     const goals = ["46'", "45+3'", "45'", "90'+2'", "Desconocido"].map(
       (minute) => ({

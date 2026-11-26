@@ -18,6 +18,11 @@ const labels: Record<string, string> = {
   "Precisión de pase": "Precisión de pases",
   Córners: "Saques de esquina",
 };
+// Older ESPN snapshots stored the pass ratio (0.9) as "0.9%".
+const shown = (label: string, value: string) =>
+  label === "Precisión de pase" && /^0[.,]\d+%$/.test(value)
+    ? `${Math.round(Number(value.slice(0, -1).replace(",", ".")) * 100)}%`
+    : value;
 
 /** Mirrored bars from the centre: the team on top of each stat is marked in yellow. */
 export default function MatchStatistics({
@@ -65,7 +70,7 @@ export default function MatchStatistics({
               <span
                 className={`stat-value ${side}${highlighted === side ? " is-highlighted" : ""}`}
               >
-                {stat[side]}
+                {shown(stat.label, stat[side])}
                 {highlighted === side && (
                   <span className="sr-only">
                     {" "}

@@ -19,6 +19,7 @@ import MatchOddsPanel from "../components/MatchOddsPanel";
 import MatchPreview from "../components/MatchPreview";
 import MatchProbability from "../components/MatchProbability";
 import MatchStatistics from "../components/MatchStatistics";
+import PlayerStats from "../components/PlayerStats";
 import MatchTimeline from "../components/MatchTimeline";
 import Matchups from "../components/Matchups";
 import TeamForm from "../components/TeamForm";
@@ -504,7 +505,12 @@ function MatchView({
           </>
         )}
         {tab === "statistics" && fits && (
-          <MatchStatistics match={match} statistics={insight!.statistics} />
+          <>
+            {insight!.statistics.length > 0 && (
+              <MatchStatistics match={match} statistics={insight!.statistics} />
+            )}
+            <PlayerStats match={match} lineups={insight!.lineups} />
+          </>
         )}
         {tab === "table" && (
           <div className="match-page-table">

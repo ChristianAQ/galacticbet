@@ -2,11 +2,30 @@ import { validProbability, type MatchProbability } from "./matchProbability";
 import { isKnownCompetition } from "./competitions";
 import type { Match } from "./domain";
 
+/** Per-player numbers ESPN publishes for a match, in display order. */
+export const PLAYER_STATS = [
+  "shots",
+  "shotsOnTarget",
+  "goals",
+  "assists",
+  "foulsCommitted",
+  "foulsSuffered",
+  "yellowCards",
+  "redCards",
+  "saves",
+] as const;
+export type PlayerStat = (typeof PLAYER_STATS)[number];
+export type PlayerStats = Partial<Record<PlayerStat, number>>;
 export interface MatchPlayer {
   name: string;
   number?: string;
   position?: string;
   starter: boolean;
+  /** Minute the player came on / went off, as published ("70'"). */
+  subIn?: string;
+  subOut?: string;
+  /** Only for players who took part; a missing number was not published. */
+  stats?: PlayerStats;
 }
 export interface MatchLineup {
   side: "home" | "away";
@@ -67,6 +86,16 @@ const record = (v: unknown): v is Record<string, unknown> =>
   Boolean(v) && typeof v === "object" && !Array.isArray(v);
 const side = (v: unknown) => v === "home" || v === "away";
 const optionalText = (v: unknown) => v === undefined || text(v);
+const playerStats = (v: unknown) =>
+  v === undefined ||
+  (record(v) &&
+    Object.entries(v).every(
+      ([key, n]) =>
+        (PLAYER_STATS as readonly string[]).includes(key) &&
+        Number.isInteger(n) &&
+        Number(n) >= 0 &&
+        Number(n) <= 99,
+    ));
 
 export function validMatchInsight(value: unknown): value is MatchInsight {
   if (!record(value)) return false;
@@ -157,7 +186,10 @@ export function validMatchInsight(value: unknown): value is MatchInsight {
             text(p.name) &&
             optionalText(p.number) &&
             optionalText(p.position) &&
-            typeof p.starter === "boolean",
+            typeof p.starter === "boolean" &&
+            (p.subIn === undefined || text(p.subIn, 30)) &&
+            (p.subOut === undefined || text(p.subOut, 30)) &&
+            playerStats(p.stats),
         ),
     ) &&
     Array.isArray(value.statistics) &&
