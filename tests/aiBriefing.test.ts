@@ -66,12 +66,6 @@ const answer = {
     { matchId: "clasico", angle: "Duelo por el liderato", preview: "Empatados a 30 puntos.", watch: "Mbappé, 12 goles." },
     { matchId: "clasico", angle: "Repetido", preview: "Otra vez.", watch: "Otra vez." },
   ],
-  stories: [
-    { url: "https://www.espn.com/futbol/nota/_/id/2", why: "Explica el cambio táctico." },
-    { url: "https://example.com/bulo", why: "Un enlace que no es nuestro." },
-    { url: "https://www.espn.com/futbol/nota/_/id/2", why: "Repetida." },
-    { url: "https://www.espn.com/futbol/nota/_/id/3#arriba", why: "La Champions, al detalle." },
-  ],
   sources: ["https://www.marca.com/futbol/real-madrid.html", "no es una web"],
 };
 
@@ -105,10 +99,11 @@ describe("portada de la IA: qué puede elegir", () => {
     expect(newsPool({ version: 2 }, now)).toEqual([]);
   });
 
-  it("los datos van sin cuotas, con las noticias y sus enlaces", () => {
+  it("los datos van sin cuotas, con las noticias como contexto", () => {
     const prompt = briefingInput([clasico], [clasico], new Map(), pool, now);
     expect(prompt).toContain("Real Madrid CF - FC Barcelona");
-    expect(prompt).toContain("https://www.espn.com/futbol/nota/_/id/2");
+    expect(prompt).toContain("Titular 2");
+    expect(prompt).not.toContain("https://www.espn.com");
     expect(prompt).not.toMatch(/cuotas|"casa"/);
     expect(briefingPrompt({ web: true })).toMatch(/WebSearch/);
     expect(briefingPrompt({ web: false })).toMatch(/No tienes búsqueda web/);
@@ -119,12 +114,14 @@ describe("portada de la IA: qué puede elegir", () => {
     const body = geminiRequest("x", "gemini-3.8-flash", { system: briefingPrompt({ web: false }), schema: BRIEFING_SCHEMA });
     expect(body.system_instruction).toMatch(/portada de GalacticBet/);
     expect(body.response_format.schema).toBe(BRIEFING_SCHEMA);
+    // The headlines are already in «Actualidad»: the AI does not list them again.
+    expect(Object.keys(BRIEFING_SCHEMA.properties)).not.toContain("stories");
   });
 });
 
 describe("portada de la IA: qué se publica", () => {
-  it("solo partidos y titulares nuestros, una vez cada uno, con nuestros datos", () => {
-    const briefing = acceptBriefing(answer, [clasico, derby, premier], pool, now)!;
+  it("solo partidos nuestros, una vez cada uno, con nuestros datos", () => {
+    const briefing = acceptBriefing({ ...answer, stories: [{ url: pool[0].url, why: "Ya no se usa." }] }, [clasico, derby, premier], now)!;
     // Agenda order, invented and repeated ones out.
     expect(briefing.keyMatches.map((k) => k.matchId)).toEqual(["clasico", "derby"]);
     expect(briefing.keyMatches[0]).toMatchObject({
@@ -134,43 +131,38 @@ describe("portada de la IA: qué se publica", () => {
       utcDate: clasico.utcDate,
       angle: "Duelo por el liderato",
     });
-    // Title, date and photo are ESPN's; the reason is the AI's. A fragment still matches.
-    expect(briefing.stories).toEqual([
-      { title: "Titular 2", url: pool[1].url, publishedAt: pool[1].publishedAt, competition: "PD", image: pool[1].image, why: "Explica el cambio táctico." },
-      { title: "Titular 3", url: pool[2].url, publishedAt: pool[2].publishedAt, competition: "CL", image: pool[2].image, why: "La Champions, al detalle." },
-    ]);
+    expect(briefing).not.toHaveProperty("stories");
     expect(briefing.sources).toEqual(["marca.com"]);
     expect(decodeBriefing(JSON.parse(JSON.stringify(briefing)))).toEqual(briefing);
   });
 
   it("recorta los textos largos y descarta una respuesta sin nada nuestro", () => {
     const long = acceptBriefing(
-      { ...answer, headline: "Muy ".repeat(80), keyMatches: [{ ...answer.keyMatches[2], angle: "Un ángulo larguísimo ".repeat(6) }], stories: [] },
+      { ...answer, headline: "Muy ".repeat(80), keyMatches: [{ ...answer.keyMatches[2], angle: "Un ángulo larguísimo ".repeat(6) }] },
       [clasico],
-      pool,
       now,
     )!;
     expect(long.headline.length).toBeLessThanOrEqual(140);
     expect(long.keyMatches[0].angle.length).toBeLessThanOrEqual(48);
     expect(long.keyMatches[0].angle.endsWith("…")).toBe(true);
-    expect(acceptBriefing({ ...answer, keyMatches: [answer.keyMatches[1]], stories: [answer.stories[1]] }, [clasico], pool, now)).toBeNull();
-    expect(acceptBriefing("texto", [clasico], pool, now)).toBeNull();
+    expect(acceptBriefing({ ...answer, keyMatches: [answer.keyMatches[1]] }, [clasico], now)).toBeNull();
+    expect(acceptBriefing("texto", [clasico], now)).toBeNull();
   });
 
-  it("el documento público rechaza enlaces que no son de ESPN y formatos desconocidos", () => {
-    const briefing = acceptBriefing(answer, [clasico, derby], pool, now)!;
-    const tampered = { ...briefing, stories: [{ ...briefing.stories[0], url: "https://example.com/x" }] };
-    expect(decodeBriefing(tampered)!.stories).toEqual([]);
+  it("el documento público rechaza datos malformados y formatos desconocidos", () => {
+    const briefing = acceptBriefing(answer, [clasico, derby], now)!;
+    const tampered = { ...briefing, keyMatches: [{ ...briefing.keyMatches[0], homeCrest: "javascript:alert(1)" }, briefing.keyMatches[1]] };
+    expect(decodeBriefing(tampered)!.keyMatches.map((k) => k.matchId)).toEqual(["derby"]);
     expect(decodeBriefing({ ...briefing, formatVersion: 2 })).toBeNull();
-    expect(decodeBriefing({ ...briefing, keyMatches: [], stories: [] })).toBeNull();
-    // Each match and story once: they key the lists on Inicio.
-    const twice = decodeBriefing({ ...briefing, keyMatches: [briefing.keyMatches[0], briefing.keyMatches[0]], stories: [briefing.stories[0], briefing.stories[0]] })!;
-    expect([twice.keyMatches.length, twice.stories.length]).toEqual([1, 1]);
+    expect(decodeBriefing({ ...briefing, keyMatches: [] })).toBeNull();
+    // Each match once: it keys the list on Inicio.
+    const twice = decodeBriefing({ ...briefing, keyMatches: [briefing.keyMatches[0], briefing.keyMatches[0]] })!;
+    expect(twice.keyMatches).toHaveLength(1);
   });
 });
 
 describe("portada de la IA en Inicio", () => {
-  const briefing = acceptBriefing(answer, [clasico, derby], pool, now)!;
+  const briefing = acceptBriefing(answer, [clasico, derby], now)!;
 
   it("no se enseña si es vieja", () => {
     expect(shownBriefing(briefing, [], now + BRIEFING_MAX_AGE + 1)).toBeNull();
@@ -187,6 +179,8 @@ describe("portada de la IA en Inicio", () => {
     // A new time from the calendar wins over the stored one.
     const moved = shownBriefing(briefing, [{ ...clasico, utcDate: hours(8) }], now)!;
     expect(moved.keyMatches[0].utcDate).toBe(hours(8));
+    // All of them played: the section goes away.
+    expect(shownBriefing(briefing, [], now + 33 * 3_600_000)).toBeNull();
   });
 });
 
@@ -215,7 +209,7 @@ describe("el job de la portada, con dobles", () => {
   });
 
   it("no gasta la IA si la portada es reciente, salvo a mano", async () => {
-    const recent = acceptBriefing(answer, [clasico, derby], pool, now - BRIEFING_FRESH_MS / 2)!;
+    const recent = acceptBriefing(answer, [clasico, derby], now - BRIEFING_FRESH_MS / 2)!;
     const { db } = setup({ [BRIEFING_DOC]: recent });
     let calls = 0;
     const ai = async () => (calls++, { output: answer });
@@ -226,7 +220,7 @@ describe("el job de la portada, con dobles", () => {
   });
 
   it("si la IA falla o responde mal, se conserva la anterior y el job lo dice", async () => {
-    const old = acceptBriefing(answer, [clasico, derby], pool, now - 10 * 3_600_000)!;
+    const old = acceptBriefing(answer, [clasico, derby], now - 10 * 3_600_000)!;
     const { store, db } = setup({ [BRIEFING_DOC]: old });
     const failing = async () => {
       throw new Error("límite de uso");

@@ -1,11 +1,10 @@
-import { ArrowUpRight, Eye, Sparkles } from "lucide-react";
+import { Eye, Sparkles } from "lucide-react";
 import { useId, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { modelName } from "../lib/bettingAnalysis";
-import { shownBriefing, type BriefingStory, type ShownKeyMatch } from "../lib/briefing";
+import { shownBriefing, type ShownKeyMatch } from "../lib/briefing";
 import { competitionName } from "../lib/competitions";
 import type { Match } from "../lib/domain";
-import { newsPhoto } from "../lib/footballNews";
 import { kickoffLabel } from "../lib/matchInsights";
 import { useBriefing } from "../lib/useBriefing";
 import { Crest } from "./ui";
@@ -34,9 +33,9 @@ function AiTag() {
 }
 
 /**
- * «La IA te cuenta»: the key matches of the next days and the stories most
- * worth reading, chosen and explained by the AI. Teams, times, titles and
- * links are real data; nothing shows until the backend has published one.
+ * «La IA te cuenta»: the key matches of the next days, chosen and
+ * explained by the AI. Teams and times are real data; nothing shows until
+ * the backend has published one.
  */
 export default function AiBriefing({ matches, now, demo = false }: { matches: Match[]; now: number; demo?: boolean }) {
   const titleId = useId();
@@ -66,30 +65,16 @@ export default function AiBriefing({ matches, now, demo = false }: { matches: Ma
         <h3>{briefing.headline}</h3>
         <p>{briefing.summary}</p>
       </div>
-      {briefing.keyMatches.length > 0 && (
-        <>
-          <h3 className="briefing-subhead">Partidos clave</h3>
-          <ul className="briefing-matches">
-            {briefing.keyMatches.map((k) => (
-              <KeyMatchCard key={k.matchId} match={k} now={now} />
-            ))}
-          </ul>
-        </>
-      )}
-      {briefing.stories.length > 0 && (
-        <>
-          <h3 className="briefing-subhead">Para leer</h3>
-          <ul className="briefing-stories">
-            {briefing.stories.map((s) => (
-              <StoryRow key={s.url} story={s} now={now} />
-            ))}
-          </ul>
-        </>
-      )}
+      <h3 className="briefing-subhead">Partidos clave</h3>
+      <ul className="briefing-matches">
+        {briefing.keyMatches.map((k) => (
+          <KeyMatchCard key={k.matchId} match={k} now={now} />
+        ))}
+      </ul>
       <p className="briefing-foot">
         <AiTag /> Elegido y escrito por IA{work.length ? ` · ${work.join(" · ")}` : ""} · a las{" "}
-        {hour.format(new Date(briefing.generatedAt))}. Partidos, horarios y titulares son datos reales (calendario
-        oficial y ESPN); puede equivocarse en el contexto.
+        {hour.format(new Date(briefing.generatedAt))}. Partidos y horarios son datos reales del calendario oficial;
+        puede equivocarse en el contexto.
       </p>
     </section>
   );
@@ -129,37 +114,6 @@ function KeyMatchCard({ match: k, now }: { match: ShownKeyMatch; now: number }) 
           </span>
         </span>
       </Link>
-    </li>
-  );
-}
-
-function StoryRow({ story: s, now }: { story: BriefingStory; now: number }) {
-  return (
-    <li>
-      <a className="briefing-story" href={s.url} target="_blank" rel="noopener noreferrer">
-        <span className="briefing-story-text">
-          <small className="briefing-meta">
-            {competitionName(s.competition, true)} · {ago(s.publishedAt, now)} · ESPN
-          </small>
-          <strong>{s.title}</strong>
-          <span className="briefing-why">{s.why}</span>
-        </span>
-        {s.image && (
-          <span className="briefing-photo">
-            <img
-              src={newsPhoto(s.image.url, 160, 160)}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                e.currentTarget.parentElement!.hidden = true;
-              }}
-            />
-          </span>
-        )}
-        <ArrowUpRight className="briefing-out" size={16} aria-hidden="true" />
-      </a>
     </li>
   );
 }

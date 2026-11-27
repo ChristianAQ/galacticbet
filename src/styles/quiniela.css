@@ -683,6 +683,17 @@
 .round-board li.is-me .rb-points b {
   color: var(--accent);
 }
+/* «IA» and «Favorito»: below the group, dimmer, outside its places. */
+.round-board-ghosts {
+  margin-top: 4px;
+  border-top: 2px dashed var(--masthead-rule);
+}
+.round-board-ghosts li {
+  opacity: 0.78;
+}
+.round-board-ghosts li:first-child {
+  border-top: 0;
+}
 .round-board .rb-live {
   padding: 1px 6px;
   border-radius: 999px;

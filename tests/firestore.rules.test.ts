@@ -281,6 +281,21 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
       await assertFails(deleteDoc(doc(db, "live/football")));
     }
   });
+  it("publica las quinielas de la IA y del favorito solo para lectura", async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), "machinePicks/PD-2026"), { formatVersion: 1, seasonId: "PD-2026", rounds: {} });
+    });
+    for (const db of [
+      env.unauthenticatedContext().firestore(),
+      env.authenticatedContext("alice").firestore(),
+    ]) {
+      await assertSucceeds(getDoc(doc(db, "machinePicks/PD-2026")));
+      await assertFails(getDocs(collection(db, "machinePicks")));
+      await assertFails(getDoc(doc(db, "machinePicks/otra")));
+      await assertFails(setDoc(doc(db, "machinePicks/PD-2026"), { formatVersion: 1, seasonId: "PD-2026", rounds: {} }));
+      await assertFails(deleteDoc(doc(db, "machinePicks/PD-2026")));
+    }
+  });
   it("publica la portada de la IA solo para lectura", async () => {
     await env.withSecurityRulesDisabled(async (c) => {
       await setDoc(doc(c.firestore(), "briefing/football"), { formatVersion: 1, generatedAt: "2026-11-28T08:00:00Z" });

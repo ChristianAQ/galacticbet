@@ -1,18 +1,16 @@
 import { decodeRun, sourceHosts, type AnalysisRun } from "./bettingAnalysis";
 import { isCompetition, type CompetitionCode } from "./competitions";
 import type { Match } from "./domain";
-import { NEWS_MAX_AGE, newsImageUrl, newsUrl, type NewsImage } from "./footballNews";
 
 /**
  * «La IA te cuenta», on Inicio: the AI picks the key matches of the next
- * days and the stories most worth reading, and says why. Matches and
- * stories are ours (the calendar and ESPN's headlines): the AI only chooses
- * them and writes the words. One public document, written by the backend.
+ * days and says why they matter. The matches are ours (the calendar): the
+ * AI only chooses them and writes the words. One public document, written
+ * by the backend.
  */
 export const BRIEFING_DOC = "briefing/football";
 export const BRIEFING_FORMAT = 1;
 export const MAX_KEY_MATCHES = 4;
-export const MAX_STORIES = 5;
 /** Older than this, it would talk about days already gone: not shown. */
 export const BRIEFING_MAX_AGE = 36 * 3_600_000;
 /** A key match leaves the front page this long after kick-off. */
@@ -25,7 +23,6 @@ export const BRIEFING_LIMITS = {
   angle: 48,
   preview: 320,
   watch: 200,
-  why: 220,
 } as const;
 
 export interface KeyMatch {
@@ -42,22 +39,12 @@ export interface KeyMatch {
   /** What to watch, in one sentence. */
   watch: string;
 }
-export interface BriefingStory {
-  title: string;
-  url: string;
-  publishedAt: string;
-  competition: CompetitionCode;
-  image?: NewsImage;
-  /** Why it is worth reading (the AI's words). */
-  why: string;
-}
 export interface Briefing {
   formatVersion: typeof BRIEFING_FORMAT;
   generatedAt: string;
   headline: string;
   summary: string;
   keyMatches: KeyMatch[];
-  stories: BriefingStory[];
   /** Sites the AI read, host names only. */
   sources?: string[];
   /** How the AI ran: model, web searches, seconds. */
@@ -93,35 +80,18 @@ function decodeKeyMatch(raw: unknown): KeyMatch | null {
   };
 }
 
-function decodeStory(raw: unknown): BriefingStory | null {
-  if (!isRow(raw)) return null;
-  const { title, url, publishedAt, competition, image, why } = raw;
-  const link = newsUrl(url);
-  if (!text(title, 240) || !link || link !== url || !date(publishedAt) || !isCompetition(competition)) return null;
-  if (!text(why, BRIEFING_LIMITS.why)) return null;
-  const photo =
-    isRow(image) && newsImageUrl(image.url) === image.url && (image.alt === undefined || text(image.alt, 300))
-      ? { url: image.url as string, ...(image.alt ? { alt: image.alt as string } : {}) }
-      : undefined;
-  return { title, url: link, publishedAt, competition, ...(photo ? { image: photo } : {}), why };
-}
-
 /** The public document, checked: anything malformed is left out (or null). */
 export function decodeBriefing(raw: unknown): Briefing | null {
   if (!isRow(raw) || raw.formatVersion !== BRIEFING_FORMAT) return null;
   const { generatedAt, headline, summary } = raw;
   if (!date(generatedAt) || !text(headline, BRIEFING_LIMITS.headline) || !text(summary, BRIEFING_LIMITS.summary))
     return null;
-  // Each match and story once: they are the lists' keys.
+  // Each match once: it is the list's key.
   const keyMatches = unique(
     (Array.isArray(raw.keyMatches) ? raw.keyMatches : []).slice(0, MAX_KEY_MATCHES).flatMap((m) => decodeKeyMatch(m) ?? []),
     (m) => m.matchId,
   );
-  const stories = unique(
-    (Array.isArray(raw.stories) ? raw.stories : []).slice(0, MAX_STORIES).flatMap((s) => decodeStory(s) ?? []),
-    (s) => s.url,
-  );
-  if (!keyMatches.length && !stories.length) return null;
+  if (!keyMatches.length) return null;
   const sources = sourceHosts(raw.sources);
   const ai = decodeRun(raw.ai);
   return {
@@ -130,7 +100,6 @@ export function decodeBriefing(raw: unknown): Briefing | null {
     headline,
     summary,
     keyMatches,
-    stories,
     ...(sources.length ? { sources } : {}),
     ...(ai ? { ai } : {}),
   };
@@ -146,7 +115,7 @@ export interface ShownKeyMatch extends KeyMatch {
 /**
  * What the front page shows now: nothing when it is too old; key matches
  * with the calendar's latest time and state, until a while after kick-off
- * (never postponed or cancelled ones); stories still current.
+ * (never postponed or cancelled ones). Nothing once they are all past.
  */
 export function shownBriefing(briefing: Briefing | null, matches: Match[], now: number) {
   if (!briefing) return null;
@@ -164,9 +133,5 @@ export function shownBriefing(briefing: Briefing | null, matches: Match[], now: 
         : k,
     ];
   });
-  const stories = briefing.stories.filter((s) => {
-    const at = Date.parse(s.publishedAt);
-    return at <= now + 3_600_000 && now - at <= NEWS_MAX_AGE;
-  });
-  return keyMatches.length || stories.length ? { ...briefing, keyMatches, stories } : null;
+  return keyMatches.length ? { ...briefing, keyMatches } : null;
 }

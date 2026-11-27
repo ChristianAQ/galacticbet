@@ -376,7 +376,11 @@ La pestaña **Apuestas** muestra, antes del primer partido de cada día de LaLig
 
 ### Inicio: «La IA te cuenta»
 
-En Inicio, bajo «Próximo saque», la IA cuenta lo que se viene: un titular, un resumen, hasta 4 **partidos clave** de los próximos días (qué está en juego, una previa con datos y qué vigilar; al tocarlos se abre el partido) y de 3 a 5 **noticias para leer** de ESPN, con una frase de por qué merece la pena cada una. Usa las mismas IA y secrets que Apuestas, sin gastar OddsPapi. [Cómo funciona](docs/portada-ia.md).
+En Inicio, bajo «Próximo saque», la IA cuenta lo que se viene: un titular, un resumen, hasta 4 **partidos clave** de los próximos días (qué está en juego, una previa con datos y qué vigilar; al tocarlos se abre el partido). Lee los titulares de ESPN como contexto, sin repetirlos: ya están en «Actualidad». Usa las mismas IA y secrets que Apuestas, sin gastar OddsPapi. [Cómo funciona](docs/portada-ia.md).
+
+### Quiniela: probabilidades, la IA, el favorito y tu perfil
+
+En la quiniela del grupo, cada jugador que ha sellado ve su **probabilidad de ganar la jornada**, recalculada con el marcador y el minuto en directo, y **qué necesita**: los resultados que más la mueven y su camino más probable. Dos rivales fijos juegan en cada grupo fuera de la tabla: la **IA** (su propia quiniela, sin cuotas) y el **Favorito** (siempre lo que dan las casas), congelados antes del cierre. En Clasificación › Temporada, **Contra la máquina** y **Tu perfil de pronosticador**. [Cómo funciona](docs/quiniela-extra.md).
 
 ### Ligas: partidos, tabla, noticias y estadísticas
 

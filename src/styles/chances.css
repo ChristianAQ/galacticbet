@@ -1,0 +1,185 @@
+/* ---------- «¿Quién se lleva la jornada?»: chances of winning the round ---------- */
+.round-chances {
+  margin-bottom: 18px;
+  padding: 14px 16px 12px;
+}
+.round-chances .round-board-heading small {
+  color: var(--ink-3);
+}
+.chances-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5rem) minmax(0, 1fr) 3.4rem;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  border-top: 1px solid var(--rule);
+}
+.chances-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.chances-name small {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+.chances-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--paper-3);
+}
+.chances-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ink-2);
+  transform-origin: left;
+  transition: transform 400ms var(--spring-snappy);
+}
+.chances-list li.is-me .chances-bar i {
+  background: var(--accent);
+}
+.chances-value {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-tight);
+  font-size: 18px;
+  font-weight: 900;
+  text-align: right;
+}
+.chances-need {
+  margin-top: 12px;
+  padding: 12px 12px 10px;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+.chances-need h4 {
+  margin-bottom: 6px;
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.chances-need li {
+  display: grid;
+  gap: 4px;
+  padding: 6px 0;
+}
+.chances-need li + li {
+  border-top: 1px solid var(--rule);
+}
+.chances-match {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.chances-ifs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.chances-if b {
+  color: var(--ink);
+}
+.chances-path {
+  margin-top: 6px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+.chances-note {
+  margin-top: 10px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+/* ---------- Clasificación: «Contra la máquina» and «Tu perfil de pronosticador» ---------- */
+.machine-insights {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+.insight-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.insight-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.insight-heading h2 {
+  font-size: var(--text-xl);
+}
+.insight-heading small {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.insight-scores {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 8px;
+}
+.insight-scores > div {
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.insight-scores > div.is-me {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.insight-scores dt {
+  color: var(--ink-3);
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-wide);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.insight-scores dd {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch-tight);
+  font-size: 26px;
+  font-weight: 900;
+}
+.insight-scores dd small {
+  color: var(--ink-3);
+  font-size: 14px;
+  font-weight: 700;
+}
+.insight-card p,
+.insight-facts li {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.insight-facts {
+  display: grid;
+  gap: 6px;
+}
+.insight-facts li {
+  padding-left: 14px;
+  text-indent: -14px;
+}
+.insight-facts li::before {
+  content: "·";
+  display: inline-block;
+  width: 14px;
+  text-indent: 0;
+  color: var(--ink-3);
+  font-weight: 900;
+}
+.insight-note {
+  color: var(--ink-3);
+  font-size: var(--text-xs) !important;
+}

@@ -43,6 +43,9 @@ import {
   type ScoreMode,
 } from "../lib/roundBoard";
 import { shareFileName } from "../lib/shareSummary";
+import { ghostPlayers } from "../lib/machinePicks";
+import { useMachinePicks } from "../lib/useMachinePicks";
+import RoundChances from "./RoundChances";
 
 const ShareDialog = lazy(() => import("./ShareDialog"));
 
@@ -212,6 +215,13 @@ export default function GroupPredictions({
     () => roundBoard(matches, mode, players),
     [matches, mode, players],
   );
+  // «IA» and «Favorito»: their slips were frozen before the round closed.
+  const machines = useMachinePicks([seasonId], canShare && !demo);
+  const machineRound = machines.get(seasonId)?.rounds[roundId];
+  const ghosts = useMemo(
+    () => roundBoard(matches, mode, ghostPlayers(machineRound, mode)),
+    [matches, mode, machineRound],
+  );
   const shareReady = players.length > 0 && !loadingOwn && !pending;
   const othersSealed = participants.filter(
     (p) => p.id !== userId && completedIds.includes(p.id),
@@ -258,8 +268,18 @@ export default function GroupPredictions({
       {shareReady && roundHasStarted(matches) && (
         <RoundBoardPanel
           rows={board}
+          ghosts={ghosts}
           userId={userId}
           live={matches.some((m) => ["IN_PLAY", "PAUSED"].includes(m.status))}
+        />
+      )}
+      {shareReady && (
+        <RoundChances
+          matches={matches}
+          players={players}
+          mode={mode}
+          userId={userId}
+          machineRound={machineRound}
         />
       )}
       {sharing && (
@@ -301,10 +321,13 @@ export default function GroupPredictions({
 
 export function RoundBoardPanel({
   rows,
+  ghosts = [],
   userId,
   live,
 }: {
   rows: ReturnType<typeof roundBoard>;
+  /** «IA» and «Favorito», scored the same way, outside the group's places. */
+  ghosts?: ReturnType<typeof roundBoard>;
   userId: string;
   live: boolean;
 }) {
@@ -345,6 +368,32 @@ export function RoundBoardPanel({
           </li>
         ))}
       </ol>
+      {ghosts.length > 0 && (
+        <ol className="round-board-ghosts" aria-label="Contra la máquina">
+          {ghosts.map((r) => (
+            <li key={r.id}>
+              <span className="rb-pos" aria-hidden="true">
+                ·
+              </span>
+              <span className="rb-name">
+                {r.name}
+                <small> · {r.id === "ghost:ai" ? "su propia quiniela" : "siempre el favorito"}</small>
+              </span>
+              <span className="rb-hits">
+                {r.hits} {r.hits === 1 ? "acierto" : "aciertos"}
+              </span>
+              <span className="rb-points">
+                <b>{r.points}</b> pts
+                {r.livePoints > 0 && (
+                  <span className="rb-live" title="Si terminaran así">
+                    +{r.livePoints}
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

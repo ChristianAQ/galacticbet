@@ -23,6 +23,7 @@ import {
 } from "../lib/domain";
 import PotCard from "../components/PotCard";
 import RoundRecap from "../components/RoundRecap";
+import MachineInsights from "../components/MachineInsights";
 import { roundRecap } from "../lib/roundRecap";
 import { groupPotCents, roundPot } from "../lib/pot";
 import { useRoundAttendance } from "../lib/useRoundAttendance";
@@ -540,6 +541,15 @@ function GroupStandings({
                 «Últ.»: lo que sumó cada uno en {latestLabel}. Las flechas
                 cuentan los puestos ganados o perdidos con esa jornada.
               </p>
+            )}
+            {period === "all" && (
+              <MachineInsights
+                groupId={selectedGroup.id}
+                seasons={data.seasons}
+                matches={matches}
+                userId={user.uid}
+                scope={scope}
+              />
             )}
           </div>
         )}

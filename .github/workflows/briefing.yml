@@ -3,6 +3,8 @@ on:
   # «La IA te cuenta» on Inicio: morning, afternoon and evening in Spain.
   # A late or skipped schedule only means a slightly older front page (it is
   # shown for 36 hours), and a run within 3 hours of the last one does nothing.
+  # Each run also freezes the slips of «IA» and «Favorito» for the rounds that
+  # close within 24 hours (at least two runs fall in that window).
   schedule:
     - cron: "45 7 * * *"
       timezone: "Europe/Madrid"

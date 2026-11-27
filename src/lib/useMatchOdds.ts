@@ -9,7 +9,7 @@ let cached: { at: number; board: OddsBoard | null } | undefined;
 let pending: Promise<OddsBoard | null> | undefined;
 
 // One public document for every fixture; shared between all open match pages.
-function loadOdds() {
+export function loadOdds() {
   if (cached && Date.now() - cached.at < TTL)
     return Promise.resolve(cached.board);
   if (!pending)
