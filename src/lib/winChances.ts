@@ -191,6 +191,8 @@ export interface RoundChances {
   shared: Record<string, number>;
   /** For one player (`focus`): their chance with each result of each open match. */
   ifResult: Record<string, Partial<Record<Outcome, number>>>;
+  /** The same, counting only the runs `focus` wins alone (ahead of everybody). */
+  ifResultAlone: Record<string, Partial<Record<Outcome, number>>>;
   /** The open matches' signs most often seen when `focus` wins, and how often. */
   path: { signs: Record<string, Outcome>; share: number } | null;
 }
@@ -216,9 +218,11 @@ export function simulateRound({
   const shared: Record<string, number> = { ...win };
   const seen: Record<string, Record<Outcome, number>> = {};
   const won: Record<string, Record<Outcome, number>> = {};
+  const alone: Record<string, Record<Outcome, number>> = {};
   for (const f of open) {
     seen[f.id] = { "1": 0, X: 0, "2": 0 };
     won[f.id] = { "1": 0, X: 0, "2": 0 };
+    alone[f.id] = { "1": 0, X: 0, "2": 0 };
   }
   const paths = new Map<string, number>();
   let focusWins = 0;
@@ -254,9 +258,11 @@ export function simulateRound({
     if (focus) {
       const k = players.findIndex((p) => p.id === focus);
       const focusWon = k >= 0 && totals[k] === top;
+      const focusAlone = focusWon && leaders === 1;
       open.forEach((f, i) => {
         seen[f.id][signs[i]]++;
         if (focusWon) won[f.id][signs[i]]++;
+        if (focusAlone) alone[f.id][signs[i]]++;
       });
       if (focusWon) {
         focusWins++;
@@ -266,16 +272,19 @@ export function simulateRound({
     }
   }
   const ifResult: RoundChances["ifResult"] = {};
-  for (const f of open)
-    ifResult[f.id] = Object.fromEntries(
-      (["1", "X", "2"] as Outcome[]).filter((s) => seen[f.id][s] > 0).map((s) => [s, won[f.id][s] / seen[f.id][s]]),
-    );
+  const ifResultAlone: RoundChances["ifResultAlone"] = {};
+  for (const f of open) {
+    const signs = (["1", "X", "2"] as Outcome[]).filter((s) => seen[f.id][s] > 0);
+    ifResult[f.id] = Object.fromEntries(signs.map((s) => [s, won[f.id][s] / seen[f.id][s]]));
+    ifResultAlone[f.id] = Object.fromEntries(signs.map((s) => [s, alone[f.id][s] / seen[f.id][s]]));
+  }
   const [likeliest, count] = [...paths].sort((a, b) => b[1] - a[1])[0] ?? [];
   return {
     runs,
     win: Object.fromEntries(Object.entries(win).map(([id, n]) => [id, n / runs])),
     shared: Object.fromEntries(Object.entries(shared).map(([id, n]) => [id, n / runs])),
     ifResult: focus ? ifResult : {},
+    ifResultAlone: focus ? ifResultAlone : {},
     path:
       focus && likeliest !== undefined && open.length
         ? {
@@ -284,6 +293,48 @@ export function simulateRound({
           }
         : null,
   };
+}
+
+/**
+ * You against one rival, match by match: where your picks differ (the only
+ * matches that can change who wins, best first) and where they are the same.
+ * For each result of a differing match: your chance of ending ahead, level
+ * or behind.
+ */
+export function duelResults(
+  chances: RoundChances,
+  mine: Record<string, PredictionValue | undefined>,
+  theirs: Record<string, PredictionValue | undefined>,
+) {
+  const differ: {
+    matchId: string;
+    swing: number;
+    byResult: Partial<Record<Outcome, { ahead: number; level: number; behind: number }>>;
+  }[] = [];
+  const same: string[] = [];
+  for (const [matchId, byResult] of Object.entries(chances.ifResult)) {
+    if (samePick(mine[matchId], theirs[matchId])) {
+      same.push(matchId);
+      continue;
+    }
+    const split = Object.fromEntries(
+      Object.entries(byResult).map(([sign, win]) => {
+        const ahead = chances.ifResultAlone[matchId]?.[sign as Outcome] ?? 0;
+        return [sign, { ahead, level: Math.max(0, win! - ahead), behind: Math.max(0, 1 - win!) }];
+      }),
+    ) as Partial<Record<Outcome, { ahead: number; level: number; behind: number }>>;
+    const values = Object.values(split).map((v) => v!.ahead);
+    differ.push({ matchId, byResult: split, swing: values.length ? Math.max(...values) - Math.min(...values) : 0 });
+  }
+  differ.sort((a, b) => b.swing - a.swing);
+  return { differ, same };
+}
+
+/** The same pick: the same sign, or the same score. */
+export function samePick(a?: PredictionValue, b?: PredictionValue) {
+  if (!a || !b) return false;
+  if (typeof a === "string" || typeof b === "string") return a === b;
+  return a.home === b.home && a.away === b.away;
 }
 
 /**

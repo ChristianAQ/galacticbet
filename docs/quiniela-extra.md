@@ -9,8 +9,8 @@ En cuanto sellas, en la vista del grupo, cada jugador que ha sellado
 tiene su **probabilidad de ganar la jornada** (sola o compartida: empatar en
 cabeza cuenta como ganarla, como en el bote).
 
-El panel sale **plegado**: solo la gráfica de quién es más probable que
-gane. Al tocar el título o la gráfica se despliega con una transición suave:
+En un grupo, el panel sale **plegado**: solo la gráfica de quién es más
+probable que gane. Al tocar el título o la gráfica se despliega con una transición suave:
 los puntos de la jornada (contra la IA), qué necesitas, cómo vas contra la
 IA y cómo se calcula. Se queda abierto o cerrado mientras navegas.
 
@@ -64,7 +64,16 @@ Dónde se ven:
     contra la IA**: los puntos de los dos (con los del directo), la
     probabilidad de ganarle, empatar o perder, qué necesitas para ganarle y,
     al acabar la jornada, quién se la ha llevado. Así nadie juega una jornada
-    sin rival.
+    sin rival. Aquí no hay nada que desplegar: se ve todo.
+    **Qué necesitas para ganarle** solo lista los partidos en los que no
+    coincidís (los únicos que pueden cambiar quién gana), con lo que ha puesto
+    cada uno y, para cada resultado, una barra de quién acabaría por delante
+    (tú, empate o la IA) y tu probabilidad; el resultado que te conviene va
+    resaltado. Los partidos en los que habéis puesto lo mismo se nombran
+    aparte: no cuentan. Si en todo lo que queda coincidís, lo dice y da el
+    resultado final, que ya no puede cambiar.
+  - en el tablero de cada partido, si la IA ha puesto lo mismo que tú, una
+    sola fila lo dice («Tú y IA») en vez de dos filas iguales;
 - En Clasificación › Temporada, **Contra la máquina**: tus puntos, los de la
   IA y los del favorito en las jornadas terminadas que habéis jugado los
   tres, en cuántas jornadas les has ganado y cuántos del grupo van por

@@ -923,3 +923,18 @@
 .standings-toolbar .segmented {
   flex: 0 1 220px;
 }
+
+/* You and the AI picked the same: one row, «Tú y IA». */
+.gm-pick-name.has-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.gm-pick-also {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-2);
+  font-weight: 500;
+}

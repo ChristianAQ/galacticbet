@@ -43,6 +43,7 @@ import {
 import { shareFileName } from "../lib/shareSummary";
 import { ghostPlayers } from "../lib/machinePicks";
 import { useMachinePicks } from "../lib/useMachinePicks";
+import { samePick } from "../lib/winChances";
 import RoundChances, { AiMark } from "./RoundChances";
 
 const ShareDialog = lazy(() => import("./ShareDialog"));
@@ -448,6 +449,8 @@ function RivalsCard({
   const visible = participants.filter(
     (p) => p.id !== userId && completedIds.includes(p.id),
   );
+  // The AI picked the same as you: one row says it, not two alike.
+  const withAi = Boolean(aiValue && samePick(ownValue, aiValue));
   return (
     <GroupMatchCard
       match={match}
@@ -465,6 +468,7 @@ function RivalsCard({
             mode={mode}
             value={ownValue}
             loading={loadingOwn}
+            alsoAi={withAi}
           />
           {canShare &&
             ready &&
@@ -479,7 +483,7 @@ function RivalsCard({
                 value={entries[person.id]?.[match.id]}
               />
             ))}
-          {aiValue && <PickRow name="IA" ai match={match} mode={mode} value={aiValue} />}
+          {aiValue && !withAi && <PickRow name="IA" ai match={match} mode={mode} value={aiValue} />}
         </ul>
         {canShare &&
           (pending || !ready ? (
@@ -509,9 +513,12 @@ export function PickRow({
   mode,
   value,
   loading = false,
+  alsoAi = false,
 }: {
   name: string;
   me?: boolean;
+  /** Your row when the AI picked exactly the same. */
+  alsoAi?: boolean;
   /** The AI's own slip: last, quieter, with its mark. */
   ai?: boolean;
   match: Match;
@@ -549,8 +556,16 @@ export function PickRow({
       className={`gm-pick${me ? " is-me" : ""}${ai ? " is-ai" : ""}${state ? ` is-${state}` : ""}${value ? "" : " is-missing"}`}
       aria-busy={loading}
     >
-      <span className="gm-pick-name" title={ai ? "La quiniela de la IA, hecha antes del cierre" : name}>
+      <span
+        className={`gm-pick-name${alsoAi ? " has-ai" : ""}`}
+        title={ai ? "La quiniela de la IA, hecha antes del cierre" : alsoAi ? "La IA ha puesto lo mismo que tú" : name}
+      >
         {ai ? <AiMark /> : name}
+        {alsoAi && (
+          <span className="gm-pick-also">
+            y <AiMark />
+          </span>
+        )}
       </span>
       {loading ? (
         <span className="gm-pick-what">

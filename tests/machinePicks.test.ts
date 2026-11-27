@@ -22,8 +22,10 @@ import {
 import { predictorProfile } from "../src/lib/predictorProfile";
 import { roundBoard } from "../src/lib/roundBoard";
 import {
+  duelResults,
   goalRates,
   keyResults,
+  samePick,
   outcomeChances,
   playedMinutes,
   simFixture,
@@ -99,6 +101,32 @@ describe("¿quién se lleva la jornada?", () => {
     });
     expect(result.win).toEqual({ ana: 1, bea: 0, eva: 1 });
     expect(result.shared.ana).toBe(1);
+  });
+
+  it("tú contra la IA: solo cuentan los partidos en los que no coincidís", () => {
+    const c = match({ id: "c", home: "Sevilla FC", away: "Valencia CF" });
+    const fixtures = [a, b, c].map((m) => simFixture(m, TYPICAL_CHANCES, undefined, now)!);
+    const me = { id: "yo", picks: { a: "1" as const, b: "X" as const, c: "2" as const } };
+    const ai = { id: "ghost:ai", picks: { a: "1" as const, b: "2" as const, c: "2" as const } };
+    const duel = simulateRound({ fixtures, players: [me, ai], mode: "classic", focus: "yo", runs: 4000 });
+    const { differ, same } = duelResults(duel, me.picks, ai.picks);
+    expect(same.sort()).toEqual(["a", "c"]);
+    expect(differ.map((d) => d.matchId)).toEqual(["b"]);
+    // Only «b» decides: a draw puts you ahead, an away win puts the AI ahead, a home win leaves you level.
+    const r = differ[0].byResult;
+    expect(r.X).toEqual({ ahead: 1, level: 0, behind: 0 });
+    expect(r["2"]).toEqual({ ahead: 0, level: 0, behind: 1 });
+    expect(r["1"]).toEqual({ ahead: 0, level: 1, behind: 0 });
+    // Everything the same: nothing left to decide.
+    expect(duelResults(duel, me.picks, me.picks).differ).toEqual([]);
+  });
+
+  it("el mismo pronóstico: el mismo signo o el mismo marcador", () => {
+    expect(samePick("1", "1")).toBe(true);
+    expect(samePick("1", "X")).toBe(false);
+    expect(samePick({ home: 2, away: 1 }, { home: 2, away: 1 })).toBe(true);
+    expect(samePick({ home: 2, away: 1 }, { home: 1, away: 0 })).toBe(false);
+    expect(samePick(undefined, "1")).toBe(false);
   });
 
   it("las probabilidades suman al menos 1 y siguen al marcador en directo", () => {

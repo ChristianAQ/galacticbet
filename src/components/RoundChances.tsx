@@ -1,6 +1,6 @@
 import { ChevronDown, Sparkles } from "lucide-react";
 import { useContext, useEffect, useId, useMemo, useState } from "react";
-import type { Match, Mode, Outcome } from "../lib/domain";
+import { predictionSummary, type Match, type Mode, type Outcome } from "../lib/domain";
 import type { MachineRound } from "../lib/machinePicks";
 import { haptic } from "../lib/motion";
 import { impliedProbabilities, type OddsBoard } from "../lib/odds";
@@ -8,6 +8,7 @@ import { roundBoard, type RoundPlayer } from "../lib/roundBoard";
 import { loadOdds } from "../lib/useMatchOdds";
 import { LiveContext, useMinuteClock } from "../lib/useLiveBoard";
 import {
+  duelResults,
   keyResults,
   simFixture,
   simulateRound,
@@ -49,8 +50,9 @@ let remembered = false;
  * group, one line says how you stand against it; alone, the panel is your
  * duel with it, so nobody plays a round without a rival.
  *
- * Folded by default: only the chart of who is likelier to win. Unfolding
- * slides the rest in (the points, what you need, how it is worked out).
+ * In a group, folded by default: only the chart of who is likelier to win;
+ * unfolding slides the rest in. Alone against the AI, everything is in
+ * sight: the points and, match by match, what you need to beat it.
  */
 export default function RoundChances({
   matches,
@@ -135,6 +137,8 @@ export default function RoundChances({
   const needs = me && focusResult ? keyResults(focusResult) : [];
   const path = focusResult?.path && mine > 0.005 && mine < 0.995 ? Object.entries(focusResult.path.signs) : [];
   const odd = duel && me ? duelOdds(duel, me.id) : null;
+  // Only the matches where you and the AI picked differently can change who wins.
+  const split = !group && duel && me && rival ? duelResults(duel, me.picks, rival.picks) : null;
   const status = live
     ? "En directo"
     : !undecided
@@ -177,9 +181,9 @@ export default function RoundChances({
         role="img"
         aria-label={`Ganas tú: ${pct(odd.you)}; empate: ${pct(odd.tie)}; gana la IA: ${pct(odd.ai)}`}
       >
-        <i className="is-me" style={{ flexGrow: odd.you }} />
-        <i className="is-tie" style={{ flexGrow: odd.tie }} />
-        <i className="is-ai" style={{ flexGrow: odd.ai }} />
+        {odd.you >= 0.005 && <i className="is-me" style={{ flexGrow: odd.you }} />}
+        {odd.tie >= 0.005 && <i className="is-tie" style={{ flexGrow: odd.tie }} />}
+        {odd.ai >= 0.005 && <i className="is-ai" style={{ flexGrow: odd.ai }} />}
       </div>
     </div>
   ) : (
@@ -208,7 +212,7 @@ export default function RoundChances({
       </p>
     </div>
   );
-  const need = needs.length > 0 && (
+  const need = group && needs.length > 0 && (
     <div className="chances-need">
       <h4>{group ? "Qué necesitas" : "Qué necesitas para ganarle"}</h4>
       <ul>
@@ -247,6 +251,90 @@ export default function RoundChances({
       )}
     </div>
   );
+  const duelNeed = split && me && rival && versus && (
+    <div className="duel-need">
+      <h4>Qué necesitas para ganarle</h4>
+      {split.differ.length === 0 ? (
+        <p className="duel-need-same-all">
+          Lo que queda lo habéis pronosticado igual: pase lo que pase, sumáis lo mismo.{" "}
+          {versus.me.points > versus.ai.points
+            ? `Le ganas ${versus.me.points} a ${versus.ai.points}.`
+            : versus.me.points < versus.ai.points
+              ? `Te gana ${versus.ai.points} a ${versus.me.points}.`
+              : `Acabáis empatados a ${versus.me.points}.`}
+        </p>
+      ) : (
+        <>
+          <p className="duel-need-lead">
+            Solo deciden los partidos en los que no coincidís. Con cada resultado, tu probabilidad de acabar por delante:
+          </p>
+          <ul>
+            {split.differ.slice(0, 4).map(({ matchId, byResult }) => {
+              const m = byId.get(matchId)!;
+              const signs = (["1", "X", "2"] as Outcome[]).filter((s) => byResult[s]);
+              const best = signs.reduce((a, b) => (byResult[b]!.ahead > byResult[a]!.ahead ? b : a), signs[0]);
+              const yours = me.picks[matchId];
+              const its = rival.picks[matchId];
+              return (
+                <li key={matchId}>
+                  <div className="duel-need-head">
+                    <span className="chances-match">
+                      {m.home} – {m.away}
+                    </span>
+                    <span className="duel-need-picks">
+                      Tú <b>{yours ? predictionSummary(yours) : "—"}</b> · <AiMark /> <b>{its ? predictionSummary(its) : "—"}</b>
+                    </span>
+                  </div>
+                  {signs.map((s) => {
+                    const v = byResult[s]!;
+                    return (
+                      <div
+                        key={s}
+                        className={`duel-if${s === best ? " is-best" : ""}`}
+                        role="img"
+                        aria-label={`Si ${signName(s, m).toLowerCase()}: por delante ${pct(v.ahead)}, empate ${pct(v.level)}, por detrás ${pct(v.behind)}${s === best ? ". Es lo que te conviene" : ""}`}
+                      >
+                        <span className="duel-if-name">{signName(s, m)}</span>
+                        <span className="duel-if-bar" aria-hidden="true">
+                          {v.ahead >= 0.005 && <i className="is-me" style={{ flexGrow: v.ahead }} />}
+                          {v.level >= 0.005 && <i className="is-tie" style={{ flexGrow: v.level }} />}
+                          {v.behind >= 0.005 && <i className="is-ai" style={{ flexGrow: v.behind }} />}
+                        </span>
+                        <b className="duel-if-value">{pct(v.ahead)}</b>
+                      </div>
+                    );
+                  })}
+                </li>
+              );
+            })}
+          </ul>
+          {split.differ.length > 4 && (
+            <p className="duel-need-more">
+              Y {split.differ.length - 4} {split.differ.length - 4 === 1 ? "partido más" : "partidos más"} en los que no
+              coincidís.
+            </p>
+          )}
+          <p className="duel-need-key" aria-hidden="true">
+            <span><i className="is-me" /> Tú por delante</span>
+            <span><i className="is-tie" /> Empate</span>
+            <span><i className="is-ai" /> La IA por delante</span>
+          </p>
+        </>
+      )}
+      {split.same.length > 0 && split.differ.length > 0 && (
+        <p className="duel-need-same">
+          {split.same.length === 1 ? "En " : `En ${split.same.length} partidos (`}
+          {split.same
+            .map((id) => {
+              const m = byId.get(id)!;
+              return `${m.home}–${m.away}`;
+            })
+            .join(", ")}
+          {split.same.length === 1 ? "" : ")"} habéis puesto lo mismo: no cuentan para el duelo.
+        </p>
+      )}
+    </div>
+  );
   const versusLine = group && odd && versus && (
     <p className="chances-duel">
       <AiMark /> Contra la IA: vas {versus.me.points + versus.me.livePoints} a {versus.ai.points + versus.ai.livePoints}{" "}
@@ -263,12 +351,14 @@ export default function RoundChances({
         ` ${typical === 1 ? "Un partido sin cuotas usa" : `${typical} partidos sin cuotas usan`} una probabilidad típica.`}
     </p>
   );
-  const hasDetails = Boolean(score || need || versusLine || note);
+  const hasDetails = Boolean(score || need || duelNeed || versusLine || note);
+  // Alone against the AI there is nothing to fold: it is all in sight.
+  const foldable = group && hasDetails;
 
   return (
     <section className={`panel round-chances${expanded ? " is-open" : ""}`} aria-labelledby={titleId}>
       <h3 className="chances-heading">
-        {hasDetails ? (
+        {foldable ? (
           <button
             type="button"
             className="chances-toggle"
@@ -290,15 +380,25 @@ export default function RoundChances({
             <span id={titleId} className="chances-title">
               {group ? "¿Quién se lleva la jornada?" : "Tú contra la IA"}
             </span>
-            <small>{status}</small>
+            <small>
+              {live && <i className="live-dot" aria-hidden="true" />}
+              {status}
+            </small>
           </span>
         )}
       </h3>
       {/* The chart opens the rest too: the panel's biggest target. */}
-      <div className="chances-summary" onClick={hasDetails ? toggle : undefined}>
+      <div className="chances-summary" onClick={foldable ? toggle : undefined}>
         {chart}
       </div>
-      {hasDetails && (
+      {!group && hasDetails && (
+        <div className="chances-open">
+          {score}
+          {duelNeed}
+          {note}
+        </div>
+      )}
+      {foldable && (
         <div id={bodyId} className="chances-body" inert={!expanded}>
           <div className="chances-body-inner">
             {score}
