@@ -21,12 +21,18 @@ import {
 const HOUR = 3_600_000;
 const MAX_DOCUMENT_READS = 80;
 const MAX_SUMMARIES = 24;
+/**
+ * Version of the rules that pair a match with its ESPN event. A match left
+ * without a report by older rules is looked up again at once.
+ */
+export const MATCHER_VERSION = 2;
 export interface StoredMatchInsight {
   insight: MatchInsight | null;
   checkedAt: string;
   kickoff: string;
   status: string;
   matchupsCheckedAt?: string;
+  matcher?: number;
 }
 interface SyncOptions {
   now?: number;
@@ -191,6 +197,7 @@ function validPrevious(
     checkedAt: value.checkedAt,
     kickoff: value.kickoff,
     status: value.status,
+    ...(typeof value.matcher === "number" ? { matcher: value.matcher } : {}),
     ...(typeof value.matchupsCheckedAt === "string" &&
     Number.isFinite(Date.parse(value.matchupsCheckedAt))
       ? { matchupsCheckedAt: value.matchupsCheckedAt }
@@ -265,6 +272,8 @@ export async function syncMatchInsights(
           : insightRefreshInterval(match, now, previous?.insight);
       const fresh =
         previous &&
+        // Without a report under older pairing rules: try again now.
+        (previous.insight || previous.matcher === MATCHER_VERSION) &&
         checkedAt <= now &&
         now - checkedAt < interval &&
         previous.status === match.status;
@@ -531,6 +540,7 @@ export async function syncMatchInsights(
           checkedAt: new Date(now).toISOString(),
           kickoff: match.utcDate,
           status: match.status,
+          matcher: MATCHER_VERSION,
         },
       });
       if (report.stopped) break;

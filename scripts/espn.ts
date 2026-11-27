@@ -798,7 +798,8 @@ export function normalizeEspnSummary(
     event.id !== expected.id ||
     event.homeId !== expected.homeId ||
     event.awayId !== expected.awayId ||
-    !eventFitsMatch(event, match)
+    // Same rules as finding it: both clubs, or one identical and the only possible match.
+    findEspnEvent(match, [event]) !== event
   )
     return null;
   const league = row(header.league);

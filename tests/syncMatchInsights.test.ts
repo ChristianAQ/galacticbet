@@ -10,6 +10,7 @@ import {
   insightCandidates,
   insightCalendarWindows,
   insightRefreshInterval,
+  MATCHER_VERSION,
   syncMatchInsights,
   type StoredMatchInsight,
 } from "../scripts/syncMatchInsights";
@@ -340,7 +341,7 @@ describe("sincronización acotada de información complementaria", () => {
   it("la caché vigente no llama al proveedor ni escribe; una consulta ausente también se cachea", async () => {
     const match = makeMatch();
     const { db, writes, docs } = database({
-      "1": { ...stored(match), insight: null },
+      "1": { ...stored(match), insight: null, matcher: MATCHER_VERSION },
     });
     const client = clientFor([match]);
     expect(
@@ -349,6 +350,13 @@ describe("sincronización acotada de información complementaria", () => {
     expect(client.scoreboard).not.toHaveBeenCalled();
     expect(writes).toEqual([]);
     expect(docs.get("1")?.insight).toBeNull();
+  });
+  it("una ficha ausente con las reglas de emparejado anteriores se busca otra vez enseguida", async () => {
+    const match = makeMatch();
+    const { db, docs } = database({ "1": { ...stored(match), insight: null } });
+    const client = clientFor([match]);
+    expect(await syncMatchInsights(db, [match], { now, client, log })).toMatchObject({ scoreboards: 1, summaries: 1 });
+    expect(docs.get("1")).toMatchObject({ matcher: MATCHER_VERSION });
   });
   it("un cambio de estado obliga a actualizar aunque la caché no haya caducado", async () => {
     const match = makeMatch();
