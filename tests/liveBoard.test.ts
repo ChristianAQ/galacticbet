@@ -336,15 +336,86 @@ describe("bucle en directo", () => {
     });
     expect(result.iterations).toBe(4);
     expect(officialSync).toHaveBeenCalledTimes(1);
-    // ESPN every two minutes, with the scoreboard only on the first pass.
+    // The scoreboard only on the first pass: the ESPN identity is kept.
     expect(espn.scoreboard).toHaveBeenCalledTimes(1);
-    // Goals and cards from ESPN every minute while the match is in play, like the score.
-    expect(espn.summary).toHaveBeenCalledTimes(4);
+    // No goal and no change of state: the same match is read again after three minutes.
+    expect(espn.summary).toHaveBeenCalledTimes(2);
     expect(writes.filter((path) => path === "live/football")).toHaveLength(1);
     expect(docs.get("live/football")).toMatchObject({
       formatVersion: 1,
       matches: [{ id: "1", status: "IN_PLAY", homeScore: 1, awayScore: 0 }],
     });
     expect(docs.get("syncStatus/football")).toBeUndefined();
+  });
+
+  // Runs the loop with the calendar changing as the clock goes (minute → match).
+  async function follow(
+    match: Match,
+    script: Record<number, Partial<Match>>,
+    options: { durationMs: number; espn?: ReturnType<typeof espnFor> },
+  ) {
+    const { db, docs } = database([match]);
+    let clock = now;
+    const espn = options.espn ?? espnFor(match);
+    const readAt: number[] = [];
+    const summary = espn.summary.getMockImplementation()!;
+    espn.summary.mockImplementation(async (...args) => {
+      readAt.push((clock - now) / MINUTE);
+      return summary(...args);
+    });
+    const logs: string[] = [];
+    const result = await runLiveLoop(db, {
+      durationMs: options.durationMs,
+      clock: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+        const change = script[(clock - now) / MINUTE];
+        if (change)
+          docs.set("calendars/PD-2026", {
+            formatVersion: 1,
+            seasonId: "PD-2026",
+            payload: encodeCalendar([{ ...match, ...change }]),
+          });
+      },
+      log: (m) => logs.push(m),
+      espnClient: () => espn,
+    });
+    return { result, readAt, docs, logs, minutes: (clock - now) / MINUTE };
+  }
+  const playing = fixture("1", -30 * MINUTE, { status: "IN_PLAY", homeScore: 1, awayScore: 0 });
+
+  it("un gol se lee al momento: quién marcó llega un minuto después del marcador", async () => {
+    const quiet = await follow(playing, {}, { durationMs: 2 * MINUTE });
+    expect(quiet.readAt).toEqual([0]);
+    const goal = await follow(playing, { 1: { homeScore: 2 } }, { durationMs: 2 * MINUTE });
+    expect(goal.readAt).toEqual([0, 1]);
+  });
+
+  it("al descanso y al final la ficha se lee al momento, y otra vez completa diez minutos después", async () => {
+    const run = await follow(
+      playing,
+      { 1: { status: "PAUSED" }, 2: { status: "IN_PLAY" }, 3: { status: "FINISHED", homeScore: 2, awayScore: 0 } },
+      { durationMs: 60 * MINUTE },
+    );
+    // Half-time, back in play (a state change too), full time and its complete report.
+    expect(run.readAt).toEqual([0, 1, 2, 3, 13]);
+    // The job waits for that last read and then ends.
+    expect(run.minutes).toBe(13);
+    expect(run.docs.get("matchInsights/1")).toMatchObject({ status: "FINISHED", score: "2-0" });
+  });
+
+  it("ESPN que falla se vuelve a probar tras una pausa, nunca se abandona el resto del día", async () => {
+    const espn = espnFor(playing);
+    const working = espn.summary.getMockImplementation()!;
+    let calls = 0;
+    espn.summary.mockImplementation(async (...args) => {
+      if (++calls <= 2) throw new Error("timeout");
+      return working(...args);
+    });
+    const run = await follow(playing, {}, { durationMs: 4 * MINUTE, espn });
+    // Fails at 0 (pause 1 min) and at 1 (pause 2 min); back at 3.
+    expect(run.readAt).toEqual([0, 1, 3]);
+    expect(run.logs.filter((m) => m.includes("se vuelve a probar"))).toHaveLength(2);
+    expect(run.docs.get("matchInsights/1")).toMatchObject({ status: "IN_PLAY" });
   });
 });

@@ -22,10 +22,47 @@ const MINUTE = 60_000;
 const HOT_GAP = MINUTE;
 const IDLE_GAP = 10 * MINUTE;
 /**
- * ESPN summaries (goals, cards and who) for fixtures in play: every minute,
- * like the score, so an event reaches the app about a minute after ESPN has it.
+ * ESPN summaries (goals, cards and who) for fixtures in play: a pass every
+ * minute, but each match is read again only after a goal (SportAPI's score
+ * changed), when its state changes (half-time, full time) or every three
+ * minutes: the scorer arrives about a minute after the score, and a night of
+ * nine Champions matches stays at about three requests a minute.
  */
 const ESPN_GAP = MINUTE;
+const ESPN_MATCH_REFRESH = 3 * MINUTE;
+/**
+ * A match that ends while followed is read at the whistle and again this
+ * long after: ESPN completes its report (statistics, line-ups) in the minutes
+ * after the end. The job waits for that read, up to a while longer.
+ */
+const FINAL_READ_AFTER = 10 * MINUTE;
+const FINAL_READ_GIVE_UP = 30 * MINUTE;
+/**
+ * A provider that fails is tried again after a pause that doubles up to the
+ * cap, never dropped for the rest of a long job: only a refused key is.
+ */
+const RETRY_FIRST = MINUTE;
+const RETRY_CAP = 15 * MINUTE;
+/** Calendar reads or writes failing this many passes in a row end the job. */
+const MAX_FAILED_PASSES = 3;
+
+function retries() {
+  let pause = 0;
+  let until = -Infinity;
+  return {
+    ready: (now: number) => now >= until,
+    /** The next pause, at least `min`. */
+    fail(now: number, min = RETRY_FIRST) {
+      pause = Math.min(RETRY_CAP, Math.max(min, pause * 2));
+      until = now + pause;
+      return pause;
+    },
+    ok() {
+      pause = 0;
+      until = -Infinity;
+    },
+  };
+}
 /** Football-Data confirms official results; scheduled full syncs may be queued behind us. */
 const OFFICIAL_HOT_GAP = 30 * MINUTE;
 const OFFICIAL_IDLE_GAP = 2 * 60 * MINUTE;
@@ -114,7 +151,15 @@ export async function runLiveLoop(db: Firestore, options: LiveLoopOptions) {
   const espnEvents = new Map<string, EspnEvent>();
   let sportApiStopped = !key;
   let sportApiFailed = false;
-  let espnEnabled = options.espn !== false;
+  const sportApiRetry = retries();
+  const espnEnabled = options.espn !== false;
+  const espnRetry = retries();
+  // Matches seen in play by this job, when each ended, and its two reports after it.
+  const playing = new Set<string>();
+  const ended = new Map<string, number>();
+  const whistleRead = new Set<string>();
+  const finalRead = new Set<string>();
+  let failedPasses = 0;
   let lastSportApi = -Infinity;
   let lastEspn = -Infinity;
   let lastOfficial: number | undefined;
@@ -127,7 +172,7 @@ export async function runLiveLoop(db: Firestore, options: LiveLoopOptions) {
     const now = clock();
     let matches: Match[];
     try {
-      if (!sportApiStopped) {
+      if (!sportApiStopped && sportApiRetry.ready(now)) {
         const result = await syncSportApi(db, key, {
           now,
           runId: `${runBase}-${iterations}`,
@@ -146,20 +191,42 @@ export async function runLiveLoop(db: Firestore, options: LiveLoopOptions) {
           minutes.set(id, { minute, at: now });
         if (result.scored) scoredAt = now;
         if (result.stopped) {
-          sportApiStopped = true;
           sportApiFailed = true;
-        }
+          if (result.failure === 401 || result.failure === 403) {
+            sportApiStopped = true;
+            log("Directo: SportAPI rechaza la clave o el plan; los marcadores siguen con Football-Data.");
+          } else {
+            // A timeout or a provider error: try again soon (a rate limit, later).
+            const pause = sportApiRetry.fail(now, result.failure === 429 ? RETRY_CAP : RETRY_FIRST);
+            log(`Directo: SportAPI no responde; se vuelve a probar en ${pause / MINUTE} min.`);
+          }
+        } else if (result.requests) sportApiRetry.ok();
       } else matches = await readCalendars(db, now);
+      failedPasses = 0;
     } catch (error) {
       log(
         `Directo: no se pudo leer o publicar el calendario (${error instanceof Error ? error.message : "error"}); se conservan los datos.`,
       );
       sportApiFailed = true;
-      break;
+      // A blip of Firestore does not end a match day: the next pass tries again.
+      if (++failedPasses >= MAX_FAILED_PASSES || clock() + MINUTE > deadline) break;
+      await sleep(MINUTE);
+      continue;
     }
     iterations++;
     const window = matches.filter((m) => inLiveWindow(m, now));
     const hot = matches.some((m) => isHotMatch(m, now));
+    for (const m of window)
+      if (["IN_PLAY", "PAUSED"].includes(m.status)) playing.add(m.id);
+      else if (m.status === "FINISHED" && playing.has(m.id) && !ended.has(m.id)) ended.set(m.id, now);
+    // The final whistle's report at once, and the complete one a few minutes later.
+    const whistleDue = [...ended.keys()].filter((id) => !whistleRead.has(id));
+    const finalDue = [...ended]
+      .filter(([id, at]) => !finalRead.has(id) && now - at >= FINAL_READ_AFTER && now - at < FINAL_READ_GIVE_UP)
+      .map(([id]) => id);
+    // Still waiting for a complete report after a final whistle (checked again once ESPN has been read).
+    const settling = () =>
+      espnEnabled && [...ended].some(([id, at]) => !finalRead.has(id) && now - at < FINAL_READ_GIVE_UP);
     const soon = matches.some((m) => {
       const kickoff = Date.parse(m.utcDate);
       return (
@@ -207,27 +274,35 @@ export async function runLiveLoop(db: Firestore, options: LiveLoopOptions) {
       );
       if (
         espnEnabled &&
+        espnRetry.ready(now) &&
         started.length &&
-        (hot || lastEspn === -Infinity) &&
+        (hot || whistleDue.length || finalDue.length || lastEspn === -Infinity) &&
         now - lastEspn >= ESPN_GAP
       ) {
         lastEspn = now;
+        let failed = false;
         try {
           const report = await syncMatchInsights(db, started, {
             now,
             client: (options.espnClient ?? createEspnClient)(),
             log,
-            liveRefreshMs: ESPN_GAP - 10_000,
+            liveRefreshMs: ESPN_MATCH_REFRESH - 10_000,
+            refresh: new Set([...whistleDue, ...finalDue]),
             events: espnEvents,
             onInsight: (id, insight) => insights.set(id, insight),
           });
-          // 403/429 or unusable responses: keep scores, stop extra ESPN calls.
-          if (report.stopped) espnEnabled = false;
+          // 403/429 or unusable responses: the scores go on; ESPN after a pause.
+          failed = report.stopped;
         } catch {
-          espnEnabled = false;
-          log(
-            "Directo: eventos ESPN no disponibles; se mantienen los marcadores.",
-          );
+          failed = true;
+        }
+        if (failed) {
+          const pause = espnRetry.fail(now);
+          log(`Directo: eventos ESPN no disponibles; se mantienen los marcadores y se vuelve a probar en ${pause / MINUTE} min.`);
+        } else {
+          espnRetry.ok();
+          for (const id of whistleDue) whistleRead.add(id);
+          for (const id of finalDue) finalRead.add(id);
         }
       }
       const board = buildLiveBoard(matches, now, minutes, insights);
@@ -251,8 +326,9 @@ export async function runLiveLoop(db: Firestore, options: LiveLoopOptions) {
       await options.onPass(clock()).catch((error) =>
         log(`Directo: tarea periódica fallida (${error instanceof Error ? error.message : "error"}).`),
       );
-    const pause = hot ? HOT_GAP : 2 * MINUTE;
-    if (!(hot || soon) || clock() + pause > deadline) break;
+    const waiting = settling();
+    const pause = hot || waiting ? HOT_GAP : 2 * MINUTE;
+    if (!(hot || soon || waiting) || clock() + pause > deadline) break;
     await sleep(pause);
   }
   log(

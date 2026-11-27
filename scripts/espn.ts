@@ -257,7 +257,12 @@ export function sameTeam(a: string, b: string) {
     y = coreTeamName(b);
   if (!x || !y || !compatible(a, b)) return false;
   if (x === y) return true;
-  const [short, long] = [x.split(" "), y.split(" ")].sort((p, q) => p.length - q.length);
+  // Either provider may write the short form: with as many words, both ways.
+  const [p, q] = [x.split(" "), y.split(" ")];
+  return (p.length <= q.length && covers(p, q)) || (q.length <= p.length && covers(q, p));
+}
+/** Every real word of the short name starts a word of the long one, and one of them is the same word. */
+function covers(short: string[], long: string[]) {
   const words = short.filter((w) => w.length > 2);
   return (
     words.length > 0 &&

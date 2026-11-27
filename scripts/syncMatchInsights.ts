@@ -33,7 +33,12 @@ export interface StoredMatchInsight {
   status: string;
   matchupsCheckedAt?: string;
   matcher?: number;
+  /** The calendar's score when the report was read («2-1»; empty before kick-off). */
+  score?: string;
 }
+/** A match's score as stored with its report: a new one in play means a goal whose scorer to read. */
+export const scoreKey = (match: Match) =>
+  match.homeScore === null || match.awayScore === null ? "" : `${match.homeScore}-${match.awayScore}`;
 interface SyncOptions {
   now?: number;
   client?: EspnClient;
@@ -42,6 +47,8 @@ interface SyncOptions {
   liveRefreshMs?: number;
   /** Live loop: ESPN identities already matched, avoiding repeated scoreboards. */
   events?: Map<string, EspnEvent>;
+  /** Live loop: matches to read again now, whatever their age (the report after the final whistle). */
+  refresh?: Set<string>;
   /** Final stored state of every candidate, refreshed or not. */
   onInsight?: (matchId: string, insight: MatchInsight | null) => void;
 }
@@ -198,6 +205,7 @@ function validPrevious(
     kickoff: value.kickoff,
     status: value.status,
     ...(typeof value.matcher === "number" ? { matcher: value.matcher } : {}),
+    ...(typeof value.score === "string" && value.score.length <= 9 ? { score: value.score } : {}),
     ...(typeof value.matchupsCheckedAt === "string" &&
     Number.isFinite(Date.parse(value.matchupsCheckedAt))
       ? { matchupsCheckedAt: value.matchupsCheckedAt }
@@ -265,18 +273,22 @@ export async function syncMatchInsights(
       previous: validPrevious(prior.get(match.id), match),
     }))
     .filter(({ match, previous }) => {
+      if (options.refresh?.has(match.id)) return true;
       const checkedAt = previous ? Date.parse(previous.checkedAt) : 0;
-      const interval =
-        options.liveRefreshMs !== undefined && isHotMatch(match, now)
-          ? options.liveRefreshMs
-          : insightRefreshInterval(match, now, previous?.insight);
+      const live = options.liveRefreshMs !== undefined && isHotMatch(match, now);
+      const interval = live
+        ? options.liveRefreshMs!
+        : insightRefreshInterval(match, now, previous?.insight);
       const fresh =
         previous &&
         // Without a report under older pairing rules: try again now.
         (previous.insight || previous.matcher === MATCHER_VERSION) &&
         checkedAt <= now &&
         now - checkedAt < interval &&
-        previous.status === match.status;
+        // A new state (half-time, full time) is read at once…
+        previous.status === match.status &&
+        // …and so is a goal in play: who scored it.
+        (!live || previous.score === scoreKey(match));
       if (fresh) report.skipped++;
       return !fresh;
     })
@@ -541,6 +553,7 @@ export async function syncMatchInsights(
           kickoff: match.utcDate,
           status: match.status,
           matcher: MATCHER_VERSION,
+          score: scoreKey(match),
         },
       });
       if (report.stopped) break;

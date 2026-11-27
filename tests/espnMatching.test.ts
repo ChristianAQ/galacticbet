@@ -55,6 +55,11 @@ describe("emparejar los partidos con ESPN", () => {
 
   it("reconoce el mismo club escrito de otra forma, sin confundir clubes distintos", () => {
     expect(sameTeam("Man City", "Manchester City")).toBe(true);
+    // Whichever provider writes the short form, in either order.
+    expect(sameTeam("Manchester City FC", "Man City")).toBe(true);
+    expect(sameTeam("Slovan Bratislava", "SL Bratislava")).toBe(true);
+    expect(sameTeam("SL Bratislava", "Slovan Bratislava")).toBe(true);
+    expect(sameTeam("Manchester United FC", "Man City")).toBe(false);
     expect(sameTeam("Viking", "Viking FK")).toBe(true);
     expect(sameTeam("Como 1907", "Como")).toBe(true);
     expect(sameTeam("Dortmund", "Borussia Dortmund")).toBe(true);

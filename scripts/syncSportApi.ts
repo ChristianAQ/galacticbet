@@ -89,6 +89,8 @@ export async function syncSportApi(
   let requests = 0;
   let changed = 0;
   let stopped = false;
+  /** Why it stopped: the provider's HTTP status, 0 without one (timeout, network). */
+  let failure: number | undefined;
   if (dates.length) {
     const runId =
       options.runId ??
@@ -174,6 +176,7 @@ export async function syncSportApi(
           error instanceof Error
             ? /SportAPI HTTP (\d{3}):/.exec(error.message)?.[1]
             : undefined;
+        failure = code ? Number(code) : 0;
         if (code)
           log(
             `SportAPI HTTP ${code}: revisa la clave, el plan y la cuota del proveedor.`,
@@ -210,6 +213,7 @@ export async function syncSportApi(
     requests,
     changed,
     stopped,
+    ...(failure !== undefined ? { failure } : {}),
     scored,
     matches: [...cache.values()].flat(),
     minutes,
