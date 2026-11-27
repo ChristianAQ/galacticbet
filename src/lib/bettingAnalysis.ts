@@ -271,19 +271,26 @@ export interface BettingAnalysis {
   /** How the AI ran: the model, its web searches and how long it took. */
   ai?: AnalysisRun;
 }
-/** Details of the AI's work on one analysis, as Claude Code reported them. */
+/** Details of the AI's work on one analysis, as Claude Code or the Gemini API reported them. */
 export interface AnalysisRun {
-  /** Model id as reported («claude-…»). */
+  /** Model id as reported («claude-…», «gemini-…»). */
   model?: string;
+  /** Web searches it made; 0 when it had no search (free Gemini). */
   searches?: number;
   seconds?: number;
 }
 
-/** «claude-sonnet-4-5-20250929» → «Claude Sonnet 4.5»; anything else as it came. */
+const capital = (word: string) => word[0].toUpperCase() + word.slice(1);
+/**
+ * «claude-sonnet-4-5-20250929» → «Claude Sonnet 4.5», «gemini-3.5-flash-lite»
+ * → «Gemini 3.5 Flash-Lite»; anything else as it came.
+ */
 export function modelName(id: string) {
   const m = /^claude-([a-z]+)-(\d{1,2})(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(id);
-  if (!m) return id;
-  return `Claude ${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}${m[3] ? `.${m[3]}` : ""}`;
+  if (m) return `Claude ${capital(m[1])} ${m[2]}${m[3] ? `.${m[3]}` : ""}`;
+  const g = /^gemini-(\d{1,2}(?:\.\d{1,2})?)-([a-z]+(?:-lite)?)(-preview)?$/.exec(id);
+  if (g) return `Gemini ${g[1]} ${g[2].split("-").map(capital).join("-")}${g[3] ? " Preview" : ""}`;
+  return id;
 }
 
 function decodeRun(raw: unknown): AnalysisRun | null {

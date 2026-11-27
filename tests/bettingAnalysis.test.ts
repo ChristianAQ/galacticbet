@@ -828,6 +828,38 @@ describe("the job, end to end with fakes", () => {
     expect(Date.parse(analysis.oddsAt) - (kickoff - 45 * 60_000)).toBeLessThan(60_000);
   });
 
+  it("a test with the AI logs the analysis and saves nothing (and the AI reads ESPN's headlines)", async () => {
+    store.clear();
+    store.set("news/football", {
+      version: 1,
+      provider: "ESPN",
+      fetchedAt: new Date(kickoff - 3_600_000).toISOString(),
+      articles: [],
+      competitionArticles: {
+        PD: [
+          {
+            title: "El Levante recupera a su delantero",
+            url: "https://www.espn.com.mx/futbol/nota/_/id/1",
+            // Two hours before this run (30 hours before kick-off).
+            publishedAt: new Date(kickoff - 32 * 3_600_000).toISOString(),
+            competition: "PD",
+          },
+        ],
+      },
+    });
+    const logs: string[] = [];
+    const prompts: string[] = [];
+    const reading = async (prompt: string) => (prompts.push(prompt), claude());
+    const result = await run(kickoff - 30 * 3_600_000, { tryAi: true, claude: reading, log: (m: string) => logs.push(m) });
+    expect(result.generated).toBe(0);
+    expect(store.get("analysis/football")).toBeUndefined();
+    expect(store.get("providerCache/oddspapiDay")).toBeUndefined();
+    expect(logs.join("\n")).toMatch(/prueba con IA, no se guarda/);
+    expect(logs.join("\n")).toMatch(/«Levante favorito»: \d+ apuestas con valor/);
+    expect(prompts[0]).toMatch(/Noticias: los últimos titulares de ESPN/);
+    expect(prompts[0]).toContain("El Levante recupera a su delantero");
+  });
+
   it("old prices or a test run ask OddsPapi again", async () => {
     store.clear();
     const down = async () => {

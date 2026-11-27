@@ -71,11 +71,27 @@ no gestiona apuestas ni dinero.
    en las apuestas de jugador. Son como mucho 80 lecturas de Firestore por
    día analizado, y solo sirven las fichas sincronizadas desde que se guardan
    los números por jugador.
-4. **IA.** Claude Code se ejecuta sin interfaz con el plan de Claude del
-   propietario (token de `claude setup-token`). Trabaja en una carpeta vacía,
-   solo puede buscar en la web (bajas y alineaciones, al menos una búsqueda por
-   partido) y no ve ningún otro secreto del job. Devuelve un JSON validado con
-   dos cosas:
+4. **IA.** Por orden, la primera que responda:
+   - **Claude** (si existe `CLAUDE_CODE_OAUTH_TOKEN`): Claude Code se ejecuta
+     sin interfaz con el plan de Claude del propietario (token de
+     `claude setup-token`). Trabaja en una carpeta vacía, solo puede buscar en
+     la web (bajas y alineaciones, al menos una búsqueda por partido) y no ve
+     ningún otro secreto del job.
+   - **Gemini gratis** (si existe `GEMINI_API_KEY`), cuando Claude falla
+     (límite de uso, plan caducado, caído) en el mismo intento y con los
+     mismos datos. Usa la Interactions API de Gemini (`gemini-3.8-flash`) con
+     una clave de Google AI Studio sin facturación. El nivel gratuito no
+     incluye la búsqueda de Google en los modelos actuales, así que trabaja
+     solo con nuestros datos y los últimos titulares de ESPN de la
+     competición; la ficha técnica lo dice («sin búsqueda web»). Se envía con
+     `store: false`. En el nivel gratuito Google puede usar lo enviado para
+     mejorar sus productos: solo van partidos, estadísticas, cuotas y
+     titulares públicos, ningún dato de los usuarios.
+
+   Las dos reciben también esos titulares de ESPN (`news/football`, los de los
+   últimos tres días). Con la variable `ANALYSIS_AI=gemini`, o eligiendo
+   «gemini» al lanzar el workflow, Gemini va primero. Devuelven un JSON
+   validado con dos cosas:
    - **Apuestas con valor:** hasta 6 apuestas (como mucho 2 por partido) que pagan
      al menos un 3 % más de lo justo según su estimación. Con casas normales
      son pocas: suelen pagar entre un 5 y un 9 % menos que el precio justo de
@@ -204,9 +220,11 @@ secrets**:
 | - | - |
 | `BET365_ODDS_KEY` | La clave de tu cuenta de [OddsPapi](https://oddspapi.io) (también vale `ODDSPAPI_KEY`). |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Token de tu plan de Claude (Pro o superior). Créalo una vez en tu ordenador con `claude setup-token` (Claude Code instalado). Dura un año. |
+| `GEMINI_API_KEY` | Opcional, de respaldo gratis. Clave de [Google AI Studio](https://aistudio.google.com/apikey) («Create API key»), **sin activar la facturación** para que siga en el nivel gratuito. Las suscripciones de Gemini (Plus, Pro) no incluyen la API. |
 
 Opcional, en **Variables**: `CLAUDE_MODEL` para elegir el modelo (si no, el
-de tu plan por defecto). Cada análisis consume uso de tu plan como una
+de tu plan por defecto), `GEMINI_MODEL` (si no, `gemini-3.8-flash`) y
+`ANALYSIS_AI=gemini` para que Gemini vaya primero. Cada análisis consume uso de tu plan como una
 conversación normal de Claude Code; no se paga nada aparte.
 
 ## Probar
@@ -230,6 +248,12 @@ las líneas «OddsPapi: tiros de jugador en …». También dice de cuántos par
 recientes hay números de jugador para la IA («números de jugador de X/Y
 partidos recientes»). La lista de mercados se vuelve a pedir una vez (una
 petición) para guardar las líneas.
+
+Con el modo **prueba-ia** hace el análisis entero del próximo día de
+partidos con la IA (la que elijas en «ia») y escribe en el registro el
+modelo, el titular y la recomendación de cada partido, sin guardar nada: sirve
+para comprobar la clave de Gemini sin tocar el informe publicado. Gasta las
+mismas peticiones de OddsPapi que la prueba.
 
 Con el modo **completo** genera y publica ya el análisis del próximo día de
 partidos, aunque falte mucho. El análisis automático de 45 minutos antes lo

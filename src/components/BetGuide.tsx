@@ -62,8 +62,9 @@ export default function BetGuide({ onClose }: { onClose: () => void }) {
           <dt>De dónde sale</dt>
           <dd>
             Cuotas de bet365 (o de otra casa española si bet365 no está al día) y de Pinnacle, vía OddsPapi; resultados
-            oficiales de Football-Data; noticias que lee la IA. El análisis lo hace Claude unos 40 minutos antes del primer
-            partido de cada día.
+            oficiales de Football-Data; noticias que lee la IA. El análisis lo hace una IA (Claude o, si no está
+            disponible, Gemini) unos 40 minutos antes del primer partido de cada día; la ficha técnica dice cuál fue y si
+            buscó en internet.
           </dd>
         </div>
         <div>

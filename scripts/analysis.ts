@@ -6,7 +6,10 @@ import {
   planNextAnalysis,
   recordAttempt,
   runBettingAnalysis,
+  withFallback,
+  type ClaudeRunner,
 } from "./bettingAnalysis";
+import { geminiRunner } from "./geminiRunner";
 
 /**
  * The AI's betting analysis, 45 minutes before the first LaLiga or Champions
@@ -23,7 +26,9 @@ const MAX_WAIT = 5 * 3_600_000 + 15 * 60_000;
 const CHAIN_HORIZON = 18 * 3_600_000;
 
 const token = process.env.CLAUDE_CODE_OAUTH_TOKEN?.trim() || "";
+const geminiKey = process.env.GEMINI_API_KEY?.trim() || "";
 const dryRun = process.env.ANALYSIS_DRY_RUN === "true";
+const tryAi = process.env.ANALYSIS_TRY_AI === "true";
 const force = process.env.ANALYSIS_FORCE === "true";
 const automatic = process.env.ANALYSIS_WAIT === "true";
 const db = backendFirestore();
@@ -35,12 +40,19 @@ const clock = new Intl.DateTimeFormat("es", {
   hour: "2-digit",
   minute: "2-digit",
 });
+// The AIs in order: Claude with the plan's token, then free Gemini if Claude
+// fails (or first, with the repository variable ANALYSIS_AI=gemini).
+const ais: { name: string; run: ClaudeRunner }[] = [];
+if (token) ais.push({ name: "Claude", run: claudeCodeRunner({ token, model: process.env.CLAUDE_MODEL?.trim() || undefined }) });
+if (geminiKey) ais.push({ name: "Gemini", run: geminiRunner({ apiKey: geminiKey, model: process.env.GEMINI_MODEL?.trim() || undefined }) });
+if (process.env.ANALYSIS_AI?.trim().toLowerCase() === "gemini") ais.reverse();
 const run = () =>
   runBettingAnalysis(db, {
     oddsKey: process.env.ODDSPAPI_KEY?.trim() || "",
     dryRun,
+    tryAi,
     force,
-    claude: token ? claudeCodeRunner({ token, model: process.env.CLAUDE_MODEL?.trim() || undefined }) : undefined,
+    claude: ais.length ? withFallback(ais) : undefined,
   });
 
 /** Tells the workflow to start the job again (a step after this one does it). */

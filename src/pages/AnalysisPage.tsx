@@ -188,7 +188,8 @@ function ReportSheet({ analysis }: { analysis: BettingAnalysis }) {
   const options = analysis.matches.reduce((n, m) => n + (m.options?.length ?? 0), 0);
   const sharp = analysis.matches.some((m) => m.market?.source === "Pinnacle");
   const work = [
-    ai?.searches !== undefined && `${ai.searches} ${ai.searches === 1 ? "búsqueda web" : "búsquedas web"}`,
+    ai?.searches !== undefined &&
+      (ai.searches === 0 ? "sin búsqueda web" : `${ai.searches} ${ai.searches === 1 ? "búsqueda web" : "búsquedas web"}`),
     ai?.seconds !== undefined && `${ai.seconds} s`,
   ].filter(Boolean);
   return (
