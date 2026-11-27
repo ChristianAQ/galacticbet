@@ -1,6 +1,6 @@
 import type { Match } from "../src/lib/domain";
 import { outcome } from "../src/lib/domain";
-import { canonicalTeamName } from "./espn";
+import { pairByTeams } from "./espn";
 import { sportApiRequestGate } from "./sportApiBudget";
 
 const leagues: Record<number, Match["competition"]> = {
@@ -83,19 +83,20 @@ export function parseSportFixtures(
 }
 
 export function findSportFixture(match: Match, fixtures: SportFixture[]) {
-  const candidates = fixtures.filter(
-    (f) =>
-      f.competition === match.competition &&
-      Math.abs(Date.parse(f.kickoff) - Date.parse(match.utcDate)) <=
-        10 * 60_000 &&
-      canonicalTeamName(f.home) === canonicalTeamName(match.home) &&
-      canonicalTeamName(f.away) === canonicalTeamName(match.away),
+  // Competition and kick-off first; then both clubs, written either way
+  // («Racing Santander» / «Racing de Santander»). Never one club alone: these
+  // results are scored.
+  const found = pairByTeams(
+    match,
+    fixtures.filter(
+      (f) =>
+        f.competition === match.competition &&
+        Math.abs(Date.parse(f.kickoff) - Date.parse(match.utcDate)) <= 10 * 60_000,
+    ),
+    { oneClub: false },
   );
-  // IDs, competition, both teams, venue order and kick-off must all agree.
-  return candidates.length === 1 &&
-    (!match.sportApiId || candidates[0].id === match.sportApiId)
-    ? candidates[0]
-    : null;
+  // A fixture already paired keeps its id.
+  return found && (!match.sportApiId || found.id === match.sportApiId) ? found : null;
 }
 
 export function applySportFixture(

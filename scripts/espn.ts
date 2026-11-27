@@ -273,32 +273,39 @@ function covers(short: string[], long: string[]) {
 const sameKickoff = (event: EspnEvent, match: Match) =>
   event.competition === match.competition &&
   Math.abs(Date.parse(event.kickoff) - Date.parse(match.utcDate)) <= 15 * 60_000;
+/**
+ * Among fixtures already at the right time and competition, the one of this
+ * match: both clubs agree («Man City» / «Manchester City»); failing that, one
+ * club exactly the same in its place (a club plays one match at a time) and
+ * the other compatible. Two possible fixtures: none.
+ */
+export function pairByTeams<T extends { home: string; away: string }>(
+  match: Pick<Match, "home" | "away">,
+  fixtures: T[],
+  { oneClub = true }: { oneClub?: boolean } = {},
+): T | null {
+  const full = fixtures.filter((f) => sameTeam(f.home, match.home) && sameTeam(f.away, match.away));
+  if (full.length || !oneClub) return full.length === 1 ? full[0] : null;
+  const exact = (a: string, b: string) => coreTeamName(a) === coreTeamName(b) && numbersAgree(a, b);
+  const partial = fixtures.filter(
+    (f) =>
+      // The other club may be written differently, but never be another side of a club («Barcelona B»).
+      compatible(f.home, match.home) &&
+      compatible(f.away, match.away) &&
+      (exact(f.home, match.home) || exact(f.away, match.away)),
+  );
+  return partial.length === 1 ? partial[0] : null;
+}
 /** Both clubs, each in its place. */
 export function eventFitsMatch(event: EspnEvent, match: Match) {
   return sameKickoff(event, match) && sameTeam(event.home, match.home) && sameTeam(event.away, match.away);
 }
-/**
- * The ESPN event of a match: both clubs agree; failing that (a name each
- * provider writes its own way, «Shaktar» / «Shakhtar Donetsk»), one club
- * exactly the same, in its place, at that kick-off and competition — a club
- * plays one match at a time. Two possible events: none.
- */
+/** The ESPN event of a match (see `pairByTeams`). */
 export function findEspnEvent(
   match: Match,
   events: EspnEvent[],
 ): EspnEvent | null {
-  const full = events.filter((event) => eventFitsMatch(event, match));
-  if (full.length) return full.length === 1 ? full[0] : null;
-  const partial = events.filter(
-    (event) =>
-      sameKickoff(event, match) &&
-      // The other club may be written differently, but never be another side of a club («Barcelona B»).
-      compatible(event.home, match.home) &&
-      compatible(event.away, match.away) &&
-      ((coreTeamName(event.home) === coreTeamName(match.home) && numbersAgree(event.home, match.home)) ||
-        (coreTeamName(event.away) === coreTeamName(match.away) && numbersAgree(event.away, match.away))),
-  );
-  return partial.length === 1 ? partial[0] : null;
+  return pairByTeams(match, events.filter((event) => sameKickoff(event, match)));
 }
 function sideFor(team: unknown, event: EspnEvent): "home" | "away" | undefined {
   const id = identifier(row(team).id);

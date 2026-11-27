@@ -58,6 +58,10 @@ it("asocia únicamente competición, ambos rivales, localía y hora, sin coincid
     expect(findSportFixture(match, [bad])).toBeNull();
   expect(findSportFixture(match, [good, good])).toBeNull();
   expect(findSportFixture({ ...match, sportApiId: "999" }, [good])).toBeNull();
+  // The same clubs written another way still pair: both, each in its place.
+  const racing = { ...match, home: "Levante UD", away: "Racing Santander" };
+  const written = fixture({ home_team: "Levante", away_team: "Racing de Santander" });
+  expect(findSportFixture(racing, [written])?.id).toBe(written.id);
 });
 it("publica el resultado FT, ganador y fuente y los conserva en el calendario", () => {
   const updated = applySportFixture(match, fixture(), now);
