@@ -139,13 +139,17 @@ export default function RoundChances({
   const odd = duel && me ? duelOdds(duel, me.id) : null;
   // Only the matches where you and the AI picked differently can change who wins.
   const split = !group && duel && me && rival ? duelResults(duel, me.picks, rival.picks) : null;
+  // The same picks in everything left: nothing can change, the chart says it all.
+  const identical = Boolean(split && split.differ.length === 0);
   const status = live
     ? "En directo"
     : !undecided
       ? "Jornada decidida"
       : group
         ? "Probabilidad de ganarla"
-        : "Probabilidad de ganarle";
+        : identical
+          ? "Misma quiniela que la IA"
+          : "Probabilidad de ganarle";
 
   /* ---------- Folded: the chart of who is likelier to win ---------- */
   const chart = group ? (
@@ -251,20 +255,10 @@ export default function RoundChances({
       )}
     </div>
   );
-  const duelNeed = split && me && rival && versus && (
+  const duelNeed = split && !identical && me && rival && versus && (
     <div className="duel-need">
       <h4>Qué necesitas para ganarle</h4>
-      {split.differ.length === 0 ? (
-        <p className="duel-need-same-all">
-          Lo que queda lo habéis pronosticado igual: pase lo que pase, sumáis lo mismo.{" "}
-          {versus.me.points > versus.ai.points
-            ? `Le ganas ${versus.me.points} a ${versus.ai.points}.`
-            : versus.me.points < versus.ai.points
-              ? `Te gana ${versus.ai.points} a ${versus.me.points}.`
-              : `Acabáis empatados a ${versus.me.points}.`}
-        </p>
-      ) : (
-        <>
+      <>
           <p className="duel-need-lead">
             Solo deciden los partidos en los que no coincidís. Con cada resultado, tu probabilidad de acabar por delante:
           </p>
@@ -319,9 +313,8 @@ export default function RoundChances({
             <span><i className="is-tie" /> Empate</span>
             <span><i className="is-ai" /> La IA por delante</span>
           </p>
-        </>
-      )}
-      {split.same.length > 0 && split.differ.length > 0 && (
+      </>
+      {split.same.length > 0 && (
         <p className="duel-need-same">
           {split.same.length === 1 ? "En " : `En ${split.same.length} partidos (`}
           {split.same
@@ -351,9 +344,9 @@ export default function RoundChances({
         ` ${typical === 1 ? "Un partido sin cuotas usa" : `${typical} partidos sin cuotas usan`} una probabilidad típica.`}
     </p>
   );
-  const hasDetails = Boolean(score || need || duelNeed || versusLine || note);
-  // Alone against the AI there is nothing to fold: it is all in sight.
-  const foldable = group && hasDetails;
+  // Alone against the AI with the same picks in everything left: only the chart.
+  const hasDetails = !identical && Boolean(score || need || duelNeed || versusLine || note);
+  const foldable = hasDetails;
 
   return (
     <section className={`panel round-chances${expanded ? " is-open" : ""}`} aria-labelledby={titleId}>
@@ -391,18 +384,12 @@ export default function RoundChances({
       <div className="chances-summary" onClick={foldable ? toggle : undefined}>
         {chart}
       </div>
-      {!group && hasDetails && (
-        <div className="chances-open">
-          {score}
-          {duelNeed}
-          {note}
-        </div>
-      )}
       {foldable && (
         <div id={bodyId} className="chances-body" inert={!expanded}>
           <div className="chances-body-inner">
             {score}
             {need}
+            {duelNeed}
             {versusLine}
             {note}
           </div>

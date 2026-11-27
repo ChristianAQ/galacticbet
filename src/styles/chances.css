@@ -378,15 +378,8 @@ button.chances-toggle:active .chances-chevron {
 }
 
 /* ---------- Alone against the AI: everything in sight, match by match ---------- */
-.chances-open {
-  display: grid;
-  gap: 12px;
-  margin-top: 12px;
-}
-.chances-open .chances-block {
-  margin: 0;
-}
 .duel-need {
+  margin-top: 12px;
   padding: 12px 12px 10px;
   border-radius: var(--r-sm);
   background: var(--accent-soft);
@@ -403,14 +396,10 @@ button.chances-toggle:active .chances-chevron {
 }
 .duel-need-lead,
 .duel-need-same,
-.duel-need-more,
-.duel-need-same-all {
+.duel-need-more {
   color: var(--ink-2);
   font-size: var(--text-sm);
   line-height: 1.4;
-}
-.duel-need-same-all {
-  color: var(--ink);
 }
 .duel-need ul {
   display: grid;
