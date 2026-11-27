@@ -73,9 +73,10 @@ jobs:
     needs: wait
     if: needs.wait.outputs.go == 'true'
     runs-on: ubuntu-latest
-    # 50 minutes following the matches (minute by minute while one is in play);
-    # if they go on, the workflow starts again.
-    timeout-minutes: 65
+    # Follows the matches minute by minute while there are any (up to 5 h 30 min,
+    # so a match is never cut by a relaunch); then the workflow starts again to
+    # wait for the next ones.
+    timeout-minutes: 345
     concurrency:
       # It writes the calendars too, like the full sync: never both at once.
       group: football-sync
@@ -97,7 +98,7 @@ jobs:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           ESPN_NEWS: ${{ vars.ESPN_NEWS }}
           ESPN_MATCH_DETAILS: ${{ vars.ESPN_MATCH_DETAILS }}
-          LIVE_LOOP_MINUTES: "50"
+          LIVE_LOOP_MINUTES: "330"
       - name: Keep watching
         if: ${{ !cancelled() && steps.live.outputs.chain == 'true' }}
         run: gh workflow run sync-live.yml --ref "${{ github.ref_name }}" -f encadenado=true

@@ -338,7 +338,8 @@ describe("bucle en directo", () => {
     expect(officialSync).toHaveBeenCalledTimes(1);
     // ESPN every two minutes, with the scoreboard only on the first pass.
     expect(espn.scoreboard).toHaveBeenCalledTimes(1);
-    expect(espn.summary).toHaveBeenCalledTimes(2);
+    // Goals and cards from ESPN every minute while the match is in play, like the score.
+    expect(espn.summary).toHaveBeenCalledTimes(4);
     expect(writes.filter((path) => path === "live/football")).toHaveLength(1);
     expect(docs.get("live/football")).toMatchObject({
       formatVersion: 1,

@@ -21,8 +21,11 @@ const MINUTE = 60_000;
 /** SportAPI cadence: one date request per minute only while a fixture is in play. */
 const HOT_GAP = MINUTE;
 const IDLE_GAP = 10 * MINUTE;
-/** ESPN summaries (goals and cards) for fixtures in play. */
-const ESPN_GAP = 2 * MINUTE;
+/**
+ * ESPN summaries (goals, cards and who) for fixtures in play: every minute,
+ * like the score, so an event reaches the app about a minute after ESPN has it.
+ */
+const ESPN_GAP = MINUTE;
 /** Football-Data confirms official results; scheduled full syncs may be queued behind us. */
 const OFFICIAL_HOT_GAP = 30 * MINUTE;
 const OFFICIAL_IDLE_GAP = 2 * 60 * MINUTE;
@@ -42,6 +45,8 @@ interface LiveLoopOptions {
   log?: (message: string) => void;
   espnClient?: () => EspnClient;
   runId?: string;
+  /** Called once per pass (after the board is written), e.g. for the round reminders. */
+  onPass?: (now: number) => Promise<unknown>;
 }
 
 export async function readCalendars(db: Firestore, now: number) {
@@ -242,6 +247,10 @@ export async function runLiveLoop(db: Firestore, options: LiveLoopOptions) {
         writes++;
       }
     }
+    if (options.onPass)
+      await options.onPass(clock()).catch((error) =>
+        log(`Directo: tarea periódica fallida (${error instanceof Error ? error.message : "error"}).`),
+      );
     const pause = hot ? HOT_GAP : 2 * MINUTE;
     if (!(hot || soon) || clock() + pause > deadline) break;
     await sleep(pause);

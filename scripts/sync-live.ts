@@ -15,15 +15,24 @@ const db = backendFirestore();
 // Remind whoever has not sealed a round that closes soon (before the matches start).
 await notifyPendingRounds(db);
 const minutes = Number(process.env.LIVE_LOOP_MINUTES || 0);
+// A long match day keeps one job: the reminders of rounds closing meanwhile, every ten minutes.
+let reminded = Date.now();
 const result = await runLiveLoop(db, {
   sportApiKey: key,
   durationMs:
     Number.isFinite(minutes) && minutes > 0
-      ? Math.min(minutes, 50) * 60_000
+      ? // One job for the whole match day (GitHub stops a job at 6 h): a relaunch
+        // in the middle of a match would leave a couple of minutes without updates.
+        Math.min(minutes, 330) * 60_000
       : 0,
   verify: process.env.SPORTAPI_VERIFY === "true",
   espn: process.env.ESPN_MATCH_DETAILS !== "false",
   officialSync: token ? () => officialSync(db, token) : undefined,
+  onPass: async (now) => {
+    if (now - reminded < 10 * 60_000) return;
+    reminded = now;
+    await notifyPendingRounds(db);
+  },
 });
 // More work soon (the match goes on, the next one, a reminder): the workflow
 // starts again and its first job waits for it.
