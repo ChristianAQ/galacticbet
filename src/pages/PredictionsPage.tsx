@@ -44,7 +44,6 @@ import { useStuck } from "../lib/useStuck";
 import { PotAmount } from "../components/PotCard";
 import { euroShort, groupPotCents } from "../lib/pot";
 import { euro } from "../lib/porra";
-import { go } from "../lib/navigation";
 import { haptic } from "../lib/motion";
 import "../styles/quiniela.css";
 
@@ -493,12 +492,6 @@ export default function PredictionsPage({
       setSubmitting(false);
     }
   }
-  // The round is already in the URL (or is the current one): «Volver» lands on it.
-  const onDetails = useCallback(
-    (id: string, from: Element | null) =>
-      go(`/partido/${encodeURIComponent(id)}`, { sharedFrom: from }),
-    [],
-  );
   const chooseRef = useRef(choose);
   chooseRef.current = choose;
   const onChoose = useCallback(
@@ -697,7 +690,8 @@ export default function PredictionsPage({
                   disabled={disabled}
                   saving={Boolean(saving[m.id])}
                   onChoose={onChoose}
-                  onDetails={onDetails}
+                  // The round is already in the URL (or is the current one): «Volver» lands on it.
+                  to={`/partido/${encodeURIComponent(m.id)}`}
                 />
               ))}
             </div>

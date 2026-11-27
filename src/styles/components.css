@@ -795,22 +795,6 @@
     transform: scale(0.8);
   }
 }
-.prediction-details-link {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-height: 46px;
-  padding: 0 16px;
-  border-top: 1px solid var(--rule);
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  transition: background-color 160ms ease;
-}
-.prediction-details-link:active {
-  background: var(--paper-2);
-}
 
 /* ---------- Round selector: the slip's matchday strip ---------- */
 .round-selector {

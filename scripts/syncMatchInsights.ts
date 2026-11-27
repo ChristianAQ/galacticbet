@@ -57,8 +57,14 @@ export function insightRefreshInterval(
   now: number,
   insight?: MatchInsight | null,
 ) {
-  // Finished without a report (not found at ESPN yet): try again soon for three days.
-  if (match.status === "FINISHED" && !insight && now - Date.parse(match.utcDate) <= 72 * HOUR) return 2 * HOUR;
+  // Finished without a report (not found at ESPN yet), or with fewer goals than
+  // the score (one ESPN had not placed): try again soon for three days.
+  const missingGoals =
+    insight && match.homeScore !== null && match.awayScore !== null
+      ? (insight.goals?.length ?? 0) < match.homeScore + match.awayScore
+      : false;
+  if (match.status === "FINISHED" && (!insight || missingGoals) && now - Date.parse(match.utcDate) <= 72 * HOUR)
+    return 2 * HOUR;
   if (match.status === "FINISHED")
     return now - Date.parse(match.utcDate) > 48 * HOUR &&
       insight?.statistics.length

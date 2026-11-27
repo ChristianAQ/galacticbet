@@ -14,6 +14,7 @@ import {
   favoriteScore,
   ghostPlayers,
   ghostRound,
+  ghostSlips,
   machineDuel,
   machinePicksPath,
   type MachinePicks,
@@ -193,6 +194,35 @@ describe("la IA y el favorito", () => {
       ["Favorito", 1],
       ["IA", 1],
     ]);
+  });
+
+  it("la quiniela de la IA se lee como un boleto: su propio perfil de pronosticador", () => {
+    const fixtures = [finished("a", 1, 0, { home: "Real Betis", away: "Sevilla FC" }), finished("b", 0, 1, { home: "Getafe CF", away: "Real Betis" })];
+    const machines = new Map([
+      [
+        "PD-2026",
+        doc({
+          [round]: {
+            frozenAt: hours(-40),
+            deadline: hours(-30),
+            matches: { a: { ai: { home: 2, away: 0 }, favorite: { home: 1, away: 0 }, p: { home: 0.5, draw: 0.3, away: 0.2 } }, b: { ai: { home: 1, away: 1 }, p: { home: 0.4, draw: 0.3, away: 0.3 } } },
+          },
+        }),
+      ],
+    ]);
+    // Each season's kind: signs in 1X2, scores in exact; seasons without a mode are left out.
+    expect(ghostSlips(machines, { "PD-2026": "classic" }, "ai")).toEqual({ [round]: { a: "1", b: "X" } });
+    expect(ghostSlips(machines, { "PD-2026": "exact" }, "ai")[round].a).toEqual({ home: 2, away: 0 });
+    expect(ghostSlips(machines, {}, "ai")).toEqual({});
+    const profile = predictorProfile({
+      slips: ghostSlips(machines, { "PD-2026": "exact" }, "ai"),
+      matches: fixtures,
+      modes: { "PD-2026": "exact" },
+      machines,
+    })!;
+    // 2-0 for a 1-0 (the sign: 1 point), 1-1 for a 0-1 (nothing); it went against the favourite in «b».
+    expect(profile).toMatchObject({ matches: 2, hits: 1, points: 1, maxPoints: 6, exact: 0 });
+    expect(profile.upsets).toEqual({ picked: 1, hits: 0 });
   });
 
   it("contra la máquina: tus jornadas frente a las suyas", () => {

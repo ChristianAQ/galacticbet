@@ -287,7 +287,9 @@ service cloud.firestore {
      // Immutable marker, complete snapshot and attendance are committed together.
     }
     match /roundEntries/{rid}/players/{uid} {
-     allow read: if member(gid) && uid in get(/databases/$(database)/documents/groups/$(gid)).data.memberIds && (request.auth.uid == uid || exists(entry(request.auth.uid,rid)));
+     // Before the deadline, only among those who sealed (nobody copies and changes);
+     // once the round closes nobody can change a slip, so every member sees them all.
+     allow read: if member(gid) && uid in get(/databases/$(database)/documents/groups/$(gid)).data.memberIds && (request.auth.uid == uid || exists(entry(request.auth.uid,rid)) || request.time >= get(/databases/$(database)/documents/rounds/$(rid)).data.submissionDeadline);
      allow create: if member(gid) && request.auth.uid == uid
        && request.resource.data.keys().hasOnly(['userId','roundId','submittedAt','formatVersion','mode','matchIds','selections'])
        && request.resource.data.userId == uid && request.resource.data.roundId == rid && request.resource.data.formatVersion == 2

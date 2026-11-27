@@ -1,5 +1,6 @@
 import { Check, ChevronRight, LockKeyhole, Minus, Plus } from "lucide-react";
 import { memo, useEffect, useState, type MouseEvent } from "react";
+import { Link } from "react-router-dom";
 import type { Match, Mode, Prediction, PredictionValue } from "../lib/domain";
 import { haptic, springTo } from "../lib/motion";
 import { MatchRow } from "./ui";
@@ -25,8 +26,10 @@ function pop(event: MouseEvent<HTMLElement>) {
 
 /**
  * One numbered row of the quiniela slip: the fixture and your 1X2 or score.
- * Played matches leave the slip for the board (GroupPredictions), so there is
- * no result strip here.
+ * Tapping the fixture opens the match (preview, odds, sheet) with the crests'
+ * morph; the picks sit apart below it, so a tap meant for 1, X or 2 never
+ * navigates. Played matches leave the slip for the board (GroupPredictions),
+ * so there is no result strip here.
  */
 function PredictionCard({
   number,
@@ -38,7 +41,7 @@ function PredictionCard({
   disabled,
   saving,
   onChoose,
-  onDetails,
+  to,
   detailsLabel,
   plainResult = false,
 }: {
@@ -51,8 +54,9 @@ function PredictionCard({
   disabled: boolean;
   saving: boolean;
   onChoose: (match: Match, value: PredictionValue) => void;
-  onDetails: (id: string, from: Element | null) => void;
-  /** Friends' competitions have no odds or preview: just the match sheet. */
+  /** The match page the fixture opens. */
+  to: string;
+  /** What it opens, for screen readers. Friends' competitions have no odds or preview: just the match sheet. */
   detailsLabel?: string;
   /** Friends' matches: no «a 90 minutos» under the score. */
   plainResult?: boolean;
@@ -66,7 +70,19 @@ function PredictionCard({
       <span className="slip-number" aria-hidden="true">
         {String(number).padStart(2, "0")}
       </span>
-      <MatchRow match={m} history={history} plainResult={plainResult} />
+      <Link
+        className="slip-fixture"
+        to={to}
+        aria-label={`${
+          detailsLabel ??
+          (["TIMED", "SCHEDULED"].includes(m.status)
+            ? "Previa, cuotas y ficha"
+            : "Ficha del partido")
+        }: ${m.home} contra ${m.away}`}
+      >
+        <MatchRow match={m} history={history} as="span" plainResult={plainResult} />
+        <ChevronRight className="slip-fixture-go" size={16} aria-hidden="true" />
+      </Link>
       <LiveEvents match={m} />
       <div className="prediction-actions">
         <span className="prediction-state" aria-live="polite">
@@ -122,19 +138,6 @@ function PredictionCard({
           />
         )}
       </div>
-      <button
-        type="button"
-        className="prediction-details-link"
-        onClick={(event) =>
-          onDetails(m.id, event.currentTarget.closest("article"))
-        }
-      >
-        {detailsLabel ??
-          (["TIMED", "SCHEDULED"].includes(m.status)
-            ? "Previa, cuotas y ficha"
-            : "Ficha del partido")}
-        <ChevronRight size={15} aria-hidden="true" />
-      </button>
     </article>
   );
 }

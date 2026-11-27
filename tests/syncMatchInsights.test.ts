@@ -315,6 +315,12 @@ describe("sincronización acotada de información complementaria", () => {
     expect(
       insightRefreshInterval({ ...makeMatch("1", -4 * 24 * HOUR), status: "FINISHED" }, now),
     ).toBe(24 * HOUR);
+    // A report with fewer goals than the score (an own goal ESPN did not place): again in 2 h.
+    const played = { ...makeMatch("1", -5 * HOUR), status: "FINISHED", homeScore: 2, awayScore: 1 };
+    const goal = { side: "home", minute: "10'", scorer: "A", kind: "goal" };
+    const report = (goals: number) => ({ goals: Array(goals).fill(goal), statistics: [] }) as unknown as MatchInsight;
+    expect(insightRefreshInterval(played, now, report(2))).toBe(2 * HOUR);
+    expect(insightRefreshInterval(played, now, report(3))).toBe(24 * HOUR);
   });
   it("carga documentos en un getAll, como máximo dos calendarios y 24 fichas; continúa pendientes después", async () => {
     const fixtures = Array.from({ length: 90 }, (_, index) => ({

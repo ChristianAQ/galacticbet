@@ -22,14 +22,13 @@ import {
 import { canPick, decodePick, encodePick } from "../lib/customPicks";
 import { hasMatchStarted, preferredRound, type Match, type PredictionValue } from "../lib/domain";
 import { haptic } from "../lib/motion";
-import { customMatchPath, go } from "../lib/navigation";
-import { roundBoard, roundHasStarted } from "../lib/roundBoard";
+import { customMatchPath } from "../lib/navigation";
 import { roundOptions } from "../lib/roundOptions";
 import type { AppUser } from "../lib/session";
 import { useClock, useMyPicks } from "../lib/useCompetitionPicks";
 import { useStuck } from "../lib/useStuck";
 import ConfirmQuiniela from "./ConfirmQuiniela";
-import { GroupMatchCard, PickRow, RoundBoardPanel } from "./GroupPredictions";
+import { GroupMatchCard, PickRow } from "./GroupPredictions";
 import PredictionCard from "./PredictionCard";
 import RoundDeliveryStatus from "./RoundDeliveryStatus";
 import RoundSelector from "./RoundSelector";
@@ -131,15 +130,6 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
     [people, uid, user.displayName],
   );
 
-  // Points of the round so far, from the sealed slips.
-  const board = useMemo(() => {
-    if (!entries) return null;
-    const matches = list.flatMap((m) => appById.get(m.id) ?? []);
-    if (!roundHasStarted(matches)) return null;
-    const players = Object.entries(entries).map(([id, picks]) => ({ id, name: nameOf(id), picks }));
-    return players.length ? roundBoard(matches, "own", players) : null;
-  }, [entries, list, appById, nameOf]);
-
   const onChoose = useCallback(
     async (match: Match, value: PredictionValue) => {
       const mid = match.id;
@@ -172,10 +162,6 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
       }
     },
     [cid, uid, following, isSealed, drafts, setDrafts],
-  );
-  const onDetails = useCallback(
-    (id: string, from: Element | null) => go(customMatchPath(cid, id), { sharedFrom: from }),
-    [cid],
   );
   useEffect(() => {
     if (!notice) return;
@@ -376,7 +362,7 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
                 disabled={!following || pending || submitting}
                 saving={Boolean(saving[m.id])}
                 onChoose={onChoose}
-                onDetails={onDetails}
+                to={customMatchPath(cid, m.id)}
                 detailsLabel="Ficha del partido"
                 plainResult
               />
@@ -427,7 +413,6 @@ export default function CustomQuiniela({ cid, user }: { cid: string; user: AppUs
               Boleto sellado. Verás el de cada seguidor en cuanto selle el suyo; al empezar el primer partido, todos.
             </p>
           )}
-          {board && <RoundBoardPanel rows={board} userId={uid} live={list.some((m) => m.status === "live")} />}
           {list.map((m) => {
             const appMatch = appById.get(m.id) ?? toAppMatch(c.id, m);
             const own = mine.picks?.[m.id];

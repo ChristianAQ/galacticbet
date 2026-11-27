@@ -120,8 +120,12 @@ no gestiona apuestas ni dinero.
    por jugador del acta. Para dar por fallada una apuesta, el acta tiene que
    haberse leído con el partido ya terminado (`status: FINISHED` en el
    documento); antes solo puede darse por acertada. Para fallar un goleador
-   hacen falta además todos los goles del marcador en el acta. Si el acta no
-   se completa en una semana, la apuesta es nula. La hora de las
+   hacen falta además todos los goles del marcador en el acta. Un gol en
+   propia no cuenta como gol del jugador (como en las casas); si ESPN no dice
+   a qué equipo va, se deduce de las alineaciones (cuenta para el rival del
+   que lo mete, suplentes incluidos). Un acta de un partido terminado con
+   menos goles que el marcador se vuelve a leer cada 2 horas durante 3 días.
+   Si el acta no se completa en una semana, la apuesta es nula. La hora de las
    cuotas es la de su lectura, no la de la respuesta de la IA. El resultado se
    publica en `analysis/football`, un documento público de solo lectura con
    los 24 últimos análisis y, en `archive`, los totales de los anteriores.

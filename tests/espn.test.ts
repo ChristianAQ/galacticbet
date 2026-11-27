@@ -262,6 +262,35 @@ describe("ESPN: asociación y datos complementarios", () => {
     ]);
     expect(validMatchInsight(data)).toBe(true);
   });
+  it("un gol en propia sin equipo explícito cuenta para el rival del jugador, también si es suplente", () => {
+    const rosters = [
+      { team: { id: "83" }, roster: [{ ...athlete("Pedri"), starter: true }] },
+      {
+        team: { id: "86" },
+        roster: [
+          { ...athlete("Thibaut Courtois"), starter: true },
+          { ...athlete("Raúl Asencio"), starter: false, subbedIn: true },
+        ],
+      },
+    ];
+    const own = (scorer: string, more: Record<string, unknown> = {}) =>
+      normalizeEspnSummary(
+        summary({
+          rosters,
+          // `team` alone says nothing safe: ESPN may give either side.
+          keyEvents: [goal("1", "Own Goal", { clock: { displayValue: "80'" }, team: { id: "86" }, participants: [athlete(scorer)], ...more })],
+        }),
+        match,
+        event,
+      )!.goals;
+    // The Madrid substitute puts it in his own net: a goal for Barcelona (home).
+    expect(own("Raul Asencio")).toEqual([{ side: "home", minute: "80'", scorer: "Raul Asencio", kind: "own-goal" }]);
+    expect(own("Pedri")[0].side).toBe("away");
+    // An explicit scoringTeam still decides.
+    expect(own("Raúl Asencio", { scoringTeam: { id: "86" } })[0].side).toBe("away");
+    // A player in no line-up: still left out rather than guessed.
+    expect(own("Desconocido")).toEqual([]);
+  });
   it("deduplica eventos repetidos entre las dos listas y acepta scoringPlays sin keyEvents", () => {
     const single = goal("1");
     const normalized = normalizeEspnSummary(

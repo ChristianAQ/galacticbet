@@ -5,7 +5,7 @@ información: no cambia los puntos oficiales del grupo.
 
 ## ¿Quién se lleva la jornada? (Quiniela › El grupo)
 
-En cuanto sellas, bajo «Puntos de la jornada», cada jugador que ha sellado
+En cuanto sellas, en la vista del grupo, cada jugador que ha sellado
 tiene su **probabilidad de ganar la jornada** (sola o compartida: empatar en
 cabeza cuenta como ganarla, como en el bote).
 
@@ -49,7 +49,17 @@ lectura, con las probabilidades del mercado de ese momento.
 
 Dónde se ven:
 
-- En «Puntos de la jornada», debajo del grupo y atenuadas, con sus puntos.
+- **En la quiniela, la IA**: en cuanto sellas tu boleto y, al cerrarse la
+  jornada (su primer partido), para todos los del grupo, hayan sellado o no:
+  - en cada partido, su pronóstico, el último y atenuado, con la marca «IA»
+    y si acierta o falla;
+  - en un grupo, una línea bajo «¿Quién se lleva la jornada?»: cómo vas
+    contra ella y en cuántas simulaciones le ganas;
+  - **si juegas solo** (nadie más ha sellado), el panel pasa a ser **Tú
+    contra la IA**: los puntos de los dos (con los del directo), la
+    probabilidad de ganarle, empatar o perder, qué necesitas para ganarle y,
+    al acabar la jornada, quién se la ha llevado. Así nadie juega una jornada
+    sin rival.
 - En Clasificación › Temporada, **Contra la máquina**: tus puntos, los de la
   IA y los del favorito en las jornadas terminadas que habéis jugado los
   tres, en cuántas jornadas les has ganado y cuántos del grupo van por
@@ -70,3 +80,10 @@ Con tus boletos sellados y los resultados oficiales:
 Cada boleto se lee una vez (una lectura por jornada) y se guarda en el
 móvil: los sellados no cambian. Se borra al cerrar sesión, como el resto de
 datos privados.
+
+**El perfil de la IA:** la misma tarjeta tiene arriba «Tú | IA». Con «IA»
+se ve el perfil de su quiniela de toda la temporada (todas las jornadas que
+ha jugado, no solo las tuyas), puntuada como juega el grupo (1X2 o
+exacto): sus signos, sus 1, X y 2, cuándo fue contra el favorito, si le gana
+al mercado, su equipo y su bestia negra. Si todavía no tienes boletos
+terminados, la tarjeta enseña directamente el de la IA.

@@ -37,15 +37,13 @@ import ShareTrigger from "./ShareTrigger";
 import {
   pickPoints,
   pickState,
-  roundBoard,
-  roundHasStarted,
   type RoundPlayer,
   type ScoreMode,
 } from "../lib/roundBoard";
 import { shareFileName } from "../lib/shareSummary";
 import { ghostPlayers } from "../lib/machinePicks";
 import { useMachinePicks } from "../lib/useMachinePicks";
-import RoundChances from "./RoundChances";
+import RoundChances, { AiMark } from "./RoundChances";
 
 const ShareDialog = lazy(() => import("./ShareDialog"));
 
@@ -104,10 +102,13 @@ export default function GroupPredictions({
     .map((p) => p.id)
     .sort();
   const membersQueryKey = JSON.stringify(membersKey);
+  // The others' slips: once yours is sealed, and for every member once the
+  // round closes, sealed or not (nobody can change one any more).
+  const canSee = canShare || deadlineClosed;
   // Inside an <Activity>: a revealed page keeps what it showed while resubscribing.
   const lastKey = useRef("");
   useEffect(() => {
-    const key = JSON.stringify([canShare, membersQueryKey, groupId, seasonId, roundId, demo, userId, attempt]);
+    const key = JSON.stringify([canSee, membersQueryKey, groupId, seasonId, roundId, demo, userId, attempt]);
     const changed = lastKey.current !== key;
     lastKey.current = key;
     if (changed) {
@@ -116,7 +117,7 @@ export default function GroupPredictions({
       setError("");
       setPending(false);
     }
-    if (!canShare) return;
+    if (!canSee) return;
     if (membersQueryKey === "[]") {
       setReady(true);
       return;
@@ -179,7 +180,7 @@ export default function GroupPredictions({
       },
     );
   }, [
-    canShare,
+    canSee,
     membersQueryKey,
     groupId,
     seasonId,
@@ -188,12 +189,12 @@ export default function GroupPredictions({
     userId,
     attempt,
   ]);
-  // Own delivery first, then every teammate who also delivered (reciprocal privacy).
+  // Your delivery first (if you sealed), then every teammate who delivered.
   const players = useMemo((): RoundPlayer[] => {
-    if (!canShare || !ready || error) return [];
+    if (!canSee || !ready || error) return [];
     const me = participants.find((p) => p.id === userId);
     return [
-      { id: userId, name: me?.name || "Tú", picks: ownValues },
+      ...(sealed || canShare ? [{ id: userId, name: me?.name || "Tú", picks: ownValues }] : []),
       ...participants
         .filter(
           (p) =>
@@ -202,7 +203,9 @@ export default function GroupPredictions({
         .map((p) => ({ id: p.id, name: p.name, picks: entries[p.id] })),
     ];
   }, [
+    canSee,
     canShare,
+    sealed,
     ready,
     error,
     participants,
@@ -211,16 +214,15 @@ export default function GroupPredictions({
     completedIds,
     entries,
   ]);
-  const board = useMemo(
-    () => roundBoard(matches, mode, players),
-    [matches, mode, players],
-  );
-  // «IA» and «Favorito»: their slips were frozen before the round closed.
-  const machines = useMachinePicks([seasonId], canShare && !demo);
+  // The market's chances frozen with the machines' slips, for «¿Quién se lleva la jornada?».
+  // «IA» plays every round with its own slip: it shows when the others' do.
+  const aiVisible = canSee;
+  const machines = useMachinePicks([seasonId], aiVisible && !demo);
   const machineRound = machines.get(seasonId)?.rounds[roundId];
-  const ghosts = useMemo(
-    () => roundBoard(matches, mode, ghostPlayers(machineRound, mode)),
-    [matches, mode, machineRound],
+  // In a group it is one more line; alone, it is your rival.
+  const rival = useMemo(
+    () => (aiVisible ? ghostPlayers(machineRound, mode).find((g) => g.id === "ghost:ai") : undefined),
+    [aiVisible, machineRound, mode],
   );
   const shareReady = players.length > 0 && !loadingOwn && !pending;
   const othersSealed = participants.filter(
@@ -252,10 +254,7 @@ export default function GroupPredictions({
         </span>
       </div>
       {missed && (
-        <p className="group-view-note">
-          No sellaste esta jornada: no suma puntos y los boletos del grupo solo
-          se ven entre quienes sellan.
-        </p>
+        <p className="group-view-note">No sellaste esta jornada: no suma puntos.</p>
       )}
       {/* Said once for the whole round, not under every match. */}
       {canShare && ready && !pending && !error && !othersSealed && (
@@ -265,14 +264,6 @@ export default function GroupPredictions({
             : "Nadie más del grupo ha sellado todavía: sus signos aparecerán aquí en cuanto lo hagan."}
         </p>
       )}
-      {shareReady && roundHasStarted(matches) && (
-        <RoundBoardPanel
-          rows={board}
-          ghosts={ghosts}
-          userId={userId}
-          live={matches.some((m) => ["IN_PLAY", "PAUSED"].includes(m.status))}
-        />
-      )}
       {shareReady && (
         <RoundChances
           matches={matches}
@@ -280,6 +271,7 @@ export default function GroupPredictions({
           mode={mode}
           userId={userId}
           machineRound={machineRound}
+          rival={rival}
         />
       )}
       {sharing && (
@@ -303,15 +295,16 @@ export default function GroupPredictions({
           participants={participants}
           userId={userId}
           started={hasMatchStarted(m, clock)}
-          canShare={canShare}
+          canShare={canSee}
           ownValue={ownValues[m.id]}
           loadingOwn={loadingOwn}
-          entries={canShare ? entries : {}}
+          entries={canSee ? entries : {}}
           pending={pending}
           ready={ready}
           error={error}
           completedIds={completedIds}
           mode={mode}
+          aiValue={rival?.picks[m.id]}
           onRetry={() => setAttempt((n) => n + 1)}
         />
       ))}
@@ -319,84 +312,6 @@ export default function GroupPredictions({
   );
 }
 
-export function RoundBoardPanel({
-  rows,
-  ghosts = [],
-  userId,
-  live,
-}: {
-  rows: ReturnType<typeof roundBoard>;
-  /** «IA» and «Favorito», scored the same way, outside the group's places. */
-  ghosts?: ReturnType<typeof roundBoard>;
-  userId: string;
-  live: boolean;
-}) {
-  return (
-    <section className="panel round-board" aria-label="Puntos de la jornada">
-      <header className="round-board-heading">
-        <h3>Puntos de la jornada</h3>
-        <small>
-          {live ? (
-            <>
-              <i className="live-dot" aria-hidden="true" /> Provisional · en
-              directo
-            </>
-          ) : (
-            "Provisional"
-          )}
-        </small>
-      </header>
-      <ol>
-        {rows.map((r) => (
-          <li key={r.id} className={r.id === userId ? "is-me" : undefined}>
-            <span className="rb-pos">{r.position}</span>
-            <span className="rb-name">
-              {r.name}
-              {r.id === userId && <small> · Tú</small>}
-            </span>
-            <span className="rb-hits">
-              {r.hits} {r.hits === 1 ? "acierto" : "aciertos"}
-            </span>
-            <span className="rb-points">
-              <b>{r.points}</b> pts
-              {r.livePoints > 0 && (
-                <span className="rb-live" title="Si terminaran así">
-                  +{r.livePoints}
-                </span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ol>
-      {ghosts.length > 0 && (
-        <ol className="round-board-ghosts" aria-label="Contra la máquina">
-          {ghosts.map((r) => (
-            <li key={r.id}>
-              <span className="rb-pos" aria-hidden="true">
-                ·
-              </span>
-              <span className="rb-name">
-                {r.name}
-                <small> · {r.id === "ghost:ai" ? "su propia quiniela" : "siempre el favorito"}</small>
-              </span>
-              <span className="rb-hits">
-                {r.hits} {r.hits === 1 ? "acierto" : "aciertos"}
-              </span>
-              <span className="rb-points">
-                <b>{r.points}</b> pts
-                {r.livePoints > 0 && (
-                  <span className="rb-live" title="Si terminaran así">
-                    +{r.livePoints}
-                  </span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
-  );
-}
 /**
  * One fixture of a board: the real match first (teams and the score that
  * decides the picks), then whatever picks go with it. Tapping the match opens
@@ -509,6 +424,7 @@ function RivalsCard({
   error,
   completedIds,
   mode,
+  aiValue,
   onRetry,
 }: {
   match: Match;
@@ -525,6 +441,8 @@ function RivalsCard({
   error: string;
   completedIds: string[];
   mode: Mode;
+  /** The AI's pick of this match, once you can see the others'. */
+  aiValue?: PredictionValue;
   onRetry: () => void;
 }) {
   const visible = participants.filter(
@@ -561,6 +479,7 @@ function RivalsCard({
                 value={entries[person.id]?.[match.id]}
               />
             ))}
+          {aiValue && <PickRow name="IA" ai match={match} mode={mode} value={aiValue} />}
         </ul>
         {canShare &&
           (pending || !ready ? (
@@ -585,6 +504,7 @@ function RivalsCard({
 export function PickRow({
   name,
   me = false,
+  ai = false,
   match,
   mode,
   value,
@@ -592,6 +512,8 @@ export function PickRow({
 }: {
   name: string;
   me?: boolean;
+  /** The AI's own slip: last, quieter, with its mark. */
+  ai?: boolean;
   match: Match;
   mode: ScoreMode;
   value?: PredictionValue;
@@ -624,11 +546,11 @@ export function PickRow({
             : "";
   return (
     <li
-      className={`gm-pick${me ? " is-me" : ""}${state ? ` is-${state}` : ""}${value ? "" : " is-missing"}`}
+      className={`gm-pick${me ? " is-me" : ""}${ai ? " is-ai" : ""}${state ? ` is-${state}` : ""}${value ? "" : " is-missing"}`}
       aria-busy={loading}
     >
-      <span className="gm-pick-name" title={name}>
-        {name}
+      <span className="gm-pick-name" title={ai ? "La quiniela de la IA, hecha antes del cierre" : name}>
+        {ai ? <AiMark /> : name}
       </span>
       {loading ? (
         <span className="gm-pick-what">

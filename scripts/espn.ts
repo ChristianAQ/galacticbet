@@ -401,10 +401,23 @@ function normalizeLineups(data: Row, event: EspnEvent): MatchLineup[] {
   }
   return result;
 }
+/**
+ * The side an own goal counts for when ESPN does not say it: the other one
+ * than the line-up with that player (substitutes included). Unknown when the
+ * name is in neither line-up, or in both.
+ */
+function ownGoalSide(scorer: string, lineups: MatchLineup[]): "home" | "away" | undefined {
+  const name = cleanName(scorer);
+  const sides = lineups
+    .filter((lineup) => lineup.players.some((p) => cleanName(p.name) === name))
+    .map((lineup) => lineup.side);
+  return sides.length === 1 ? (sides[0] === "home" ? "away" : "home") : undefined;
+}
 function normalizeGoals(
   data: Row,
   event: EspnEvent,
   competition: Row,
+  lineups: MatchLineup[],
 ): MatchGoal[] {
   // keyEvents/scoringPlays expose type, clock, team and participants. Competition
   // details is a fallback for snapshots that expose scoring plays in the header.
@@ -439,9 +452,6 @@ function normalizeGoals(
       /penalty|penalt[yi] kick/.test(kind) || entry.penaltyKick === true;
     // Reject generic incidents and attempts. A bare penalty is not proof it scored.
     if (!/goal/.test(kind) && entry.scoringPlay !== true) continue;
-    // Public payloads do not consistently distinguish the own-goal player's team
-    // from the beneficiary. Only an explicit scoringTeam makes its side safe.
-    const side = sideFor(own ? entry.scoringTeam : entry.team, event);
     const minute =
       text(row(entry.clock).displayValue, 30) || text(entry.displayClock, 30);
     const participants = rows(entry.participants);
@@ -454,6 +464,12 @@ function normalizeGoals(
       playerName(entry.scorer) ||
       playerName(explicitScorer || participants[0]) ||
       playerName(rows(entry.athletes)[0]);
+    // Public payloads do not consistently distinguish the own-goal player's team
+    // from the beneficiary: an explicit scoringTeam, else the player's line-up
+    // (the goal counts for the other side). Never `team`, which may be either.
+    const side = own
+      ? sideFor(entry.scoringTeam, event) ?? (scorer ? ownGoalSide(scorer, lineups) : undefined)
+      : sideFor(entry.team, event);
     const assistant = participants.find((p) =>
       /assist/.test(String(p.type || p.role || "").toLowerCase()),
     );
@@ -841,6 +857,7 @@ export function normalizeEspnSummary(
           fetchedAt,
         ) || probabilityFromOdds(data.pickcenter, fetchedAt)
       : undefined;
+  const lineups = normalizeLineups(data, event);
   const insight: MatchInsight = {
     version: 1,
     matchId: match.id,
@@ -859,8 +876,8 @@ export function normalizeEspnSummary(
       Math.min(Date.parse(match.utcDate), Date.parse(fetchedAt)),
     ),
     incidents: normalizeIncidents(data, event, competition),
-    lineups: normalizeLineups(data, event),
-    goals: normalizeGoals(data, event, competition),
+    lineups,
+    goals: normalizeGoals(data, event, competition, lineups),
     statistics: normalizeStatistics(data, event),
   };
   return validMatchInsight(insight) ? insight : null;

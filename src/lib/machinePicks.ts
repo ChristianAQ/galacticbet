@@ -103,6 +103,25 @@ export function ghostPlayers(round: MachineRound | undefined, mode: Mode): Round
   });
 }
 
+/**
+ * A ghost's slips as a player's (round → match → pick, of each season's
+ * kind): the AI's own forecaster profile reads them like yours.
+ */
+export function ghostSlips(machines: Map<string, MachinePicks>, modes: Record<string, Mode>, key: GhostKey) {
+  const slips: Record<string, Record<string, PredictionValue>> = {};
+  for (const [seasonId, machine] of machines) {
+    const mode = modes[seasonId];
+    if (!mode) continue;
+    for (const [roundId, round] of Object.entries(machine.rounds)) {
+      const picks = Object.fromEntries(
+        Object.entries(round.matches).flatMap(([id, m]) => (m[key] ? [[id, asPick(m[key]!, mode)]] : [])),
+      );
+      if (Object.keys(picks).length) slips[roundId] = picks;
+    }
+  }
+  return slips;
+}
+
 /** A ghost's points and hits in a finished round, scored as the group scores it. */
 export function ghostRound(round: MachineRound, key: GhostKey, fixtures: Match[], mode: Mode): RankingTotal | null {
   let points = 0,

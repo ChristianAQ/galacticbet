@@ -710,7 +710,7 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
       ),
     );
   });
-  it("solo los miembros con entrega completa ven las entradas compartidas antes y después del inicio", async () => {
+  it("antes del cierre, solo los miembros con entrega completa ven las entradas compartidas", async () => {
     const bob = env.authenticatedContext("bob").firestore();
     await sealRound(
       doc(bob, "groups/g").firestore,
@@ -769,6 +769,26 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
         ),
       ),
     );
+  });
+  it("al cerrarse la jornada, todos los miembros ven las entregas, aunque no sellaran la suya", async () => {
+    const bob = env.authenticatedContext("bob").firestore();
+    await sealRound(doc(bob, "groups/g").firestore, "bob", "g", "PD-2026", "r", { future: "X" });
+    const alice = env.authenticatedContext("alice").firestore();
+    const peer = doc(alice, "groups/g/gameSeasons/PD-2026/roundEntries/r/players/bob");
+    // Alice never sealed: nothing before the deadline…
+    await assertFails(getDoc(peer));
+    await env.withSecurityRulesDisabled((c) =>
+      updateDoc(doc(c.firestore(), "rounds/r"), { submissionDeadline: Timestamp.fromMillis(1) }),
+    );
+    // …everything after it, read one by one or as the board's query.
+    expect(decodeDelivery((await assertSucceeds(getDoc(peer))).data()!)).toEqual({ future: "X" });
+    const shared = collection(alice, "groups/g/gameSeasons/PD-2026/roundEntries/r/players");
+    expect((await assertSucceeds(getDocs(query(shared, where(documentId(), "in", ["alice", "bob"]))))).size).toBe(1);
+    // Drafts stay private, outsiders stay out, and a closed round still takes no slip.
+    await assertFails(getDoc(doc(alice, "groups/g/gameSeasons/PD-2026/predictions/bob_future")));
+    const outsider = env.authenticatedContext("outsider").firestore();
+    await assertFails(getDoc(doc(outsider, "groups/g/gameSeasons/PD-2026/roundEntries/r/players/bob")));
+    await assertFails(deliver(alice, "alice", { future: "1" }));
   });
   it("no permite esquivar el cierre moviendo un pronóstico a otra ronda", async () => {
     const db = env.authenticatedContext("bob").firestore();
