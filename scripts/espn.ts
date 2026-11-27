@@ -46,8 +46,11 @@ function identifier(value: unknown): string | undefined {
       : text(value, 30);
   return result && /^\d+$/.test(result) ? result : undefined;
 }
+// Letters that lose no accent but must still compare («Bodø» = «Bodo»).
+const LETTERS: Record<string, string> = { ø: "o", Ø: "o", æ: "ae", Æ: "ae", ß: "ss", ł: "l", Ł: "l", đ: "d", Đ: "d", ı: "i" };
 const cleanName = (value: string) =>
   value
+    .replace(/[øØæÆßłŁđĐı]/g, (c) => LETTERS[c])
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -222,21 +225,75 @@ export function parseEspnScoreboard(
     return parsed ? [parsed] : [];
   });
 }
-export function eventFitsMatch(event: EspnEvent, match: Match) {
+/** Club-type words and years that the two providers add or leave out («Viking FK», «Como 1907»). */
+const GENERIC = new Set(["fc", "cf", "fk", "sk", "afc", "sc", "ac", "as", "bc", "bk", "sv", "if", "club", "calcio"]);
+/** Reserve, youth and women's sides: never the same club as the first team. */
+const SIDE_MARKERS = new Set(["b", "c", "ii", "iii", "u17", "u19", "u20", "u21", "u23", "w", "women", "femenino", "fem", "youth", "reserves"]);
+const sideOf = (name: string) => name.split(" ").filter((t) => SIDE_MARKERS.has(t)).sort().join(" ");
+/** Numbers in a name («Como 1907», «Schalke 04»): left out only when one of the two names has none. */
+const numbersOf = (name: string) => canonicalTeamName(name).split(" ").filter((t) => /^\d+$/.test(t)).sort().join(" ");
+const numbersAgree = (a: string, b: string) => {
+  const x = numbersOf(a),
+    y = numbersOf(b);
+  return !x || !y || x === y;
+};
+/** Same kind of side and no clashing numbers: what a different spelling may never hide. */
+const compatible = (a: string, b: string) =>
+  sideOf(coreTeamName(a)) === sideOf(coreTeamName(b)) && numbersAgree(a, b);
+/** The name without those words, after the explicit aliases. */
+export function coreTeamName(value: string) {
+  return canonicalTeamName(value)
+    .split(" ")
+    .filter((t) => t && !GENERIC.has(t) && !/^\d+$/.test(t))
+    .join(" ");
+}
+/**
+ * The same club, said differently: every word of the shorter name starts a
+ * word of the other («man city» / «manchester city», «dortmund» / «borussia
+ * dortmund», «sl bratislava» / «slovan bratislava»), with a real word in common.
+ */
+export function sameTeam(a: string, b: string) {
+  const x = coreTeamName(a),
+    y = coreTeamName(b);
+  if (!x || !y || !compatible(a, b)) return false;
+  if (x === y) return true;
+  const [short, long] = [x.split(" "), y.split(" ")].sort((p, q) => p.length - q.length);
+  const words = short.filter((w) => w.length > 2);
   return (
-    event.competition === match.competition &&
-    Math.abs(Date.parse(event.kickoff) - Date.parse(match.utcDate)) <=
-      15 * 60_000 &&
-    canonicalTeamName(event.home) === canonicalTeamName(match.home) &&
-    canonicalTeamName(event.away) === canonicalTeamName(match.away)
+    words.length > 0 &&
+    words.some((w) => long.includes(w)) &&
+    words.every((w) => long.some((l) => l.startsWith(w)))
   );
 }
+const sameKickoff = (event: EspnEvent, match: Match) =>
+  event.competition === match.competition &&
+  Math.abs(Date.parse(event.kickoff) - Date.parse(match.utcDate)) <= 15 * 60_000;
+/** Both clubs, each in its place. */
+export function eventFitsMatch(event: EspnEvent, match: Match) {
+  return sameKickoff(event, match) && sameTeam(event.home, match.home) && sameTeam(event.away, match.away);
+}
+/**
+ * The ESPN event of a match: both clubs agree; failing that (a name each
+ * provider writes its own way, «Shaktar» / «Shakhtar Donetsk»), one club
+ * exactly the same, in its place, at that kick-off and competition — a club
+ * plays one match at a time. Two possible events: none.
+ */
 export function findEspnEvent(
   match: Match,
   events: EspnEvent[],
 ): EspnEvent | null {
-  const candidates = events.filter((event) => eventFitsMatch(event, match));
-  return candidates.length === 1 ? candidates[0] : null;
+  const full = events.filter((event) => eventFitsMatch(event, match));
+  if (full.length) return full.length === 1 ? full[0] : null;
+  const partial = events.filter(
+    (event) =>
+      sameKickoff(event, match) &&
+      // The other club may be written differently, but never be another side of a club («Barcelona B»).
+      compatible(event.home, match.home) &&
+      compatible(event.away, match.away) &&
+      ((coreTeamName(event.home) === coreTeamName(match.home) && numbersAgree(event.home, match.home)) ||
+        (coreTeamName(event.away) === coreTeamName(match.away) && numbersAgree(event.away, match.away))),
+  );
+  return partial.length === 1 ? partial[0] : null;
 }
 function sideFor(team: unknown, event: EspnEvent): "home" | "away" | undefined {
   const id = identifier(row(team).id);

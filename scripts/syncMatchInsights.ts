@@ -12,7 +12,6 @@ import { isHotMatch } from "../src/lib/liveBoard";
 import {
   createEspnClient,
   EspnRequestError,
-  eventFitsMatch,
   findEspnEvent,
   normalizeEspnSummary,
   type EspnClient,
@@ -45,6 +44,8 @@ export function insightRefreshInterval(
   now: number,
   insight?: MatchInsight | null,
 ) {
+  // Finished without a report (not found at ESPN yet): try again soon for three days.
+  if (match.status === "FINISHED" && !insight && now - Date.parse(match.utcDate) <= 72 * HOUR) return 2 * HOUR;
   if (match.status === "FINISHED")
     return now - Date.parse(match.utcDate) > 48 * HOUR &&
       insight?.statistics.length
@@ -305,7 +306,8 @@ export async function syncMatchInsights(
     for (const { match, previous } of pending) {
       if (report.summaries >= MAX_SUMMARIES) break;
       let event = options.events?.get(match.id) ?? null;
-      if (event && !eventFitsMatch(event, match)) event = null;
+      // The event found before for this match, if it still fits (same rules as finding it).
+      if (event && findEspnEvent(match, [event]) !== event) event = null;
       const window = windowForMatch.get(match.id)!;
       // Download only the date window actually needed, not every historical day.
       if (!event && !listings.has(window)) {

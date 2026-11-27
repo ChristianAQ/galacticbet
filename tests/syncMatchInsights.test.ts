@@ -281,6 +281,7 @@ describe("sincronización acotada de información complementaria", () => {
     expect(insightRefreshInterval(match, now, docs.get("1")?.insight)).toBe(
       7 * 24 * HOUR,
     );
+    // A week later, still without a report: daily.
     expect(insightRefreshInterval(match, now, null)).toBe(24 * HOUR);
   });
   it("limita candidatos a 48 h anteriores/24 h futuras, 80 lecturas y excluye cancelados", () => {
@@ -306,8 +307,12 @@ describe("sincronización acotada de información complementaria", () => {
       12 * HOUR,
     );
     expect(insightRefreshInterval(makeMatch(), now)).toBe(2 * HOUR);
+    // Just finished and not found at ESPN yet: again in 2 h for three days, then daily.
     expect(
       insightRefreshInterval({ ...makeMatch(), status: "FINISHED" }, now),
+    ).toBe(2 * HOUR);
+    expect(
+      insightRefreshInterval({ ...makeMatch("1", -4 * 24 * HOUR), status: "FINISHED" }, now),
     ).toBe(24 * HOUR);
   });
   it("carga documentos en un getAll, como máximo dos calendarios y 24 fichas; continúa pendientes después", async () => {
