@@ -9,6 +9,11 @@ En cuanto sellas, en la vista del grupo, cada jugador que ha sellado
 tiene su **probabilidad de ganar la jornada** (sola o compartida: empatar en
 cabeza cuenta como ganarla, como en el bote).
 
+El panel sale **plegado**: solo la gráfica de quién es más probable que
+gane. Al tocar el título o la gráfica se despliega con una transición suave:
+los puntos de la jornada (contra la IA), qué necesitas, cómo vas contra la
+IA y cómo se calcula. Se queda abierto o cerrado mientras navegas.
+
 - Se simula la jornada 20.000 veces en el propio móvil, sin lecturas
   nuevas. Cada partido por jugar recibe goles de un modelo de Poisson
   ajustado a las probabilidades 1X2 sin margen de las casas.

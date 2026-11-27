@@ -30,8 +30,11 @@ const app = configured
       authDomain: e.VITE_FIREBASE_AUTH_DOMAIN,
       projectId: e.VITE_FIREBASE_PROJECT_ID,
       appId: e.VITE_FIREBASE_APP_ID,
+      // Usage statistics, only with consent (see analytics.ts).
+      ...(e.VITE_FIREBASE_MEASUREMENT_ID ? { measurementId: e.VITE_FIREBASE_MEASUREMENT_ID } : {}),
     })
   : null;
+export const firebaseApp = app;
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getFirestore(app) : null;
 // Local development against the Firebase emulators only (never in a build).

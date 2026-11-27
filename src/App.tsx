@@ -10,6 +10,8 @@ import NavBar from "./components/NavBar";
 import StackNavigator from "./components/StackNavigator";
 import PullToRefresh from "./components/PullToRefresh";
 import ContextMenuHost from "./components/ContextMenu";
+import { ConsentPrompt } from "./components/AnalyticsConsent";
+import { screen } from "./lib/analytics";
 import { Empty, PageTitle, readableError } from "./components/ui";
 import {
   loadGroups,
@@ -68,6 +70,8 @@ function LegacyMatchesRoute() {
 
 export default function App() {
   const { pathname } = useLocation();
+  // Usage statistics: one screen per route, only with consent (analytics.ts).
+  useEffect(() => screen(pathname), [pathname]);
   const [, setProfileVersion] = useState(0);
   // The account of the last launch paints at once; Firebase confirms it (or
   // signs out) after its own network round trips.
@@ -446,6 +450,7 @@ export default function App() {
             )
           )}
           <ContextMenuHost />
+          <ConsentPrompt hidden={demo || login || Boolean(error) || (updateReady && !updateDismissed)} />
           {login && (
             <LoginModal
               close={() => setLogin(false)}

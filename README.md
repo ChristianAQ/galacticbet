@@ -43,6 +43,10 @@ npx firebase deploy --only firestore:rules,firestore:indexes --project TU_PROJEC
 
 El login es para tu máquina con tu propia cuenta. En automatización usa credenciales protegidas y permisos mínimos; no inicies sesión ni copies credenciales de otra identidad del entorno. No hay credenciales reales en este repositorio.
 
+## Estadísticas de uso (Firebase Analytics)
+
+Opcional. Con la *repository variable* `VITE_FIREBASE_MEASUREMENT_ID` (el `measurementId`, `G-…`, de la app web en Configuración del proyecto de Firebase), la web publicada pregunta una vez, unos segundos después de abrirla, si puede medir qué pantallas se usan. Hasta que alguien dice que sí no se descarga la librería ni se guarda nada; la respuesta se puede cambiar en Perfil › Ajustes › «Estadísticas de uso». Se registran las pantallas por ruta (`/partido/:id`, sin identificadores) y dos acciones: `sellar_quiniela` (competición y modalidad) y `compartir` (qué se comparte). Nunca pronósticos, nombres ni datos de grupos. En desarrollo no se activa. Los datos aparecen en el informe «Tiempo real» de Analytics en unos minutos y en el resto en 24–48 horas; quien use un bloqueador de anuncios no cuenta.
+
 ## Información de partidos
 
 «Partidos» presenta tarjetas con horario local (Hoy/Mañana), estado y forma de ambos equipos. Al pulsarlas se abre una ficha con rendimiento de temporada (partidos, victorias, empates, derrotas y goles), enfrentamientos anteriores y contexto de ida/vuelta de Champions cuando el calendario permite identificar el cruce. El global se orienta hacia los equipos local y visitante del partido abierto y se calcula solo con marcadores reglamentarios finalizados y fiables; se distingue de la clasificación oficial tras prórroga o penaltis.

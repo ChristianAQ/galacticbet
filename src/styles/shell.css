@@ -568,6 +568,21 @@ body {
 .toast.is-update p {
   padding-top: 0;
 }
+/* «¿Nos dejas medir…?»: the question, a yes and a quiet no. */
+.toast.is-consent {
+  align-items: center;
+}
+.toast.is-consent p {
+  font-weight: 450;
+  line-height: 1.4;
+}
+.toast .toast-secondary {
+  width: auto;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
 .toast .toast-action {
   width: auto;
   padding: 0 14px;

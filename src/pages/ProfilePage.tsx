@@ -20,6 +20,7 @@ import { haptic } from "../lib/motion";
 import { setTheme, useTheme, type Theme } from "../lib/theme";
 import { disablePush } from "../lib/push";
 import { PushRow } from "../components/PushControls";
+import { ConsentRow } from "../components/AnalyticsConsent";
 import "../styles/profile.css";
 
 /**
@@ -234,6 +235,9 @@ export default function ProfilePage({
                   <ul className="more-list">
                     <li>
                       <PushRow uid={user.uid} />
+                    </li>
+                    <li>
+                      <ConsentRow />
                     </li>
                   </ul>
                 </>

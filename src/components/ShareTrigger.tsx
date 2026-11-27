@@ -1,4 +1,5 @@
 import { Share2 } from "lucide-react";
+import { track } from "../lib/analytics";
 
 export default function ShareTrigger({
   label = "Compartir",
@@ -14,7 +15,10 @@ export default function ShareTrigger({
       type="button"
       className="share-trigger"
       disabled={disabled}
-      onClick={onClick}
+      onClick={() => {
+        track("compartir", { que: label });
+        onClick();
+      }}
     >
       <Share2 size={14} aria-hidden="true" /> {label}
     </button>

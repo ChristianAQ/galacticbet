@@ -45,6 +45,7 @@ import { PotAmount } from "../components/PotCard";
 import { euroShort, groupPotCents } from "../lib/pot";
 import { euro } from "../lib/porra";
 import { haptic } from "../lib/motion";
+import { track } from "../lib/analytics";
 import "../styles/quiniela.css";
 
 const CustomQuiniela = lazy(() => import("../components/CustomQuiniela"));
@@ -481,6 +482,7 @@ export default function PredictionsPage({
           ),
         );
         setSealed({ key: sealKey, value: true, sharing: true });
+        track("sellar_quiniela", { competicion: season.split("-")[0], modo: mode });
       }
       haptic("success");
       focusAfterSubmit.current = true;
