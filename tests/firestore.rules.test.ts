@@ -281,6 +281,21 @@ describe.skipIf(!enabled)("Firestore: permisos reales del backend", () => {
       await assertFails(deleteDoc(doc(db, "live/football")));
     }
   });
+  it("publica la portada de la IA solo para lectura", async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), "briefing/football"), { formatVersion: 1, generatedAt: "2026-11-28T08:00:00Z" });
+    });
+    for (const db of [
+      env.unauthenticatedContext().firestore(),
+      env.authenticatedContext("alice").firestore(),
+    ]) {
+      await assertSucceeds(getDoc(doc(db, "briefing/football")));
+      await assertFails(getDocs(collection(db, "briefing")));
+      await assertFails(getDoc(doc(db, "briefing/other")));
+      await assertFails(setDoc(doc(db, "briefing/football"), { formatVersion: 1, headline: "Falsa" }));
+      await assertFails(deleteDoc(doc(db, "briefing/football")));
+    }
+  });
   it("publica el análisis de apuestas solo para lectura y oculta cuotas y presupuestos internos", async () => {
     await env.withSecurityRulesDisabled(async (c) => {
       await setDoc(doc(c.firestore(), "analysis/football"), {

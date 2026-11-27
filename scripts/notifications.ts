@@ -120,19 +120,26 @@ export async function remindPendingRounds(
   let reminded = 0;
   for (const reminder of collectReminders(rounds)) {
     const log = db.doc(`pushLog/remind_${reminder.round.id}_${reminder.uid}`);
-    if ((await log.get()).exists) continue;
-    const delivered = await sendToUser(
-      db,
-      reminder.uid,
-      reminderMessage(reminder),
-      keys,
-      send,
-    );
-    // Only marked once it reached a device: turning avisos on later still works.
-    if (delivered) {
-      await log.set({ at: now });
-      reminded++;
+    // Claimed before sending, like the results: two jobs at once never remind twice.
+    try {
+      await log.create({ at: now });
+    } catch {
+      continue;
     }
+    let delivered = 0;
+    try {
+      delivered = await sendToUser(
+        db,
+        reminder.uid,
+        reminderMessage(reminder),
+        keys,
+        send,
+      );
+    } finally {
+      // Only kept once it reached a device: turning avisos on later still works.
+      if (!delivered) await log.delete();
+    }
+    if (delivered) reminded++;
   }
   return { reminded };
 }

@@ -198,6 +198,7 @@ export function preferredRound(matches: Match[], now = Date.now()) {
       const list = roundCore(all).core;
       return {
         id,
+        season: all[0].seasonId,
         list,
         start: Math.min(...list.map((m) => Date.parse(m.utcDate))),
         started: list.some((m) => hasMatchStarted(m, now)),
@@ -207,13 +208,24 @@ export function preferredRound(matches: Match[], now = Date.now()) {
       (a, b) =>
         a.start - b.start || a.id.localeCompare(b.id, "es", { numeric: true }),
     );
+  // A postponed match keeps its round open only until the next round of the
+  // season is under way or about to start: it may not be played for weeks.
+  const done = (r: (typeof rounds)[number]) =>
+    isRoundComplete(r.list) ||
+    (rounds.some(
+      (n) =>
+        n.season === r.season &&
+        n.start > r.start &&
+        now >= n.start - NEXT_ROUND_NOTICE_MS,
+    ) &&
+      isRoundComplete(r.list.filter((m) => m.status !== "POSTPONED")));
   // Wait for the whole started round, including missing final scores and the gap
   // between Champions match days. A passing kick-off time never closes a round.
-  const current = rounds.find((r) => r.started && !isRoundComplete(r.list));
+  const current = rounds.find((r) => r.started && !done(r));
   if (current) return current.id;
   // Just finished: it stays for a couple of days (results, table, who won),
   // then the next one takes over — earlier if the next one is about to start.
-  const finished = rounds.filter((r) => r.started && isRoundComplete(r.list)).at(-1);
+  const finished = rounds.filter((r) => r.started && done(r)).at(-1);
   if (finished) {
     const end = Math.max(...finished.list.map((m) => Date.parse(m.utcDate)));
     const next = rounds.find((r) => r.start > finished.start && !r.started);

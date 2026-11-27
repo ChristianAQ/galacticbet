@@ -75,6 +75,20 @@ describe("Resumen de la jornada", () => {
     expect(r.blank.map((b) => b.name)).toEqual(["Carla"]);
   });
 
+  it("un partido adelantado semanas no está en el boleto: no impide el pleno", () => {
+    const early = { ...fixture("6", 2, 2), utcDate: "2026-09-20T18:00:00Z" };
+    const r = roundRecap({
+      participants: people,
+      seasons,
+      scope: "PD",
+      roundIds: [1, 2, 3, 4].map(R),
+      roundId: R(4),
+      userId: "ana",
+      fixtures: [...fixtures, early],
+    })!;
+    expect(r.perfect.map((p) => p.name)).toEqual(["Bruno"]);
+  });
+
   it("rachas vivas de 3 o más jornadas y jornadas sin puntos", () => {
     // Ana and Carla both have three in a row by round 3.
     expect(recap(R(3))!.streak).toMatchObject({ rounds: 3 });

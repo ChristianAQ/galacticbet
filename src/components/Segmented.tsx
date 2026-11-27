@@ -45,9 +45,11 @@ export default function Segmented<T extends string>({
           : enabled[(position + step + enabled.length) % enabled.length];
     if (!next) return;
     select(next.value);
+    // React clears currentTarget once the handler returns: keep the group now.
+    const group = event.currentTarget;
     requestAnimationFrame(() =>
-      event.currentTarget
-        ?.querySelector<HTMLElement>(`[data-value="${next.value}"]`)
+      group
+        .querySelector<HTMLElement>(`[data-value="${next.value}"]`)
         ?.focus(),
     );
   };

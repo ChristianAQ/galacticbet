@@ -54,6 +54,10 @@ export async function createPrivateGroup(
   return group.id;
 }
 
+/** The same competition one season earlier: «PD-2026» → «PD-2025». */
+const previousSeasonId = (id: string) =>
+  id.replace(/\d{4}$/, (year) => String(Number(year) - 1));
+
 // Add only missing current seasons. Existing rules and predictions remain immutable.
 export async function prepareGroupCompetitions(
   store: Firestore,
@@ -71,7 +75,15 @@ export async function prepareGroupCompetitions(
         "Solo el administrador puede preparar las competiciones del grupo.",
       );
     const seasons = await Promise.all(refs.map((ref) => tx.get(ref)));
-    const existing = seasons.find((s) => s.exists());
+    // A new season keeps the mode the group played the previous one with.
+    const earlier = seasons.some((s) => s.exists())
+      ? []
+      : await Promise.all(
+          refs.map((ref) =>
+            tx.get(doc(group, "gameSeasons", previousSeasonId(ref.id))),
+          ),
+        );
+    const existing = [...seasons, ...earlier].find((s) => s.exists());
     const mode = existing?.data()?.mode === "exact" ? "exact" : "classic";
     seasons.forEach((season, i) => {
       if (!season.exists())

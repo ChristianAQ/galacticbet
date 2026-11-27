@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import webpush from "web-push";
 
@@ -126,7 +127,8 @@ export async function sendToUser(
         },
         TTL: 6 * 3600,
         urgency: "high",
-        topic: message.tag.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 32),
+        // At most 32 URL-safe characters: a hash, as cutting the tag would merge different rounds.
+        topic: createHash("sha256").update(message.tag).digest("base64url").slice(0, 32),
         timeout: 10_000,
       });
       delivered++;

@@ -293,8 +293,11 @@ export default function PredictionsPage({
         setSeasons(next);
         // A reminder links to its round: open that competition's season.
         const linked = new URLSearchParams(window.location.hash.split("?")[1] || "").get("round") || "";
+        // The same group read again (a season added): the one on screen stays.
         setSeason(
-          next.find((s) => linked.startsWith(`${s.id}-`))?.id ||
+          (current) =>
+            (!changed && next.some((s) => s.id === current) ? current : "") ||
+            next.find((s) => linked.startsWith(`${s.id}-`))?.id ||
             next.find((s) => s.competition === preferences.competition)?.id ||
             next[0]?.id ||
             "",

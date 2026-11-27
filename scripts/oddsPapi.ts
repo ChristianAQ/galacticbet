@@ -612,7 +612,16 @@ export async function fetchDayOdds(
         unmatched.push(`${match.home} - ${match.away}`);
         continue;
       }
-      const answer = await client.fixtureOdds(fixture.fixtureId, [...SOFT_BOOKS, PINNACLE]);
+      let answer: unknown;
+      try {
+        answer = await client.fixtureOdds(fixture.fixtureId, [...SOFT_BOOKS, PINNACLE]);
+      } catch (error) {
+        // Key, plan or rate limit: the rest would fail too. Anything else fails this match
+        // only, and the prices already paid for are kept (and cached for a retry).
+        if (error instanceof OddsPapiError && [401, 402, 403, 429].includes(error.status)) throw error;
+        unmatched.push(`${match.home} - ${match.away} (cuotas no disponibles: ${error instanceof OddsPapiError ? error.message : "sin respuesta"})`);
+        continue;
+      }
       const books = parseFixtureOdds(answer, markets);
       if (debug) logPlayerProps(`${match.home} - ${match.away}`, describePlayerProps(answer, playerMarkets), log);
       const slug = chooseBook(books);

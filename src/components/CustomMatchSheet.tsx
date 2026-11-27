@@ -383,7 +383,7 @@ export default function MatchEditSheet({
                 if (confirm === "lock") void write({ ...stored(match), locked: true });
                 else {
                   setBusy(true);
-                  deleteMatch(competition.id, match.id).then(onDeleted, (e) => {
+                  settled(deleteMatch(competition.id, match.id)).then(onDeleted, (e) => {
                     setError(readableError(e));
                     setBusy(false);
                   });

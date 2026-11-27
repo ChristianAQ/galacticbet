@@ -293,7 +293,7 @@ export function modelName(id: string) {
   return id;
 }
 
-function decodeRun(raw: unknown): AnalysisRun | null {
+export function decodeRun(raw: unknown): AnalysisRun | null {
   if (!isRow(raw)) return null;
   const run: AnalysisRun = {
     ...(typeof raw.model === "string" && /^[a-z0-9][a-z0-9.-]{1,79}$/.test(raw.model) ? { model: raw.model } : {}),

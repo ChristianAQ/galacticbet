@@ -1,0 +1,50 @@
+name: AI front page
+on:
+  # «La IA te cuenta» on Inicio: morning, afternoon and evening in Spain.
+  # A late or skipped schedule only means a slightly older front page (it is
+  # shown for 36 hours), and a run within 3 hours of the last one does nothing.
+  schedule:
+    - cron: "45 7 * * *"
+      timezone: "Europe/Madrid"
+    - cron: "45 13 * * *"
+      timezone: "Europe/Madrid"
+    - cron: "45 18 * * *"
+      timezone: "Europe/Madrid"
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "automático: solo si la actual tiene más de 3 h · prueba: con la IA, sin guardar · completo: una nueva ya"
+        type: choice
+        options: [automatico, prueba, completo]
+        default: automatico
+      ia:
+        description: "Qué IA va primero (la otra entra si falla)"
+        type: choice
+        options: [claude, gemini]
+        default: claude
+permissions:
+  contents: read
+concurrency:
+  group: ai-briefing
+  cancel-in-progress: false
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run briefing
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          ANALYSIS_AI: ${{ inputs.ia || (vars.ANALYSIS_AI == 'gemini' && 'gemini' || 'claude') }}
+          BRIEFING_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'prueba' }}
+          BRIEFING_FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'completo' }}

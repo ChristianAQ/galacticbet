@@ -64,6 +64,9 @@ export default function ContextMenuHost() {
       setOpen({ element, rect: element.getBoundingClientRect(), title, items });
     };
     const onDown = (event: PointerEvent) => {
+      // Some browsers send no click after a long press: the next touch is a
+      // new gesture, and its click (a menu item's) must go through.
+      suppressClick = false;
       if (event.pointerType === "mouse" || event.button !== 0) return;
       const element = (event.target as Element).closest<HTMLElement>("[data-context-menu]");
       if (!element || document.documentElement.hasAttribute("data-swiping")) return;

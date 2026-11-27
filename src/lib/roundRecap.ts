@@ -2,6 +2,7 @@ import { predictionSummary, score, type Match, type Mode, type PredictionValue }
 import type { Participant } from "./data";
 import { buildRanking, type RankingRow, type SeasonRanking } from "./rankings";
 import { potLines, type PotSummary } from "./pot";
+import { roundRequirements } from "./roundDelivery";
 
 /**
  * The story of a finished round in a group: who won it, how you did, and the
@@ -99,7 +100,11 @@ export function roundRecap({
       streak = { name: person.name, id: person.id, rounds: run };
   }
 
-  const played = fixtures.filter((m) => m.homeScore !== null && m.awayScore !== null).length;
+  // Only the slip's matches: one moved weeks away from the round is in nobody's.
+  const required = new Set(roundRequirements(fixtures).matchIds);
+  const played = fixtures.filter(
+    (m) => required.has(m.id) && m.homeScore !== null && m.awayScore !== null,
+  ).length;
   return {
     roundId,
     rows,

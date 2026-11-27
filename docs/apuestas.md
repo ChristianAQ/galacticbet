@@ -17,7 +17,7 @@ no gestiona apuestas ni dinero.
    3 veces al día. Por eso el workflow `AI betting analysis` no depende de su
    horario:
    - en modo automático calcula cuándo toca el próximo análisis, espera dentro
-     del propio job hasta esa hora (hasta 5 h 15 min) y lo hace;
+     del propio job hasta esa hora (hasta 4 h 45 min) y lo hace;
    - si falta más y el día de partidos está a menos de 18 horas, espera ese tiempo
      y se vuelve a lanzar él mismo (`gh workflow run`, con el permiso
      `actions: write` del propio workflow);

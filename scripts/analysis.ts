@@ -21,7 +21,8 @@ import { geminiRunner } from "./geminiRunner";
  * MAX_WAIT) and, when the day is still further away, asks GitHub to start the
  * job again. Any run of the other workflows (syncs, deploys) also starts it.
  */
-const MAX_WAIT = 5 * 3_600_000 + 15 * 60_000;
+// Room left in the 350-minute job for the analysis: two days, each Claude (12 min) then Gemini (6 min).
+const MAX_WAIT = 4 * 3_600_000 + 45 * 60_000;
 /** Keep a job waiting only when a match day is this close. */
 const CHAIN_HORIZON = 18 * 3_600_000;
 

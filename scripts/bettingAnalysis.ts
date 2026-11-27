@@ -36,6 +36,7 @@ import {
   type AnalysisDay,
   type AnalysisMatch,
   type AnalysisPick,
+  type AnalysisRun,
   type BettingAnalysis,
   type BetMarket,
   type Confidence,
@@ -458,6 +459,8 @@ export function acceptAnalysis(
     picks.push(pick);
     if (picks.length >= MAX_PICKS) break;
   }
+  // Nothing of the AI's for any priced match (an answer of another shape): no analysis, the day is retried.
+  if (!picks.length && !matches.some((m) => previews.get(m.matchId) || m.pick)) return null;
   const at = new Date(now).toISOString();
   // «Combinada de valor», fixed now: the record never re-picks it later.
   const combo = valueCombo(picks).map(pickKey);
@@ -508,13 +511,34 @@ export function runDetails(result: Record<string, unknown>): { model?: string; s
   };
 }
 export type ClaudeRunner = (prompt: string) => Promise<ClaudeAnswer>;
+/** How the AI ran (model, web searches, seconds), for a technical sheet; undefined when unknown. */
+export function aiRun(answer: ClaudeAnswer): AnalysisRun | undefined {
+  const run: AnalysisRun = {
+    ...(answer.model ? { model: answer.model } : {}),
+    ...(answer.searches !== undefined ? { searches: answer.searches } : {}),
+    ...(answer.durationMs !== undefined ? { seconds: Math.round(answer.durationMs / 1000) } : {}),
+  };
+  return Object.keys(run).length ? run : undefined;
+}
+/**
+ * What an AI is asked to do: its instructions and the JSON schema of its
+ * answer. The betting analysis by default; Inicio's front page has its own.
+ */
+export interface AiTask {
+  system: string;
+  schema: object;
+}
 
 /**
  * The AIs in order of preference (Claude with the plan, then free Gemini):
  * when one fails (usage limit, plan ended, provider down) the next one tries,
  * with the same prices and data.
  */
-export function withFallback(runners: { name: string; run: ClaudeRunner }[], log: (m: string) => void = console.log): ClaudeRunner {
+export function withFallback(
+  runners: { name: string; run: ClaudeRunner }[],
+  log: (m: string) => void = console.log,
+  label = "Análisis",
+): ClaudeRunner {
   return async (prompt) => {
     let failure: unknown = new Error("no hay ninguna IA configurada");
     for (const [i, { name, run }] of runners.entries()) {
@@ -523,7 +547,7 @@ export function withFallback(runners: { name: string; run: ClaudeRunner }[], log
       } catch (error) {
         failure = error;
         const next = runners[i + 1];
-        if (next) log(`Análisis: ${name} no respondió (${error instanceof Error ? error.message : "error"}); se prueba con ${next.name}.`);
+        if (next) log(`${label}: ${name} no respondió (${error instanceof Error ? error.message : "error"}); se prueba con ${next.name}.`);
       }
     }
     throw failure;
@@ -543,7 +567,14 @@ function claudeCommand(args: string[]): [string, string[]] {
  * process sees no other secret of the job. Without a token (local tests) it
  * uses the CLI's own login.
  */
-export function claudeCodeRunner(options: { token: string; model?: string; timeoutMs?: number; log?: (m: string) => void }): ClaudeRunner {
+export function claudeCodeRunner(options: {
+  token: string;
+  model?: string;
+  timeoutMs?: number;
+  log?: (m: string) => void;
+  task?: AiTask;
+}): ClaudeRunner {
+  const task = options.task ?? { system: ANALYST_PROMPT, schema: ANALYSIS_SCHEMA };
   return async (prompt) => {
     const cwd = await mkdtemp(join(tmpdir(), "analysis-"));
     const args = [
@@ -551,9 +582,9 @@ export function claudeCodeRunner(options: { token: string; model?: string; timeo
       "--output-format",
       "json",
       "--json-schema",
-      JSON.stringify(ANALYSIS_SCHEMA),
+      JSON.stringify(task.schema),
       "--system-prompt",
-      ANALYST_PROMPT,
+      task.system,
       "--tools",
       "WebSearch",
       "--allowedTools",
@@ -602,6 +633,9 @@ export function claudeCodeRunner(options: { token: string; model?: string; timeo
           clearTimeout(force);
           resolve({ stdout, stderr, code });
         });
+        // The CLI may exit before reading the prompt (failed install, rejected flag): the write
+        // error (EPIPE) must not crash the job; `close` then reports it and the next AI tries.
+        child.stdin.on("error", () => {});
         child.stdin.end(prompt);
       });
       let result: Record<string, unknown> | null = null;
@@ -750,7 +784,7 @@ export async function competitionNews(db: Firestore, competition: string, now: n
   }
 }
 
-async function seasonScorers(db: Firestore, seasonId: string): Promise<Scorer[]> {
+export async function seasonScorers(db: Firestore, seasonId: string): Promise<Scorer[]> {
   try {
     const data = (await db.doc(`leagueStats/${seasonId}`).get()).data();
     return validLeagueStats(data) ? data.scorers : [];
@@ -816,6 +850,23 @@ export async function planNextAnalysis(db: Firestore, now: number) {
   const matches = await readCalendars(db, now);
   const board = decodeAnalysisBoard((await db.doc(ANALYSIS_DOC).get()).data());
   return planFrom(matches, board?.analyses ?? [], await readAttempts(db), now);
+}
+
+/** The season of a moment, as the calendars keep it (`2025` for 2025/26, from July). */
+const seasonOf = (at: number) => new Date(at).getUTCFullYear() - (new Date(at).getUTCMonth() < 6 ? 1 : 0);
+
+/**
+ * The calendars of past seasons of analyses leaving the board: the board
+ * outlives the summer, and without last season's results none of its picks
+ * would settle in the archive.
+ */
+export async function pastSeasonMatches(db: Firestore, dropped: Pick<BettingAnalysis, "date">[], now: number) {
+  const seasons = new Map<number, number>();
+  for (const a of dropped) {
+    const at = Date.parse(`${a.date}T12:00:00Z`);
+    if (Number.isFinite(at) && seasonOf(at) !== seasonOf(now)) seasons.set(seasonOf(at), at);
+  }
+  return (await Promise.all([...seasons.values()].map((at) => readCalendars(db, at)))).flat();
 }
 
 export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions) {
@@ -947,16 +998,16 @@ export async function runBettingAnalysis(db: Firestore, options: AnalysisOptions
       clock(),
     );
     // How the AI ran, for the report's technical sheet.
-    const run = {
-      ...(answer.model ? { model: answer.model } : {}),
-      ...(answer.searches !== undefined ? { searches: answer.searches } : {}),
-      ...(answer.durationMs !== undefined ? { seconds: Math.round(answer.durationMs / 1000) } : {}),
-    };
-    const analysis = Object.keys(run).length ? { ...merged, ai: run } : merged;
+    const run = aiRun(answer);
+    const analysis = run ? { ...merged, ai: run } : merged;
     const all = [analysis, ...analyses.filter((a) => a.id !== analysis.id)];
     // What leaves the board is counted in the archive first: the record never forgets a pick.
     const dropped = all.slice(MAX_ANALYSES);
-    if (dropped.length) archive = archiveAnalyses(archive, dropped, matches);
+    if (dropped.length) {
+      // Days of last season settle with that season's calendars (injected matches hold them already).
+      const past = options.matches ? [] : await pastSeasonMatches(db, dropped, now);
+      archive = archiveAnalyses(archive, dropped, [...matches, ...past]);
+    }
     analyses = all.slice(0, MAX_ANALYSES);
     await boardRef.set({
       formatVersion: ANALYSIS_FORMAT,

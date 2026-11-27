@@ -239,10 +239,13 @@ export function MatchTicker({
 export function HomeTools({
   user,
   groups,
+  groupsReady,
   onLogin,
 }: {
   user: User | null;
   groups: Group[];
+  /** Your groups have loaded: until then «no groups» only means «not yet». */
+  groupsReady: boolean;
   onLogin: () => void;
 }) {
   return (
@@ -250,7 +253,7 @@ export function HomeTools({
       <div className="section-heading">
         <h2 id="tools-title">En el banquillo</h2>
       </div>
-      {!groups.length && (
+      {!groups.length && (!user || groupsReady) && (
         <div className="home-crew">
           <div>
             <strong>Sin vestuario todavía</strong>

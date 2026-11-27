@@ -640,6 +640,12 @@ const roundRef = (cid: string, rk: string) => doc(competitionRef(cid), "rounds",
 const entryRef = (cid: string, rk: string, uid: string) => doc(roundRef(cid, rk), "entries", uid);
 const attendanceRef = (cid: string, rk: string) => doc(competitionRef(cid), "roundAttendance", rk);
 const ENTRIES_KEY = (cid: string) => `galacticbet:competition-entries:v1:${cid}`;
+/**
+ * A round's slips are kept on the device only once this long has passed since
+ * its deadline: with a clock running fast (a sealed player may read them
+ * early), the list could still lack the last slips.
+ */
+const ENTRIES_SETTLED_MS = 10 * 60_000;
 
 /** Each round's deadline (first kick-off) and the matches its slip asks for. */
 export function useCompetitionRounds(cid: string): RoundDocs | null {
@@ -727,7 +733,9 @@ export function useRoundEntries(cid: string, rk: string, enabled: boolean) {
     null,
   );
   const key = `${cid}:${rk}`;
-  const [attempt, setAttempt] = useState(0);
+  // Retries are counted afresh for each round.
+  const [retries, setRetries] = useState({ key: "", n: 0 });
+  const attempt = retries.key === key ? retries.n : 0;
   useEffect(() => {
     if (!enabled || !cid || !rk || !db) return;
     let retry: number | undefined;
@@ -744,7 +752,11 @@ export function useRoundEntries(cid: string, rk: string, enabled: boolean) {
       () => {
         // Closed by this device's clock but not yet by the server's (or no
         // signal): still loading, try again shortly; give up after a while.
-        if (attempt < 8) retry = window.setTimeout(() => setAttempt((n) => n + 1), 15_000);
+        if (attempt < 8)
+          retry = window.setTimeout(
+            () => setRetries((r) => ({ key, n: (r.key === key ? r.n : 0) + 1 })),
+            15_000,
+          );
         else setState({ key, entries: {} });
       },
     );
@@ -871,7 +883,7 @@ export async function loadClosedEntries(
   for (const f of fetched) {
     if (!f) continue;
     out[f.r.id] = decode(f.raw);
-    if (f.complete) next[f.r.id] = { t: f.r.deadline, e: f.raw };
+    if (f.complete && Date.now() - f.r.deadline > ENTRIES_SETTLED_MS) next[f.r.id] = { t: f.r.deadline, e: f.raw };
   }
   try {
     localStorage.setItem(ENTRIES_KEY(cid), JSON.stringify(next));

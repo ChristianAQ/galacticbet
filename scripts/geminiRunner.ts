@@ -1,4 +1,4 @@
-import { ANALYSIS_SCHEMA, analystPrompt, type ClaudeAnswer, type ClaudeRunner } from "./bettingAnalysis";
+import { ANALYSIS_SCHEMA, analystPrompt, type AiTask, type ClaudeAnswer, type ClaudeRunner } from "./bettingAnalysis";
 
 /**
  * The analysis with Gemini, on the free tier of the Gemini API (a key from
@@ -15,12 +15,15 @@ export const GEMINI_MODEL = "gemini-3.8-flash";
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions";
 const API_REVISION = "2026-05-20";
 
-export function geminiRequest(prompt: string, model: string) {
+/** The betting analysis, without web search. */
+const ANALYSIS_TASK: AiTask = { system: analystPrompt({ web: false }), schema: ANALYSIS_SCHEMA };
+
+export function geminiRequest(prompt: string, model: string, task: AiTask = ANALYSIS_TASK) {
   return {
     model,
-    system_instruction: analystPrompt({ web: false }),
+    system_instruction: task.system,
     input: prompt,
-    response_format: { type: "text", mime_type: "application/json", schema: ANALYSIS_SCHEMA },
+    response_format: { type: "text", mime_type: "application/json", schema: task.schema },
     store: false,
   };
 }
@@ -65,6 +68,7 @@ export function geminiRunner(options: {
   model?: string;
   timeoutMs?: number;
   request?: typeof fetch;
+  task?: AiTask;
 }): ClaudeRunner {
   const model = options.model || GEMINI_MODEL;
   const request = options.request ?? fetch;
@@ -77,7 +81,7 @@ export function geminiRunner(options: {
         "Content-Type": "application/json",
         "Api-Revision": API_REVISION,
       },
-      body: JSON.stringify(geminiRequest(prompt, model)),
+      body: JSON.stringify(geminiRequest(prompt, model, options.task)),
       signal: AbortSignal.timeout(options.timeoutMs ?? 6 * 60_000),
     });
     const text = await response.text();

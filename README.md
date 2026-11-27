@@ -374,6 +374,10 @@ Clasificación muestra solo la del grupo (las tablas de cada competición están
 
 La pestaña **Apuestas** muestra, antes del primer partido de cada día de LaLiga o Champions, las cuotas de bet365 que la IA considera más jugosas, comparadas con las de Pinnacle y con los datos de la temporada, junto con el historial de aciertos. Necesita el repository secret `BET365_ODDS_KEY` (plan gratuito de OddsPapi) y una IA: `CLAUDE_CODE_OAUTH_TOKEN` (tu plan de Claude, con `claude setup-token`) y, de respaldo gratis, `GEMINI_API_KEY` (Google AI Studio, sin facturación). [Cómo funciona, configuración y pruebas](docs/apuestas.md). Información orientativa para mayores de 18: GalacticBet no gestiona apuestas.
 
+### Inicio: «La IA te cuenta»
+
+En Inicio, bajo «Próximo saque», la IA cuenta lo que se viene: un titular, un resumen, hasta 4 **partidos clave** de los próximos días (qué está en juego, una previa con datos y qué vigilar; al tocarlos se abre el partido) y de 3 a 5 **noticias para leer** de ESPN, con una frase de por qué merece la pena cada una. Usa las mismas IA y secrets que Apuestas, sin gastar OddsPapi. [Cómo funciona](docs/portada-ia.md).
+
 ### Ligas: partidos, tabla, noticias y estadísticas
 
 La antigua sección Partidos pasa a **Ligas** (`/ligas`). Incluye cuatro pestañas con menú fijo bajo la cabecera, selector compartido de competición/temporada y navegación sin recargar. Conserva el calendario y las fichas; la clasificación muestra todas las columnas mediante desplazamiento horizontal en móvil. Los enlaces antiguos siguen funcionando.

@@ -32,8 +32,11 @@ export function useClosedEntries(
     owner: string;
     entries: Record<string, Record<string, Record<string, PredictionValue>>>;
   } | null>(null);
-  const [attempt, setAttempt] = useState(0);
   const owner = `${cid}:${uid}`;
+  // Retries are counted afresh for each competition and each newly closed round.
+  const scope = `${owner}|${key}`;
+  const [retries, setRetries] = useState({ scope: "", n: 0 });
+  const attempt = retries.scope === scope ? retries.n : 0;
   useEffect(() => {
     if (!uid || !cid) return setState({ owner, entries: {} });
     if (!enabled) return;
@@ -44,7 +47,10 @@ export function useClosedEntries(
       setState({ owner, entries });
       // Closed by this device's clock but not yet by the server's (or offline).
       if (attempt < MAX_RETRIES && closed.some((r) => !entries[r.id]))
-        retry = window.setTimeout(() => setAttempt((n) => n + 1), RETRY_MS);
+        retry = window.setTimeout(
+          () => setRetries((r) => ({ scope, n: (r.scope === scope ? r.n : 0) + 1 })),
+          RETRY_MS,
+        );
     });
     return () => {
       live = false;

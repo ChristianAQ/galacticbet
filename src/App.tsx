@@ -250,6 +250,7 @@ export default function App() {
             userId={user?.uid || ""}
             user={user}
             groups={activeGroups}
+            groupsReady={groupsReady}
             matches={matches}
             loading={loading}
             demo={demo}

@@ -43,6 +43,8 @@ service cloud.firestore {
   match /odds/football { allow get: if true; }
   // The AI's betting analysis of each match day (information only); backend writes only.
   match /analysis/football { allow get: if true; }
+  // «La IA te cuenta» on Inicio: key matches and stories chosen by the AI; backend writes only.
+  match /briefing/football { allow get: if true; }
   // Competitions between friends. The document id is the invitation code:
   // whoever has it can follow the competition (read only, even without an
   // account). Signed players follow it; the owner and the administrators run it.

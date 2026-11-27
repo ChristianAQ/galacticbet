@@ -33,7 +33,7 @@ concurrency:
 jobs:
   analysis:
     runs-on: ubuntu-latest
-    # Up to 5 h 15 min of waiting, then the analysis itself.
+    # Up to 4 h 45 min of waiting, then the analysis itself.
     timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4

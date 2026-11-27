@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AppUser as User } from "../lib/session";
+import AiBriefing from "../components/AiBriefing";
 import UpcomingSchedule from "../components/UpcomingSchedule";
 import NewsSection from "../components/NewsSection";
 import { PushPrompt } from "../components/PushControls";
@@ -32,6 +33,7 @@ export default function HomePage({
   userId,
   user,
   groups,
+  groupsReady,
   matches,
   loading,
   demo = false,
@@ -40,6 +42,7 @@ export default function HomePage({
   userId: string;
   user: User | null;
   groups: Group[];
+  groupsReady: boolean;
   matches: Match[];
   loading: boolean;
   demo?: boolean;
@@ -84,7 +87,8 @@ export default function HomePage({
         now={now}
         loading={loading}
       />
-      <HomeTools user={user} groups={groups} onLogin={onLogin} />
+      {!loading && <AiBriefing matches={matches} now={now} demo={demo} />}
+      <HomeTools user={user} groups={groups} groupsReady={groupsReady} onLogin={onLogin} />
       <NewsSection demo={demo} />
     </div>
   );

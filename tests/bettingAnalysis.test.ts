@@ -605,6 +605,50 @@ describe("OddsPapi", () => {
     expect(prices[0]).toMatchObject({ market: "1X2", price: 1.5, sharp: 1.52, book: "bet365" });
     expect(marketPrices(KNOWN_MARKETS, bet365, undefined, "bet365")[0].fair).toBeUndefined();
   });
+
+  it("one match without prices does not lose the day; key or rate-limit errors stop it", async () => {
+    const { fetchDayOdds, OddsPapiError } = await import("../scripts/oddsPapi");
+    const store = new Map<string, unknown>();
+    const db = {
+      doc: (path: string) => ({
+        get: async () => ({ data: () => store.get(path) }),
+        set: async (value: unknown) => void store.set(path, value),
+      }),
+    } as unknown as import("firebase-admin/firestore").Firestore;
+    const one = (p: number) => ({ players: { "0": { active: true, price: p } } });
+    const games = [
+      match({ id: "a", home: "Levante UD", away: "Elche CF", utcDate: "2026-11-28T13:00:00Z" }),
+      match({ id: "b", home: "Sevilla FC", away: "Getafe CF", utcDate: "2026-11-28T15:15:00Z" }),
+    ];
+    let spent = 0;
+    const client = (failure: Error) => ({
+      remaining: async () => null,
+      markets: async () => {
+        throw new Error("sin lista");
+      },
+      fixtures: async () => (spent++, [
+        { fixtureId: "fa", startTime: "2026-11-28T13:00:00Z", participant1Name: "Levante UD", participant2Name: "Elche CF" },
+        { fixtureId: "fb", startTime: "2026-11-28T15:15:00Z", participant1Name: "Sevilla FC", participant2Name: "Getafe CF" },
+      ]),
+      fixtureOdds: async (id: string) => {
+        spent++;
+        if (id === "fa") throw failure;
+        return { fixtureId: id, statusId: 0, bookmakerOdds: { bet365: { bookmakerIsActive: true, markets: { "101": { outcomes: { "101": one(2), "102": one(3.4), "103": one(3.8) } } } } } };
+      },
+      get spent() {
+        return spent;
+      },
+    });
+    const options = { now: Date.parse("2026-11-28T12:15:00Z"), log: () => {} };
+    // A server error on one match: the other keeps the prices already paid for.
+    const odds = await fetchDayOdds(db, client(new OddsPapiError("HTTP 500", 500)), "PD", games, options);
+    expect([...odds.prices.keys()]).toEqual(["b"]);
+    expect(odds.unmatched).toEqual(["Levante UD - Elche CF (cuotas no disponibles: HTTP 500)"]);
+    expect(odds.requests).toBe(3);
+    // Rate limit: the rest would fail too, so the day stops (and every request is counted).
+    await expect(fetchDayOdds(db, client(new OddsPapiError("HTTP 429", 429)), "PD", games, options)).rejects.toThrow("HTTP 429");
+    expect(store.get("providerBudgets/oddspapi")).toMatchObject({ month: "2026-11", used: 5 });
+  });
 });
 
 describe("picks and results", () => {
@@ -735,6 +779,9 @@ describe("accepting the AI's answer", () => {
   it("refuses answers without matches and clips long texts", () => {
     expect(acceptAnalysis(day, null, prices, 0)).toBeNull();
     expect(acceptAnalysis(day, { picks: [] }, new Map(), 0)).toBeNull();
+    // An answer of another shape: nothing of the AI's for any priced match.
+    expect(acceptAnalysis(day, {}, prices, 0)).toBeNull();
+    expect(acceptAnalysis(day, { analysis: { headline: "H" }, matches: [{ matchId: "zz", preview: "P" }] }, prices, 0)).toBeNull();
     expect(clip("uno dos tres cuatro cinco", 12)).toBe("uno dos…");
     expect(clip("  corto ", 12)).toBe("corto");
   });
@@ -1026,6 +1073,31 @@ describe("the record never forgets and the day is analysed once", () => {
     const base = archivedRecord(board.archive, ["PD", "CL"], "value")!;
     expect(trackRecord([], [], "value", base.totals)).toMatchObject({ picks: 2, won: 1, lost: 1, units: 0.5, yield: 0.25 });
     expect(archivedRecord(board.archive, ["CL"], "value")).toBeNull();
+  });
+
+  it("archives last season's days with that season's results, after the summer", async () => {
+    const { pastSeasonMatches } = await import("../scripts/bettingAnalysis");
+    const { CALENDAR_FORMAT, encodeCalendar } = await import("../src/lib/calendar");
+    const may = finished("may", 0, 1, { seasonId: "PD-2025", roundId: "PD-2025-38", utcDate: "2026-05-24T19:00:00Z" });
+    const store = new Map<string, unknown>([
+      ["calendars/PD-2025", { formatVersion: CALENDAR_FORMAT, seasonId: "PD-2025", payload: encodeCalendar([may]) }],
+    ]);
+    const read: string[] = [];
+    const db = {
+      doc: (path: string) => ({ path }),
+      getAll: async (...refs: { path: string }[]) =>
+        refs.map(({ path }) => (read.push(path), { exists: store.has(path), data: () => store.get(path) })),
+    } as unknown as import("firebase-admin/firestore").Firestore;
+    const dropped = [analysis({ id: "PD-2026-05-24", date: "2026-05-24", matches: [game("may", "2026-05-24T19:00:00Z")], picks: [tip("may")] })];
+    // August: the current calendars no longer hold May's match; last season's do.
+    const past = await pastSeasonMatches(db, dropped, Date.parse("2026-08-16T12:00:00Z"));
+    expect(read).toEqual(["calendars/PD-2025", "calendars/CL-2025", "calendars/PL-2025"]);
+    expect(archiveAnalyses(undefined, dropped, []).PD!.value).toMatchObject({ picks: 1, settled: 0 });
+    expect(archiveAnalyses(undefined, dropped, past).PD!.value).toMatchObject({ picks: 1, settled: 1, lost: 1, units: -1 });
+    // Same season: nothing more to read.
+    read.length = 0;
+    expect(await pastSeasonMatches(db, dropped, Date.parse("2026-06-01T12:00:00Z"))).toEqual([]);
+    expect(read).toEqual([]);
   });
 
   it("la combinada de valor: una por partido, la de más valor, y se fija al publicar", () => {

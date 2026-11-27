@@ -182,6 +182,43 @@ it("un aplazado sigue pendiente dentro de una jornada iniciada; cancelaciones y 
     ).toBe(true);
   expect(isRoundComplete([])).toBe(false);
 });
+it("un aplazado deja de retener su jornada cuando la siguiente empieza o está a punto", () => {
+  const make = (id: string, matchday: number, utcDate: string, extra: Partial<Match> = {}): Match => ({
+    id,
+    competition: "PD",
+    seasonId: "PD-2026",
+    roundId: `PD-2026-REGULAR_SEASON-${matchday}`,
+    stage: "REGULAR_SEASON",
+    matchday,
+    utcDate,
+    status: "TIMED",
+    home: "Local",
+    away: "Visitante",
+    homeScore: null,
+    awayScore: null,
+    ...extra,
+  });
+  const played = { status: "FINISHED", homeScore: 1, awayScore: 0 };
+  const j4 = [
+    make("a1", 4, "2026-11-01T15:00:00Z", played),
+    make("a2", 4, "2026-11-01T18:00:00Z", played),
+    make("a3", 4, "2026-11-02T18:00:00Z", { status: "POSTPONED" }),
+  ];
+  const j5 = ["2026-11-08T15:00:00Z", "2026-11-08T18:00:00Z", "2026-11-09T18:00:00Z"].map((d, i) =>
+    make(`b${i}`, 5, d),
+  );
+  const j6 = ["2026-11-15T15:00:00Z", "2026-11-15T18:00:00Z", "2026-11-16T18:00:00Z"].map((d, i) =>
+    make(`c${i}`, 6, d),
+  );
+  // Days before J5: the postponed match still holds J4.
+  expect(preferredRound([...j4, ...j5, ...j6], Date.parse("2026-11-05T12:00:00Z"))).toBe(j4[0].roundId);
+  // J5 starts within a day, is in play, then is over: J4 no longer holds.
+  expect(preferredRound([...j4, ...j5, ...j6], Date.parse("2026-11-07T20:00:00Z"))).toBe(j5[0].roundId);
+  const live = j5.map((m, i) => (i === 0 ? { ...m, ...played } : i === 1 ? { ...m, status: "IN_PLAY", homeScore: 0, awayScore: 0 } : m));
+  expect(preferredRound([...j4, ...live, ...j6], Date.parse("2026-11-08T19:00:00Z"))).toBe(j5[0].roundId);
+  const over = j5.map((m) => ({ ...m, ...played }));
+  expect(preferredRound([...j4, ...over, ...j6], Date.parse("2026-11-14T12:00:00Z"))).toBe(j6[0].roundId);
+});
 it("mantiene la última jornada al acabar la temporada y elige la primera futura antes del inicio", () => {
   const matches = calendar("PD");
   const finished = matches

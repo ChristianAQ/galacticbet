@@ -32,6 +32,7 @@ import {
   newParticipantId,
   saveMatch,
   saveParticipant,
+  settled,
   shrinkImage,
   updateCompetition,
   usePeople,
@@ -351,7 +352,7 @@ function AddMatchesSheet({
       id: () => newMatchId(c.id),
     });
     void run(async () => {
-      await addFixtures(c.id, fixtures, user.uid);
+      await settled(addFixtures(c.id, fixtures, user.uid));
       onDone(times === 1 ? "Partido añadido al calendario." : `${times} partidos añadidos al calendario.`);
       onClose();
     });
@@ -456,26 +457,50 @@ function MoveRoundSheet({
     return [...byKey.entries()].map(([key, list]) => ({ key, list, title: matchTitle(list[0]).replace(/ · (ida|vuelta)$/, "") }));
   }, [view]);
   const firstOpen = rounds.find((r) => r.list.some((m) => !m.locked && m.status !== "finished")) || rounds[0];
-  const [key, setKey] = useState(firstOpen?.key || "");
-  const chosen = rounds.find((r) => r.key === key);
-  const start = chosen ? Math.min(...chosen.list.map((m) => m.startAt)) : Date.now();
-  const [date, setDate] = useState(localParts(start, tz).date);
-  const [time, setTime] = useState(localParts(start, tz).time);
+  /**
+   * What moves and from when, taken as the round is chosen: the shift counts
+   * from its first pending match (played ones stay put), and a retry after a
+   * failed save writes the same times instead of moving them twice.
+   */
+  const planFor = (key: string) => {
+    const list = rounds.find((r) => r.key === key)?.list || [];
+    const movable = list.filter((m) => !m.locked && m.status !== "finished");
+    const from = movable.length ? movable : list;
+    return {
+      key,
+      origin: Object.fromEntries(movable.map((m) => [m.id, m.startAt])),
+      start: from.length ? Math.min(...from.map((m) => m.startAt)) : Date.now(),
+    };
+  };
+  const [plan, setPlan] = useState(() => planFor(firstOpen?.key || ""));
+  const chosen = rounds.find((r) => r.key === plan.key);
+  const [date, setDate] = useState(localParts(plan.start, tz).date);
+  const [time, setTime] = useState(localParts(plan.start, tz).time);
   const { busy, error, setError, run } = useBusy();
   function submit(e: FormEvent) {
     e.preventDefault();
     if (!chosen) return;
-    const movable = chosen.list.filter((m) => !m.locked && m.status !== "finished");
+    const movable = chosen.list.filter((m) => m.id in plan.origin && !m.locked && m.status !== "finished");
     if (!movable.length) return setError("Todos los partidos de esta jornada están jugados.");
     const target = zonedInstant(date, timeToMinutes(time), tz);
-    const shift = target - start;
+    const shift = target - plan.start;
     void run(async () => {
-      for (const m of movable)
-        await saveMatch(
-          c.id,
-          { ...stored(m), startAt: m.startAt + shift, status: m.status === "postponed" ? "scheduled" : m.status },
-          user.uid,
-        );
+      // All at once: without signal they queue together and the sheet moves on.
+      await settled(
+        Promise.all(
+          movable.map((m) =>
+            saveMatch(
+              c.id,
+              {
+                ...stored(m),
+                startAt: plan.origin[m.id] + shift,
+                status: m.status === "postponed" ? "scheduled" : m.status,
+              },
+              user.uid,
+            ),
+          ),
+        ).then(() => undefined),
+      );
       onDone(`${chosen.title}: ${movable.length} ${movable.length === 1 ? "partido movido" : "partidos movidos"}.`);
       onClose();
     });
@@ -486,16 +511,14 @@ function MoveRoundSheet({
         <label>
           Jornada
           <select
-            value={key}
+            value={plan.key}
             disabled={busy}
             onChange={(e) => {
-              setKey(e.target.value);
-              const r = rounds.find((x) => x.key === e.target.value);
-              if (r) {
-                const s = localParts(Math.min(...r.list.map((m) => m.startAt)), tz);
-                setDate(s.date);
-                setTime(s.time);
-              }
+              const next = planFor(e.target.value);
+              setPlan(next);
+              const s = localParts(next.start, tz);
+              setDate(s.date);
+              setTime(s.time);
             }}
           >
             {rounds.map((r) => (
@@ -605,17 +628,19 @@ function ParticipantSheet({
     if (data.participants.some((p) => p.id !== participant?.id && p.name.toLocaleLowerCase("es") === clean.toLocaleLowerCase("es")))
       return setError("Ya hay un participante con ese nombre.");
     void run(async () => {
-      await saveParticipant(c.id, {
-        id: participant?.id || newParticipantId(c.id),
-        name: clean,
-        kind: participant?.kind || c.participantType,
-        userId: participant?.userId || null,
-        icon,
-        seed: participant?.seed ?? Math.min(63, data.participants.length),
-        players: team
-          ? players.flatMap((p) => (p.name.trim() ? [{ ...p, name: p.name.trim() }] : []))
-          : participant?.players,
-      });
+      await settled(
+        saveParticipant(c.id, {
+          id: participant?.id || newParticipantId(c.id),
+          name: clean,
+          kind: participant?.kind || c.participantType,
+          userId: participant?.userId || null,
+          icon,
+          seed: participant?.seed ?? Math.min(63, data.participants.length),
+          players: team
+            ? players.flatMap((p) => (p.name.trim() ? [{ ...p, name: p.name.trim() }] : []))
+            : participant?.players,
+        }),
+      );
       onClose();
     });
   }
@@ -638,7 +663,7 @@ function ParticipantSheet({
               className="button danger"
               disabled={busy}
               onClick={() => void run(async () => {
-                await deleteParticipant(c.id, participant!.id);
+                await settled(deleteParticipant(c.id, participant!.id));
                 onClose();
               })}
             >
@@ -686,7 +711,7 @@ function SettingsSheet({ competition: c, onClose }: { competition: Competition; 
     if (name.trim().length < 3 || name.trim().length > 60) return setError("El nombre va de 3 a 60 caracteres.");
     if (sport.trim().length > 40) return setError("El deporte admite hasta 40 caracteres.");
     void run(async () => {
-      await updateCompetition(c.id, { name: name.trim(), sport: sport.trim(), icon, predictionMode: mode, visibility });
+      await settled(updateCompetition(c.id, { name: name.trim(), sport: sport.trim(), icon, predictionMode: mode, visibility }));
       onClose();
     });
   }
